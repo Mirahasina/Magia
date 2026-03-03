@@ -1,5 +1,7 @@
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { CheckCircle2 } from "lucide-react";
+import React from "react";
+import etapeImg from "../../assets/etape.png"; 
 
 const steps = [
   {
@@ -64,15 +66,13 @@ export function HowItWorksSection() {
               </div>
             </div>
           </div>
-
-          {/* Image */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl blur-3xl opacity-20"></div>
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-              <ImageWithFallback
-                src="https://images.unsplash.com/photo-1732203971761-e9d4a6f5e93f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBBSSUyMHRlY2hub2xvZ3klMjBkYXNoYm9hcmR8ZW58MXx8fHwxNzcyNTAyMzcwfDA&ixlib=rb-4.1.0&q=80&w=1080"
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl w-full h-[400px]">
+              <img
+                src={etapeImg}
                 alt="Dashboard MAGIA"
-                className="w-full h-auto"
+                className="w-full h-full object-cover"
               />
             </div>
           </div>
