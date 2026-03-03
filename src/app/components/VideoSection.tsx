@@ -46,7 +46,7 @@ export function VideoSection() {
               onPause={() => setIsPlaying(false)}
               onEnded={() => setIsPlaying(false)}
             >
-              <source src="/src/MAGIA.mp4" type="video/mp4" />
+              <source src="/MAGIA.mp4" type="video/mp4" />
               Votre navigateur ne supporte pas la lecture de vidéos.
             </video>
 
