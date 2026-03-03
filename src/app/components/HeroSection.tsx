@@ -4,18 +4,21 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 export function HeroSection() {
   return (
-    <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden relative">
+      {/* Animated background bloobs */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+      </div>
+
       <div className="container mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
-          <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 rounded-full border border-purple-200">
-              <span className="w-2 h-2 bg-purple-600 rounded-full animate-pulse"></span>
-              <span className="text-sm text-purple-700">Lancement imminent • Mars 2026</span>
-            </div>
+          <div className="space-y-8 animate-reveal">
 
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight">
-              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-purple-600 via-blue-600 to-purple-600 bg-[length:200%_auto] bg-clip-text text-transparent animate-gradient-text">
                 MAGIA
               </span>{" "}
               arrive bientôt
@@ -61,8 +64,8 @@ export function HeroSection() {
           </div>
 
           {/* Right Image */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl blur-3xl opacity-20"></div>
+          <div className="relative animate-float">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl blur-3xl opacity-20 animate-pulse"></div>
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
               <ImageWithFallback
                 src="https://images.unsplash.com/photo-1758519289200-384c7ef2d163?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwYnVzaW5lc3MlMjB0ZWFtJTIwbWVldGluZ3xlbnwxfHx8fDE3NzI1NDAwODd8MA&ixlib=rb-4.1.0&q=80&w=1080"

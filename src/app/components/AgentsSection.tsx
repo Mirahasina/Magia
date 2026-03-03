@@ -1,11 +1,11 @@
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { 
-  Headphones, 
-  ShoppingCart, 
-  Calculator, 
-  UserCheck, 
-  BarChart3, 
+import {
+  Headphones,
+  ShoppingCart,
+  Calculator,
+  UserCheck,
+  BarChart3,
   MessageSquare,
   FileText,
   Briefcase
@@ -79,15 +79,15 @@ export function AgentsSection() {
           {agents.map((agent, index) => {
             const Icon = agent.icon;
             return (
-              <Card key={index} className="p-6 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer group">
+              <Card key={index} className="p-6 glass-card hover:shadow-2xl transition-all hover:-translate-y-2 cursor-pointer group">
                 <div className="flex flex-col h-full">
                   <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <Icon className="w-7 h-7 text-white" />
                   </div>
-                  
+
                   <h3 className="text-xl font-bold mb-2">{agent.name}</h3>
                   <p className="text-gray-600 text-sm mb-4 flex-1">{agent.description}</p>
-                  
+
                   <div className="flex flex-wrap gap-2">
                     {agent.tags.map((tag, tagIndex) => (
                       <Badge key={tagIndex} variant="secondary" className="text-xs">
@@ -107,7 +107,7 @@ export function AgentsSection() {
           </p>
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-lg shadow-md">
             <span className="text-sm font-medium">Marketplace prévue après le lancement</span>
-            <Badge className="bg-gradient-to-r from-purple-600 to-blue-600">2025</Badge>
+            <Badge className="bg-gradient-to-r from-purple-600 to-blue-600">2026</Badge>
           </div>
         </div>
       </div>

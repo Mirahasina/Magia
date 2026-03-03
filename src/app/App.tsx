@@ -7,19 +7,34 @@ import { AgentsSection } from "./components/AgentsSection";
 import { AboutSection } from "./components/AboutSection";
 import { CTASection } from "./components/CTASection";
 import { Footer } from "./components/Footer";
+import { useScrollReveal } from "./hooks/useScrollReveal";
 
 export default function App() {
+  useScrollReveal();
+
   return (
     <div className="min-h-screen bg-white">
       <Header />
       <main>
         <HeroSection />
-        <VideoSection />
-        <FeaturesSection />
-        <HowItWorksSection />
-        <AgentsSection />
-        <AboutSection />
-        <CTASection />
+        <div className="scroll-reveal">
+          <VideoSection />
+        </div>
+        <div className="scroll-reveal">
+          <FeaturesSection />
+        </div>
+        <div className="scroll-reveal">
+          <HowItWorksSection />
+        </div>
+        <div className="scroll-reveal">
+          <AgentsSection />
+        </div>
+        <div className="scroll-reveal">
+          <AboutSection />
+        </div>
+        <div className="scroll-reveal">
+          <CTASection />
+        </div>
       </main>
       <Footer />
     </div>

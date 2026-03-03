@@ -21,7 +21,7 @@ export function VideoSection() {
       </div>
 
       <div className="container mx-auto relative z-10">
-        <div className="text-center max-w-3xl mx-auto mb-12">
+        <div className="text-center max-w-3xl mx-auto mb-12 animate-reveal">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full backdrop-blur-sm mb-6">
             <Volume2 className="w-4 h-4" />
             <span className="text-sm">Aperçu de la plateforme</span>
@@ -46,19 +46,16 @@ export function VideoSection() {
               onPause={() => setIsPlaying(false)}
               onEnded={() => setIsPlaying(false)}
             >
-              <source src="https://videos.pexels.com/video-files/3130284/3130284-uhd_2560_1440_30fps.mp4" type="video/mp4" />
+              <source src="/src/MAGIA.mp4" type="video/mp4" />
               Votre navigateur ne supporte pas la lecture de vidéos.
             </video>
 
-            {/* Play Button Overlay */}
             {!isPlaying && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-pointer transition-all group-hover:bg-black/50" onClick={handlePlayClick}>
                 <div className="relative">
-                  {/* Pulse rings */}
                   <div className="absolute inset-0 rounded-full bg-white/30 animate-ping"></div>
                   <div className="absolute inset-0 rounded-full bg-white/20 animate-pulse"></div>
-                  
-                  {/* Play button */}
+
                   <div className="relative w-24 h-24 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center shadow-2xl transform transition-transform group-hover:scale-110">
                     <Play className="w-10 h-10 text-white ml-1" fill="white" />
                   </div>
@@ -66,7 +63,6 @@ export function VideoSection() {
               </div>
             )}
 
-            {/* Video Info Overlay */}
             <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
               <div className="flex items-center justify-between">
                 <div>
@@ -83,25 +79,16 @@ export function VideoSection() {
           </div>
 
           {/* Video Features */}
-          <div className="grid md:grid-cols-3 gap-6 mt-12">
-            <div className="text-center p-6 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">⚡</span>
-              </div>
+          <div className="grid md:grid-cols-3 gap-6 mt-12 animate-reveal" style={{ animationDelay: '0.2s' }}>
+            <div className="text-center p-6 glass-card rounded-xl border border-white/10 hover:scale-105 transition-transform">
               <h4 className="font-semibold mb-2">Interface intuitive</h4>
               <p className="text-sm text-gray-300">Déployez vos agents IA en quelques clics</p>
             </div>
-            <div className="text-center p-6 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">🎯</span>
-              </div>
+            <div className="text-center p-6 glass-card rounded-xl border border-white/10 hover:scale-105 transition-transform">
               <h4 className="font-semibold mb-2">Contrôle total</h4>
               <p className="text-sm text-gray-300">Supervisez et ajustez vos agents en temps réel</p>
             </div>
-            <div className="text-center p-6 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">📊</span>
-              </div>
+            <div className="text-center p-6 glass-card rounded-xl border border-white/10 hover:scale-105 transition-transform">
               <h4 className="font-semibold mb-2">Analytics puissants</h4>
               <p className="text-sm text-gray-300">Mesurez l'impact de vos agents IA</p>
             </div>

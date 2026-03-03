@@ -14,10 +14,6 @@ export function CTASection() {
       <div className="container mx-auto relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 rounded-full backdrop-blur-sm">
-              <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-              <span className="text-sm">Lancement imminent • Mars 2026</span>
-            </div>
 
             <h2 className="text-4xl sm:text-5xl font-bold leading-tight">
               Restez informé du lancement de MAGIA
@@ -44,7 +40,7 @@ export function CTASection() {
                   placeholder="Nom de votre entreprise"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-gray-900"
                 />
-                <Button 
+                <Button
                   size="lg"
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                 >
@@ -60,8 +56,8 @@ export function CTASection() {
             <div className="flex items-center gap-6 pt-4">
               <div className="flex -space-x-2">
                 {[1, 2, 3, 4].map((i) => (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 border-2 border-white"
                   ></div>
                 ))}

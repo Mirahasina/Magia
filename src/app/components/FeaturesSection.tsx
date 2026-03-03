@@ -51,9 +51,9 @@ export function FeaturesSection() {
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
-              <Card key={index} className="p-6 hover:shadow-lg transition-shadow border-2 border-transparent hover:border-purple-200">
+              <Card key={index} className="p-6 glass-card hover:shadow-2xl transition-all hover:-translate-y-2 border-transparent hover:border-purple-200 group">
                 <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Icon className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
