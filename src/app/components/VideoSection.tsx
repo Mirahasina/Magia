@@ -1,3 +1,4 @@
+import magiaVideo from "@/assets/MAGIA.mp4";
 import { Play, Volume2 } from "lucide-react";
 import { useState, useRef } from "react";
 
@@ -46,7 +47,7 @@ export function VideoSection() {
               onPause={() => setIsPlaying(false)}
               onEnded={() => setIsPlaying(false)}
             >
-              <source src="/MAGIA.mp4" type="video/mp4" />
+              <source src={magiaVideo} type="video/mp4" />
               Votre navigateur ne supporte pas la lecture de vidéos.
             </video>
 
