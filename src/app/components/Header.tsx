@@ -28,8 +28,11 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-4">
+            <Button variant="ghost" className="text-gray-600 hover:text-gray-900">
+              Se connecter
+            </Button>
             <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-              Être notifié
+              Commencer gratuitement
             </Button>
           </div>
         </div>

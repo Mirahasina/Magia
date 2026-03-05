@@ -1,64 +1,43 @@
 import { Card } from "./ui/card";
-import { Badge } from "./ui/badge";
-import {
+import { 
+  Target,
+  Coins,
+  Users,
+  Package,
   Headphones,
-  ShoppingCart,
-  Calculator,
-  UserCheck,
-  BarChart3,
-  MessageSquare,
-  FileText,
-  Briefcase
+  Scale
 } from "lucide-react";
 
 const agents = [
   {
-    icon: ShoppingCart,
-    name: "Agent Commercial",
-    description: "Prospection, qualification de leads, suivi des opportunités et automatisation du cycle de vente.",
-    tags: ["Vente", "CRM", "Lead Gen"]
+    icon: Target,
+    name: "Sales",
+    description: "SDR, BDR, AE"
+  },
+  {
+    icon: Coins,
+    name: "Finance",
+    description: "Compta, facturation"
+  },
+  {
+    icon: Users,
+    name: "RH",
+    description: "Recrutement, paie"
+  },
+  {
+    icon: Package,
+    name: "Logistics",
+    description: "Stock, livraison"
   },
   {
     icon: Headphones,
-    name: "Agent Support Client",
-    description: "Réponses automatiques, gestion des tickets, support multicanal 24/7 en français.",
-    tags: ["Support", "Chat", "Tickets"]
+    name: "Support",
+    description: "Service client"
   },
   {
-    icon: Calculator,
-    name: "Agent Comptable",
-    description: "Facturation, rapprochement bancaire, suivi de trésorerie et reporting financier.",
-    tags: ["Finance", "Compta", "Facturation"]
-  },
-  {
-    icon: UserCheck,
-    name: "Agent RH",
-    description: "Recrutement, onboarding, gestion des congés et automatisation des processus RH.",
-    tags: ["RH", "Recrutement", "Gestion"]
-  },
-  {
-    icon: BarChart3,
-    name: "Agent Analytics",
-    description: "Collecte et analyse de données, tableaux de bord personnalisés et insights métier.",
-    tags: ["Data", "Analytics", "BI"]
-  },
-  {
-    icon: MessageSquare,
-    name: "Agent Marketing",
-    description: "Gestion des campagnes, création de contenu, social media et email marketing.",
-    tags: ["Marketing", "Content", "Social"]
-  },
-  {
-    icon: FileText,
-    name: "Agent Documentation",
-    description: "Création et gestion de documents, knowledge base et automatisation administrative.",
-    tags: ["Docs", "Admin", "KB"]
-  },
-  {
-    icon: Briefcase,
-    name: "Agent Opérations",
-    description: "Gestion de projets, coordination d'équipes et optimisation des processus métier.",
-    tags: ["Ops", "Projets", "Process"]
+    icon: Scale,
+    name: "Legal",
+    description: "Contrats, compliance"
   }
 ];
 
@@ -67,48 +46,32 @@ export function AgentsSection() {
     <section id="agents" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
       <div className="container mx-auto">
         <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className="inline-block px-4 py-2 bg-blue-50 rounded-full mb-4">
+            <span className="text-sm text-blue-600 font-medium">VERTICAL PACKS</span>
+          </div>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Nos futurs <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">agents IA</span>
+            Des agents dédiés à votre métier
           </h2>
           <p className="text-xl text-gray-600">
-            Des agents spécialisés pour chaque fonction de votre entreprise
+            Activez un pack entier d'agents IA de 5 dashboards calibrés pour votre secteur.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
           {agents.map((agent, index) => {
             const Icon = agent.icon;
             return (
-              <Card key={index} className="p-6 glass-card hover:shadow-2xl transition-all hover:-translate-y-2 cursor-pointer group">
-                <div className="flex flex-col h-full">
-                  <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <Card key={index} className="p-6 bg-white border-gray-200 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer text-center">
+                <div className="mb-4 flex justify-center">
+                  <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
                     <Icon className="w-7 h-7 text-white" />
                   </div>
-
-                  <h3 className="text-xl font-bold mb-2">{agent.name}</h3>
-                  <p className="text-gray-600 text-sm mb-4 flex-1">{agent.description}</p>
-
-                  <div className="flex flex-wrap gap-2">
-                    {agent.tags.map((tag, tagIndex) => (
-                      <Badge key={tagIndex} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
                 </div>
+                <h3 className="text-xl font-bold mb-1">{agent.name}</h3>
+                <p className="text-gray-600 text-sm">{agent.description}</p>
               </Card>
             );
           })}
-        </div>
-
-        <div className="mt-12 text-center space-y-4">
-          <p className="text-gray-600">
-            Nouveau vertical métier déployé tous les 2 à 3 mois
-          </p>
-          <div className="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-lg shadow-md">
-            <span className="text-sm font-medium">Marketplace prévue après le lancement</span>
-            <Badge className="bg-gradient-to-r from-purple-600 to-blue-600">2026</Badge>
-          </div>
         </div>
       </div>
     </section>

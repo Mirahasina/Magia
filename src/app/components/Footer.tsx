@@ -47,26 +47,26 @@ export function Footer() {
               La plateforme AI Workforce qui permet aux PME africaines de déployer et orchestrer des agents IA spécialisés en 24h.
             </p>
             <div className="flex gap-4">
-              <a
-                href="#"
+              <a 
+                href="#" 
                 className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
               >
                 <Linkedin className="w-5 h-5" />
               </a>
-              <a
-                href="#"
+              <a 
+                href="#" 
                 className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
               >
                 <Twitter className="w-5 h-5" />
               </a>
-              <a
-                href="#"
+              <a 
+                href="#" 
                 className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
               >
                 <Facebook className="w-5 h-5" />
               </a>
-              <a
-                href="#"
+              <a 
+                href="#" 
                 className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
               >
                 <Mail className="w-5 h-5" />
@@ -132,11 +132,13 @@ export function Footer() {
         <div className="border-t border-gray-800 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm">
-              © 2026 MAGIA. Tous droits réservés. Made with Love in Madagascar.
+              © 2026 MAGIA - Madagascar. Par Andreas LOVATIANA
             </p>
-            <p className="text-gray-400 text-sm">
-              Lancement S2 2026 • Vision 500K utilisateurs 2030
-            </p>
+            <div className="flex items-center gap-6 text-gray-400 text-sm">
+              <a href="#" className="hover:text-white transition-colors">CGU</a>
+              <a href="#" className="hover:text-white transition-colors">Contact</a>
+              <a href="#" className="hover:text-white transition-colors">Politique de confidentialité</a>
+            </div>
           </div>
         </div>
       </div>
