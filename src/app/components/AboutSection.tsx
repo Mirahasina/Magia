@@ -32,8 +32,8 @@ export function AboutSection() {
   return (
     <section id="about" className="py-20 px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-4xl sm:text-5xl font-bold mb-4">
+        <div className="text-center max-w-3xl mx-auto mb-16 reveal-on-scroll">
+          <h2 className="text-4xl sm:text-6xl font-extrabold mb-6 tracking-tight">
             Notre vision
           </h2>
           <p className="text-xl text-gray-600">
@@ -45,7 +45,7 @@ export function AboutSection() {
           {milestones.map((milestone, index) => {
             const Icon = milestone.icon;
             return (
-              <Card key={index} className="p-6 text-center hover:shadow-lg transition-shadow">
+              <Card key={index} className="p-6 text-center hover-premium reveal-on-scroll" style={{ transitionDelay: `${index * 100}ms` }}>
                 <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center mx-auto mb-4">
                   <Icon className="w-7 h-7 text-white" />
                 </div>
@@ -57,9 +57,9 @@ export function AboutSection() {
           })}
         </div>
 
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-3xl p-8 md:p-12">
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-3xl p-8 md:p-12 reveal-on-scroll">
           <div className="max-w-3xl mx-auto text-center space-y-6">
-            <h3 className="text-3xl font-bold">Pourquoi MAGIA ?</h3>
+            <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Pourquoi MAGIA ?</h3>
             <p className="text-lg text-gray-700">
               Nous croyons que chaque PME africaine mérite d'avoir accès aux mêmes outils que les grandes entreprises internationales. MAGIA est conçu dès le départ pour le contexte africain, avec un ratio puissance/coût optimal et un support francophone complet.
             </p>

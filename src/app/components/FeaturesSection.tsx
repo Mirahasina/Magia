@@ -36,13 +36,13 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-900">
+    <section id="features" className="py-32 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="container mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16">
+        <div className="text-center max-w-3xl mx-auto mb-16 reveal-on-scroll">
           <div className="inline-block px-4 py-2 bg-blue-50 rounded-full mb-4">
             <span className="text-sm text-blue-600 font-medium">FONCTIONNALITÉS CLÉS</span>
           </div>
-          <h2 className="text-4xl sm:text-5xl font-bold mb-4">
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 tracking-tight">
             Tout ce dont votre équipe IA a besoin
           </h2>
           <p className="text-xl text-gray-600">
@@ -54,14 +54,14 @@ export function FeaturesSection() {
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
-              <Card key={index} className="p-6 bg-gray-900 text-white border-gray-700 hover:shadow-xl transition-all hover:-translate-y-1">
-                <div className="mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+              <Card key={index} className="p-10 bg-white border-gray-100/50 hover-premium reveal-on-scroll shadow-sm hover:shadow-2xl transition-all duration-500 group" style={{ transitionDelay: `${index * 100}ms` }}>
+                <div className="mb-6">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                     <Icon className="w-6 h-6 text-white" />
                   </div>
                 </div>
-                <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                <p className="text-gray-400">{feature.description}</p>
+                <h3 className="text-xl font-bold mb-3 group-hover:text-purple-600 transition-colors">{feature.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{feature.description}</p>
               </Card>
             );
           })}

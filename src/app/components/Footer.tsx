@@ -1,4 +1,4 @@
-import { Sparkles, Linkedin, Twitter, Facebook, Mail } from "lucide-react";
+import { Target, Linkedin, Twitter, Facebook, Mail } from "lucide-react";
 
 const footerLinks = {
   product: [
@@ -39,7 +39,7 @@ export function Footer() {
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg">
-                <Sparkles className="w-6 h-6 text-white" />
+                <Target className="w-6 h-6 text-white" />
               </div>
               <span className="text-2xl font-bold text-white">MAGIA</span>
             </div>
@@ -47,26 +47,26 @@ export function Footer() {
               La plateforme AI Workforce qui permet aux PME africaines de déployer et orchestrer des agents IA spécialisés en 24h.
             </p>
             <div className="flex gap-4">
-              <a 
-                href="#" 
+              <a
+                href="#"
                 className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
               >
                 <Linkedin className="w-5 h-5" />
               </a>
-              <a 
-                href="#" 
+              <a
+                href="#"
                 className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
               >
                 <Twitter className="w-5 h-5" />
               </a>
-              <a 
-                href="#" 
+              <a
+                href="#"
                 className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
               >
                 <Facebook className="w-5 h-5" />
               </a>
-              <a 
-                href="#" 
+              <a
+                href="#"
                 className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
               >
                 <Mail className="w-5 h-5" />
@@ -115,7 +115,7 @@ export function Footer() {
           </div>
 
           <div>
-            <h3 className="text-white font-semibold mb-4">Légal</h3>
+            <h3 className="text-white font-semibold mb-4">Législation</h3>
             <ul className="space-y-3">
               {footerLinks.legal.map((link, index) => (
                 <li key={index}>

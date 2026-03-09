@@ -13,7 +13,10 @@ export function VideoSection() {
   };
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 text-white relative overflow-hidden">
+    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 text-white relative overflow-hidden">
+      {/* Top Transition */}
+      <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-t from-transparent to-white pointer-events-none"></div>
+
       {/* Animated Background */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-purple-500 rounded-full blur-3xl animate-pulse"></div>
@@ -57,7 +60,7 @@ export function VideoSection() {
                   {/* Pulse rings */}
                   <div className="absolute inset-0 rounded-full bg-white/30 animate-ping"></div>
                   <div className="absolute inset-0 rounded-full bg-white/20 animate-pulse"></div>
-                  
+
                   {/* Play button */}
                   <div className="relative w-24 h-24 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center shadow-2xl transform transition-transform group-hover:scale-110">
                     <Play className="w-10 h-10 text-white ml-1" fill="white" />
@@ -108,6 +111,9 @@ export function VideoSection() {
           </div>
         </div>
       </div>
+
+      {/* Bottom Transition */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white pointer-events-none"></div>
     </section>
   );
 }

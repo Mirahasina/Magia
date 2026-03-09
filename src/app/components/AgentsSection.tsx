@@ -1,5 +1,5 @@
 import { Card } from "./ui/card";
-import { 
+import {
   Target,
   Coins,
   Users,
@@ -11,7 +11,7 @@ import {
 const agents = [
   {
     icon: Target,
-    name: "Sales",
+    name: "Ventes",
     description: "SDR, BDR, AE"
   },
   {
@@ -26,7 +26,7 @@ const agents = [
   },
   {
     icon: Package,
-    name: "Logistics",
+    name: "Logistique",
     description: "Stock, livraison"
   },
   {
@@ -36,19 +36,16 @@ const agents = [
   },
   {
     icon: Scale,
-    name: "Legal",
-    description: "Contrats, compliance"
+    name: "Juridique",
+    description: "Contrats, conformité"
   }
 ];
 
 export function AgentsSection() {
   return (
-    <section id="agents" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+    <section id="agents" className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50">
       <div className="container mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-block px-4 py-2 bg-blue-50 rounded-full mb-4">
-            <span className="text-sm text-blue-600 font-medium">VERTICAL PACKS</span>
-          </div>
+        <div className="text-center max-w-3xl mx-auto mb-16 reveal-on-scroll">
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
             Des agents dédiés à votre métier
           </h2>
@@ -61,7 +58,7 @@ export function AgentsSection() {
           {agents.map((agent, index) => {
             const Icon = agent.icon;
             return (
-              <Card key={index} className="p-6 bg-white border-gray-200 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer text-center">
+              <Card key={index} className="p-6 bg-white border-gray-200 hover-premium reveal-on-scroll cursor-pointer text-center" style={{ transitionDelay: `${index * 100}ms` }}>
                 <div className="mb-4 flex justify-center">
                   <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
                     <Icon className="w-7 h-7 text-white" />
