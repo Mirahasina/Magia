@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Slider } from "./ui/slider";
+import { ScrollReveal } from "./ScrollReveal";
 
 export function PricingSection() {
   const [numAgents, setNumAgents] = useState(2);
@@ -71,9 +72,9 @@ export function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="py-32 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="container mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16 reveal-on-scroll">
+    <section id="pricing" className="py-32 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">
+      <ScrollReveal className="container mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
             Payez uniquement pour ce que vous utilisez
           </h2>
@@ -133,7 +134,7 @@ export function PricingSection() {
           {plans.map((plan, index) => {
             const isSelected = selectedPlan === plan.name;
             return (
-              <div key={index} className="h-full animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both" style={{ animationDelay: `${index * 150}ms` }}>
+              <div key={index} className="h-full" style={{ transitionDelay: `${index * 150}ms` }}>
                 <Card
                   onClick={() => setSelectedPlan(plan.name)}
                   className={`h-full p-8 relative flex flex-col transition-all duration-300 cursor-pointer group/card ${isSelected
@@ -194,7 +195,7 @@ export function PricingSection() {
         <div className="text-center text-sm text-gray-500 bg-gray-50 inline-block px-10 py-4 rounded-xl mx-auto w-full max-w-2xl border border-gray-100 italic">
           <p>Tous les plans incluent : Installation Guidée, Support Tech 24/7, Conformité RGPD & Hébergement local.</p>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }

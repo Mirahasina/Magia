@@ -1,4 +1,5 @@
 import { Card } from "./ui/card";
+import { ScrollReveal } from "./ScrollReveal";
 
 const features = [
   {
@@ -29,9 +30,9 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="py-32 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="container mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <section id="features" className="py-32 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">
+      <ScrollReveal className="container mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-block px-4 py-2 bg-blue-50 rounded-full mb-4">
             <span className="text-sm text-blue-600 font-medium">FONCTIONNALITÉS CLÉS</span>
           </div>
@@ -47,7 +48,7 @@ export function FeaturesSection() {
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
-              <Card key={index} className="p-10 bg-white border-gray-100/50 hover-premium animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-sm hover:shadow-2xl transition-all duration-500 group" style={{ animationDelay: `${index * 100}ms`, fillMode: "both" }}>
+              <Card key={index} className="p-10 bg-white border-gray-100/50 hover-premium shadow-sm hover:shadow-2xl transition-all duration-500 group">
                 <div className="mb-6">
                   <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                     <Icon className="w-6 h-6 text-white" />
@@ -59,7 +60,7 @@ export function FeaturesSection() {
             );
           })}
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }

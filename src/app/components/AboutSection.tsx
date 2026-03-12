@@ -1,4 +1,5 @@
 import { Card } from "./ui/card";
+import { ScrollReveal } from "./ScrollReveal";
 
 const milestones = [
   {
@@ -25,9 +26,9 @@ const milestones = [
 
 export function AboutSection() {
   return (
-    <section id="about" className="py-20 px-4 sm:px-6 lg:px-8">
-      <div className="container mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <section id="about" className="py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <ScrollReveal className="container mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl sm:text-6xl font-extrabold mb-6 tracking-tight">
             Notre vision
           </h2>
@@ -38,7 +39,8 @@ export function AboutSection() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
           {milestones.map((milestone, index) => {
-              <Card key={index} className="p-6 text-center hover-premium animate-in fade-in slide-in-from-bottom-4 duration-700 h-full flex flex-col justify-center" style={{ animationDelay: `${index * 100}ms`, fillMode: "both" }}>
+            return (
+              <Card key={index} className="p-6 text-center hover-premium h-full flex flex-col justify-center">
                 <h3 className="text-3xl font-bold mb-1">{milestone.title}</h3>
                 <p className="text-sm text-purple-600 font-semibold mb-2">{milestone.subtitle}</p>
                 <p className="text-gray-600 text-sm">{milestone.description}</p>
@@ -47,7 +49,7 @@ export function AboutSection() {
           })}
         </div>
 
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-8 md:p-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-8 md:p-12">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Pourquoi MAGIA ?</h3>
             <p className="text-lg text-gray-700">
@@ -69,7 +71,7 @@ export function AboutSection() {
             </div>
           </div>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }

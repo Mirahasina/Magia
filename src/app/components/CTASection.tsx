@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { AuthModals } from "./AuthModals";
+import { ScrollReveal } from "./ScrollReveal";
 
 export function CTASection() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -13,8 +14,8 @@ export function CTASection() {
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="container mx-auto relative z-10">
-          <div className="max-w-4xl mx-auto text-center space-y-8 animate-in fade-in zoom-in duration-1000">
+        <ScrollReveal className="container mx-auto relative z-10">
+          <div className="max-w-4xl mx-auto text-center space-y-8">
             <h2 className="text-5xl sm:text-6xl font-extrabold leading-[1.1] tracking-tight text-white mb-6">
               Prêt à déployer<br />votre première équipe IA ?
             </h2>
@@ -39,7 +40,7 @@ export function CTASection() {
               </Button>
             </div>
           </div>
-        </div>
+        </ScrollReveal>
       </section>
 
       <AuthModals

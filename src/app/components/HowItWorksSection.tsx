@@ -1,3 +1,4 @@
+import { ScrollReveal } from "./ScrollReveal";
 const steps = [
   {
     number: "01",
@@ -27,8 +28,8 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className="py-32 px-4 sm:px-6 lg:px-8 bg-gray-50 border-y border-gray-100">
-      <div className="container mx-auto">
+    <section className="py-32 px-4 sm:px-6 lg:px-8 bg-gray-50 border-y border-gray-100 overflow-hidden">
+      <ScrollReveal className="container mx-auto">
         <div className="max-w-6xl mx-auto">
           <div className="mb-20 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter uppercase leading-tight">
@@ -38,7 +39,7 @@ export function HowItWorksSection() {
           </div>
           <div className="grid md:grid-cols-4 gap-x-8 gap-y-12">
             {steps.map((step, index) => (
-              <div key={index} className="flex flex-col relative animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both" style={{ animationDelay: `${index * 150}ms` }}>
+              <div key={index} className="flex flex-col relative" style={{ transitionDelay: `${index * 150}ms` }}>
                 {index > 0 && (
                   <div className="hidden md:block absolute -left-4 top-12 bottom-0 w-px bg-gray-200/60"></div>
                 )}
@@ -57,7 +58,7 @@ export function HowItWorksSection() {
             ))}
           </div>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }
