@@ -1,4 +1,5 @@
 import { ScrollReveal } from "./ScrollReveal";
+import bgImage2 from "../../assets/auth-futuristic.png";
 const steps = [
   {
     number: "01",
@@ -28,7 +29,12 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className="py-32 px-4 sm:px-6 lg:px-8 bg-gray-50 border-y border-gray-100 overflow-hidden">
+    <section id="how-it-works" className="relative py-32 px-4 sm:px-6 lg:px-8 bg-gray-50 border-y border-gray-100 overflow-hidden">
+      {/* Blurred background image */}
+      <div className="absolute top-1/3 -left-1/4 w-[600px] h-[600px] rounded-full overflow-hidden blur-[100px] opacity-40 -z-10 pointer-events-none">
+        <img src={bgImage2} alt="" className="w-full h-full object-cover" />
+      </div>
+
       <ScrollReveal className="container mx-auto">
         <div className="max-w-6xl mx-auto">
           <div className="mb-20 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -39,12 +45,15 @@ export function HowItWorksSection() {
           </div>
           <div className="grid md:grid-cols-4 gap-x-8 gap-y-12">
             {steps.map((step, index) => (
-              <div key={index} className="flex flex-col relative" style={{ transitionDelay: `${index * 150}ms` }}>
+              <div key={index} className="flex flex-col relative group" style={{ transitionDelay: `${index * 150}ms` }}>
                 {index > 0 && (
-                  <div className="hidden md:block absolute -left-4 top-12 bottom-0 w-px bg-gray-200/60"></div>
+                  <div className="hidden md:block absolute -left-4 top-12 bottom-0 w-px bg-gradient-to-b from-purple-200 to-transparent"></div>
                 )}
-                <div className="text-7xl font-black text-gray-200/80 mb-6 tracking-tighter leading-none">
-                  {step.number}
+                <div className="text-7xl font-mono font-black text-gray-200/50 mb-6 tracking-tighter leading-none relative">
+                  <span className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-500"></span>
+                  <span className="relative z-10 bg-clip-text text-transparent bg-gradient-to-b from-gray-400 to-gray-200 group-hover:from-purple-500 group-hover:to-blue-500 transition-colors duration-500">
+                    {step.number}
+                  </span>
                 </div>
                 <div>
                   <h3 className="text-xl font-bold mb-4 text-gray-900 tracking-tight">{step.title}</h3>

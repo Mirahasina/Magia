@@ -3,11 +3,12 @@ import { Button } from "./ui/button";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { DemoModal } from "./DemoModal";
 import { ScrollReveal } from "./ScrollReveal";
-import landingImage1 from "../../assets/lading.jpeg";
-import landingImage2 from "../../assets/lading2.jpeg";
-import landingImage3 from "../../assets/lading3.jpeg";
+import landingImage1 from "../../assets/hero-futuristic.png";
+import landingImage2 from "../../assets/lading.jpeg";
+import landingImage3 from "../../assets/lading2.jpeg";
+import landingImage4 from "../../assets/lading3.jpeg";
 
-const images = [landingImage1, landingImage2, landingImage3];
+const images = [landingImage1, landingImage2, landingImage3, landingImage4];
 
 export function HeroSection() {
   const [isDemoOpen, setIsDemoOpen] = useState(false);
@@ -23,7 +24,8 @@ export function HeroSection() {
 
   return (
     <>
-      <section className="min-h-[calc(100vh-64px)] flex items-center pt-32 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden bg-white">
+      <section id="home" className="relative min-h-[calc(100vh-64px)] flex items-center pt-32 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden bg-white">
+        <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] -z-10" />
         <ScrollReveal className="container mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="flex flex-col justify-center space-y-8">

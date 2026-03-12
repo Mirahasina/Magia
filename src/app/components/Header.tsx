@@ -129,21 +129,27 @@ export function Header({ onLogin }: HeaderProps) {
                   </NavigationMenuItem>
 
                   <NavigationMenuItem>
-                    <a href="#features" className={cn(navigationMenuTriggerStyle(), "bg-transparent hover:bg-indigo-50/50 text-gray-600 hover:text-indigo-600 font-bold text-sm tracking-wide transition-all rounded-full px-5")}>
-                      Fonctionnalités
-                    </a>
+                    <NavigationMenuLink asChild>
+                      <a href="#how-it-works" className={cn(navigationMenuTriggerStyle(), "bg-transparent hover:bg-indigo-50/50 text-gray-600 hover:text-indigo-600 font-bold text-sm tracking-wide transition-all rounded-full px-5")}>
+                        Fonctionnalités
+                      </a>
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
 
                   <NavigationMenuItem>
-                    <a href="#pricing" className={cn(navigationMenuTriggerStyle(), "bg-transparent hover:bg-indigo-50/50 text-gray-600 hover:text-indigo-600 font-bold text-sm tracking-wide transition-all rounded-full px-5")}>
-                      Tarification
-                    </a>
+                    <NavigationMenuLink asChild>
+                      <a href="#pricing" className={cn(navigationMenuTriggerStyle(), "bg-transparent hover:bg-indigo-50/50 text-gray-600 hover:text-indigo-600 font-bold text-sm tracking-wide transition-all rounded-full px-5")}>
+                        Tarification
+                      </a>
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
 
                   <NavigationMenuItem>
-                    <a href="#about" className={cn(navigationMenuTriggerStyle(), "bg-transparent hover:bg-indigo-50/50 text-gray-600 hover:text-indigo-600 font-bold text-sm tracking-wide transition-all rounded-full px-5")}>
-                      À propos
-                    </a>
+                    <NavigationMenuLink asChild>
+                      <a href="#home" className={cn(navigationMenuTriggerStyle(), "bg-transparent hover:bg-indigo-50/50 text-gray-600 hover:text-indigo-600 font-bold text-sm tracking-wide transition-all rounded-full px-5")}>
+                        À propos
+                      </a>
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                 </NavigationMenuList>
               </NavigationMenu>
@@ -193,9 +199,9 @@ export function Header({ onLogin }: HeaderProps) {
                 </div>
               </div>
               <div className="pt-2 border-t border-gray-50">
-                <a href="#features" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Fonctionnalités</a>
+                <a href="#how-it-works" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Fonctionnalités</a>
                 <a href="#pricing" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Tarification</a>
-                <a href="#about" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">À propos</a>
+                <a href="#home" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">À propos</a>
               </div>
               <div className="flex flex-col gap-3 pt-4 border-t border-gray-50">
                 <Button
