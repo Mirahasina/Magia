@@ -11,7 +11,6 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Sparkles } from "lucide-react";
 import { Logo } from "./Logo";
 
 interface AuthModalProps {
@@ -27,14 +26,14 @@ export function AuthModals({ isOpen, onClose, defaultView = "signup", onSuccess 
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none shadow-2xl">
-                <div className="bg-gradient-to-br from-indigo-600 to-blue-600 p-8 text-white text-center relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-10">
-                        <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-                        <div className="absolute bottom-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+            <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-none shadow-2xl rounded-3xl animate-in fade-in zoom-in-95 duration-300">
+                <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-700 p-10 text-white text-center relative overflow-hidden">
+                    <div className="absolute inset-0 opacity-20">
+                        <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full blur-[60px] -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
+                        <div className="absolute bottom-0 right-0 w-40 h-40 bg-purple-300 rounded-full blur-[60px] translate-x-1/2 translate-y-1/2 animate-pulse"></div>
                     </div>
                     <div className="relative z-10 flex flex-col items-center">
-                        <div className="w-14 h-14 bg-white p-2 rounded-2xl flex items-center justify-center mb-4 shadow-xl shadow-blue-900/20">
+                        <div className="w-14 h-14 p-2 rounded-xl flex items-center justify-center mb-4 shadow-xl shadow-blue-900/20">
                             <Logo />
                         </div>
 
@@ -49,11 +48,11 @@ export function AuthModals({ isOpen, onClose, defaultView = "signup", onSuccess 
                     </div>
                 </div>
 
-                <div className="p-8 bg-white">
-                    <div className="space-y-4">
+                <div className="p-8 bg-white relative">
+                    <div className="space-y-5 animate-in slide-in-from-right-2 fade-in duration-300" key={view}>
                         <Button
                             variant="outline"
-                            className="w-full flex items-center justify-center gap-2 border-gray-200 hover:bg-gray-50 h-11 text-gray-700 font-medium"
+                            className="w-full flex items-center justify-center gap-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 h-12 rounded-xl text-gray-700 font-bold transition-all hover:shadow-sm"
                             onClick={() => { }}
                         >
                             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -86,19 +85,19 @@ export function AuthModals({ isOpen, onClose, defaultView = "signup", onSuccess 
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <div className="space-y-1">
-                                <Label htmlFor="email">Email</Label>
-                                <Input id="email" type="email" placeholder="nom@entreprise.com" className="h-11 border-gray-200 focus:ring-purple-500" />
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="email" className="font-bold text-gray-700">Email</Label>
+                                <Input id="email" type="email" placeholder="nom@entreprise.com" className="h-12 border-gray-200 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 rounded-xl transition-all font-medium bg-gray-50/50 hover:bg-gray-50" />
                             </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="password">Mot de passe</Label>
-                                <Input id="password" type="password" placeholder="••••••••" className="h-11 border-gray-200 focus:ring-purple-500" />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="password" className="font-bold text-gray-700">Mot de passe</Label>
+                                <Input id="password" type="password" placeholder="••••••••" className="h-12 border-gray-200 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 rounded-xl transition-all font-medium bg-gray-50/50 hover:bg-gray-50" />
                             </div>
                         </div>
 
                         <Button
-                            className="w-full h-11 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold"
+                            className="w-full h-12 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-violet-200 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
                             onClick={() => onSuccess?.()}
                         >
                             {view === "signup" ? "Créer mon compte" : "Se connecter"}

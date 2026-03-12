@@ -17,16 +17,17 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
         channels: [] as string[],
         kb: [] as string[],
         mode: "Auto (seuil)",
-        confidence: 85
+        confidence: 85,
+        avatar: "/avatars/avatar_1.png"
     });
 
     const templates = [
-        { id: "lead_qualifier", name: "Qualificateur de Leads Pro", icon: <Target className="w-6 h-6 text-orange-500" />, desc: "Qualification et scoring des leads entrants", time: "90 sec", mode: "Auto 85%" },
-        { id: "email_responder", name: "Répondeur d'Email", icon: <Mail className="w-6 h-6 text-blue-500" />, desc: "Réponses email avec ton de marque", time: "2 min", mode: "Auto 85%" },
-        { id: "meeting_setter", name: "Prise de RDV Expert", icon: <Clock className="w-6 h-6 text-purple-500" />, desc: "Planification automatique des réunions", time: "2 min", mode: "Suggest" },
-        { id: "whatsapp_sales", name: "Ventes WhatsApp", icon: <MessageSquare className="w-6 h-6 text-green-500" />, desc: "Prospection et suivi sur WhatsApp", time: "3 min", mode: "Suggest" },
-        { id: "follow_up", name: "Agent de Relance", icon: <Zap className="w-6 h-6 text-yellow-500" />, desc: "Relances intelligentes et personnalisées", time: "90 sec", mode: "Auto 85%" },
-        { id: "crm_enricher", name: "Enrichisseur CRM", icon: <Database className="w-6 h-6 text-indigo-500" />, desc: "Enrichessement automatique des données client", time: "2 min", mode: "Full Auto" },
+        { id: "lead_qualifier", name: "Qualificateur de leads pro", desc: "Qualification et scoring des leads entrants", time: "90 sec", mode: "Auto 85%" },
+        { id: "email_responder", name: "Répondeur d'email", desc: "Réponses email avec ton de marque", time: "2 min", mode: "Auto 85%" },
+        { id: "meeting_setter", name: "Prise de RDV expert", desc: "Planification automatique des réunions", time: "2 min", mode: "Suggest" },
+        { id: "whatsapp_sales", name: "Ventes whatsApp", desc: "Prospection et suivi sur WhatsApp", time: "3 min", mode: "Suggest" },
+        { id: "follow_up", name: "Agent de relance", desc: "Relances intelligentes et personnalisées", time: "90 sec", mode: "Auto 85%" },
+        { id: "crm_enricher", name: "Enrichisseur CRM", desc: "Enrichessement automatique des données client", time: "2 min", mode: "Full Auto" },
     ];
 
     useEffect(() => {
@@ -83,11 +84,11 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                 </div>
 
                 <div className="pt-8 grid grid-cols-2 gap-4 text-left">
-                    <div className="p-4 bg-white border border-gray-100 rounded-2xl flex items-center gap-3">
+                    <div className="p-4 bg-white border border-gray-100 rounded-xl flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full bg-green-500" />
                         <span className="text-xs font-bold text-gray-900">Infrastructure prête</span>
                     </div>
-                    <div className="p-4 bg-white border border-gray-100 rounded-2xl flex items-center gap-3 opacity-50">
+                    <div className="p-4 bg-white border border-gray-100 rounded-xl flex items-center gap-3 opacity-50">
                         <div className={cn("w-2 h-2 rounded-full", progress > 40 ? "bg-green-500" : "bg-gray-300")} />
                         <span className="text-xs font-bold text-gray-900">LLM Connecté</span>
                     </div>
@@ -116,11 +117,11 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-blue-600 font-bold text-sm tracking-wider uppercase">Étape 01</span>
+                            <span className="magia-label text-blue-600">Étape 01</span>
                             {selectedTemplate && <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-500">Estimé: {selectedTemplate.time}</span>}
                         </div>
-                        <h2 className="text-3xl font-bold text-gray-900">Moteur d'Agents IA</h2>
-                        <p className="text-gray-500">Choisissez un template vertical pour démarrer en moins de 2 minutes.</p>
+                        <h2 className="magia-h2">Moteur d'Agents IA</h2>
+                        <p className="magia-subtitle">Choisissez un template vertical pour démarrer en moins de 2 minutes.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -133,7 +134,7 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                                     setStep(2);
                                 }}
                                 className={cn(
-                                    "p-6 bg-white border rounded-2xl shadow-sm transition-all cursor-pointer group",
+                                    "p-6 bg-white border rounded-xl shadow-sm transition-all cursor-pointer group",
                                     selectedTemplate?.id === t.id ? "border-blue-600 ring-4 ring-blue-50" : "border-gray-100 hover:border-blue-200"
                                 )}
                             >
@@ -153,7 +154,7 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                                 setSelectedTemplate({ name: "Agent Personnalisé", time: "5 min" });
                                 setStep(2);
                             }}
-                            className="p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center text-center hover:bg-white hover:border-blue-400 transition-all cursor-pointer group"
+                            className="p-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-center hover:bg-white hover:border-blue-400 transition-all cursor-pointer group"
                         >
                             <Plus className="w-8 h-8 text-gray-400 mb-2 group-hover:text-blue-600 transition-colors" />
                             <h3 className="font-bold text-gray-500 group-hover:text-gray-900">Partir de zéro</h3>
@@ -166,62 +167,88 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
             {step === 2 && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-2">
-                        <span className="text-blue-600 font-bold text-sm tracking-wider uppercase">Étape 02</span>
-                        <h2 className="text-3xl font-bold text-gray-900">Identité & Persona</h2>
-                        <p className="text-gray-500">Définissez le caractère et l'intelligence de votre agent.</p>
+                        <span className="magia-label text-blue-600">Étape 02</span>
+                        <h2 className="magia-h2">Identité & Persona</h2>
+                        <p className="magia-subtitle">Définissez le caractère et l'intelligence de votre agent.</p>
+                    </div>
+            <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
+                <div className="space-y-6">
+                    <div className="space-y-4">
+                        <label className="magia-label ml-1">Choisir un avatar</label>
+                        <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
+                            {[1, 2, 3, 4].map((i) => (
+                                <div
+                                    key={i}
+                                    onClick={() => setConfig({ ...config, avatar: `/avatars/avatar_${i}.png` })}
+                                    className={cn(
+                                        "aspect-square rounded-xl border-2 transition-all cursor-pointer overflow-hidden relative group",
+                                        config.avatar === `/avatars/avatar_${i}.png` ? "border-blue-600 ring-4 ring-blue-50" : "border-gray-100 hover:border-blue-200"
+                                    )}
+                                >
+                                    <img src={`/avatars/avatar_${i}.png`} alt={`Avatar ${i}`} className="w-full h-full object-cover" />
+                                    {config.avatar === `/avatars/avatar_${i}.png` && (
+                                        <div className="absolute inset-0 bg-blue-600/10 flex items-center justify-center">
+                                            <div className="bg-blue-600 rounded-full p-1 shadow-lg">
+                                                <Check className="w-3 h-3 text-white" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
-                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700 ml-1">Nom de l'agent</label>
-                                <input
-                                    type="text"
-                                    value={config.name}
-                                    onChange={(e) => setConfig({ ...config, name: e.target.value })}
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700 ml-1">Modèle LLM</label>
-                                <select
-                                    value={config.llm}
-                                    onChange={(e) => setConfig({ ...config, llm: e.target.value })}
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl"
-                                >
-                                    <option>GPT-4o (Recommandé)</option>
-                                    <option>Claude 3.5 Sonnet</option>
-                                    <option>Gemini 1.5 Pro</option>
-                                </select>
-                            </div>
-                        </div>
-
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700 ml-1">System Prompt (Instructions)</label>
-                            <textarea
-                                rows={4}
-                                value={config.systemPrompt}
-                                onChange={(e) => setConfig({ ...config, systemPrompt: e.target.value })}
-                                placeholder="Tu es un assistant expert en..."
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl resize-none"
+                            <label className="magia-label ml-1">Nom de l'agent</label>
+                            <input
+                                type="text"
+                                value={config.name}
+                                onChange={(e) => setConfig({ ...config, name: e.target.value })}
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl"
                             />
                         </div>
-
-                        <div className="flex items-center justify-between pt-4">
-                            <button onClick={() => setStep(1)} className="px-6 py-3 text-sm font-bold text-gray-500">Précédent</button>
-                            <button onClick={() => setStep(3)} className="px-10 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">Continuer</button>
+                        <div className="space-y-2">
+                            <label className="magia-label ml-1">Modèle LLM</label>
+                            <select
+                                value={config.llm}
+                                onChange={(e) => setConfig({ ...config, llm: e.target.value })}
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl"
+                            >
+                                <option>GPT-4o (Recommandé)</option>
+                                <option>Claude 3.5 Sonnet</option>
+                                <option>Gemini 1.5 Pro</option>
+                            </select>
                         </div>
                     </div>
+
+                    <div className="space-y-2">
+                        <label className="magia-label ml-1">System Prompt (Instructions)</label>
+                        <textarea
+                            rows={4}
+                            value={config.systemPrompt}
+                            onChange={(e) => setConfig({ ...config, systemPrompt: e.target.value })}
+                            placeholder="Tu es un assistant expert en..."
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl resize-none"
+                        />
+                    </div>
                 </div>
-            )}
+
+                <div className="flex items-center justify-between pt-4">
+                    <button onClick={() => setStep(1)} className="px-6 py-3 text-sm font-bold text-gray-500">Précédent</button>
+                    <button onClick={() => setStep(3)} className="px-10 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">Continuer</button>
+                </div>
+            </div>
+        </div>
+    )}
 
             {/* Step 3: Activation Channels */}
             {step === 3 && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-2">
-                        <span className="text-blue-600 font-bold text-sm tracking-wider uppercase">Étape 03</span>
-                        <h2 className="text-3xl font-bold text-gray-900">Canaux d'activation</h2>
-                        <p className="text-gray-500">Où cet agent doit-il intervenir ?</p>
+                        <span className="magia-label text-blue-600">Étape 03</span>
+                        <h2 className="magia-h2">Canaux d'activation</h2>
+                        <p className="magia-subtitle">Où cet agent doit-il intervenir ?</p>
                     </div>
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -240,7 +267,7 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                                     setConfig({ ...config, channels: newChannels });
                                 }}
                                 className={cn(
-                                    "p-6 rounded-3xl border transition-all cursor-pointer flex flex-col items-center gap-4",
+                                    "p-6 rounded-xl border transition-all cursor-pointer flex flex-col items-center gap-4",
                                     config.channels.includes(c.id) ? "border-blue-600 bg-blue-50/50" : "border-gray-100 bg-white hover:border-blue-200"
                                 )}
                             >
@@ -261,20 +288,20 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
             {step === 4 && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-2">
-                        <span className="text-blue-600 font-bold text-sm tracking-wider uppercase">Étape 04</span>
-                        <h2 className="text-3xl font-bold text-gray-900">Sources & Base de Connaissances</h2>
-                        <p className="text-gray-500">Associez des documents pour un moteur RAG efficace.</p>
+                        <span className="magia-label text-blue-600">Étape 04</span>
+                        <h2 className="magia-h2">Sources & Base de Connaissances</h2>
+                        <p className="magia-subtitle">Associez des documents pour un moteur RAG efficace.</p>
                     </div>
 
                     <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
-                        <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-3xl p-12 bg-gray-50/50">
+                        <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-xl p-12 bg-gray-50/50">
                             <Plus className="w-10 h-10 text-gray-300 mb-4" />
                             <p className="font-bold text-gray-900 mb-1">Glissez-déposez vos fichiers</p>
                             <p className="text-sm text-gray-400">PDF, DOCX, TXT ou URLs (max 50 MB)</p>
                         </div>
                         <div className="space-y-3">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-2">Sources récemment utilisées</p>
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-white rounded-lg shadow-sm"><FileText className="w-4 h-4 text-gray-400" /></div>
                                     <span className="text-sm font-bold text-gray-900">Guide_Produit_V2.pdf</span>
@@ -295,9 +322,9 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
             {step === 5 && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-2">
-                        <span className="text-blue-600 font-bold text-sm tracking-wider uppercase">Étape 05</span>
-                        <h2 className="text-3xl font-bold text-gray-900">Niveau d'autonomie</h2>
-                        <p className="text-gray-500">Déterminez comment l'agent doit répondre.</p>
+                        <span className="magia-label text-blue-600">Étape 05</span>
+                        <h2 className="magia-h2">Niveau d'autonomie</h2>
+                        <p className="magia-subtitle">Déterminez comment l'agent doit répondre.</p>
                     </div>
 
                     <div className="space-y-4">
@@ -336,9 +363,9 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
             {step === 6 && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-2">
-                        <span className="text-blue-600 font-bold text-sm tracking-wider uppercase">Étape 06</span>
-                        <h2 className="text-3xl font-bold text-gray-900">Sandbox Test (Dry Run)</h2>
-                        <p className="text-gray-500">Simulez une interaction pour valider le comportement.</p>
+                        <span className="magia-label text-blue-600">Étape 06</span>
+                        <h2 className="magia-h2">Sandbox Test (Dry Run)</h2>
+                        <p className="magia-subtitle">Simulez une interaction pour valider le comportement.</p>
                     </div>
 
                     <div className="bg-gray-900 rounded-[2.5rem] p-8 shadow-2xl space-y-6 relative overflow-hidden">
@@ -349,13 +376,13 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                         <div className="space-y-4 min-h-[200px]">
                             <div className="flex gap-4">
                                 <div className="w-8 h-8 rounded-full bg-blue-500 flex-shrink-0" />
-                                <div className="bg-white/5 rounded-2xl p-4 text-sm text-white/80 max-w-[80%]">
+                                <div className="bg-white/5 rounded-xl p-4 text-sm text-white/80 max-w-[80%]">
                                     Simuler une demande de client : "Bonjour, quels sont vos tarifs pour le pack Business ?"
                                 </div>
                             </div>
                             <div className="flex gap-4 flex-row-reverse">
                                 <div className="w-8 h-8 rounded-full bg-indigo-500 flex-shrink-0" />
-                                <div className="bg-blue-600 rounded-2xl p-4 text-sm text-white max-w-[80%] shadow-lg shadow-blue-900/40">
+                                <div className="bg-blue-600 rounded-xl p-4 text-sm text-white max-w-[80%] shadow-lg shadow-blue-900/40">
                                     <span className="flex items-center gap-2 mb-2 italic text-xs text-blue-200">
                                         <Sparkles className="w-3 h-3" /> Agent thinking... (Confiance: 92%)
                                     </span>
@@ -380,9 +407,9 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
             {step === 7 && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-2">
-                        <span className="text-blue-600 font-bold text-sm tracking-wider uppercase">Étape finale</span>
-                        <h2 className="text-3xl font-bold text-gray-900">Prêt pour le déploiement</h2>
-                        <p className="text-gray-500">Vérifiez les derniers détails avant la mise en ligne.</p>
+                        <span className="magia-label text-blue-600">Étape finale</span>
+                        <h2 className="magia-h2">Prêt pour le déploiement</h2>
+                        <p className="magia-subtitle">Vérifiez les derniers détails avant la mise en ligne.</p>
                     </div>
 
                     <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-10">
@@ -405,14 +432,14 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                             </div>
                         </div>
 
-                        <div className="p-8 bg-blue-50 rounded-3xl border border-blue-100 text-center relative overflow-hidden group">
+                        <div className="p-8 bg-blue-50 rounded-xl border border-blue-100 text-center relative overflow-hidden group">
                             <div className="relative z-10">
                                 <div className="text-4xl font-black text-blue-600 mb-2">90%</div>
                                 <p className="text-sm font-bold text-blue-900">Score de fidélité au template</p>
                                 <div className="mt-8 flex justify-center">
                                     <button
                                         onClick={() => setIsDeploying(true)}
-                                        className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-200 transition-all active:scale-95"
+                                        className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-lg shadow-xl shadow-blue-200 transition-all active:scale-95"
                                     >
                                         Lancer mon agent en production
                                     </button>

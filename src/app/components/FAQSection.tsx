@@ -1,30 +1,25 @@
 import { useState } from "react";
-import { ChevronDown, HelpCircle, Shield, CreditCard, Zap, Package } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "./ui/utils";
 
 const faqs = [
     {
-        icon: Shield,
         question: "Mes données professionnelles sont-elles en sécurité ?",
         answer: "Absolument. Vos données sont cryptées au repos et en transit. De plus, nous garantissons que vos informations ne sont jamais utilisées pour entraîner les modèles publics d'OpenAI ou Anthropic. Vous gardez le contrôle total."
     },
     {
-        icon: CreditCard,
         question: "Puis-je tester avant de m'engager ?",
         answer: "Oui ! Nous proposons un plan gratuit à vie pour tester vos premiers agents. Aucun numéro de carte bancaire n'est requis pour démarrer. Vous pouvez passer au plan Pro à tout moment pour plus de capacité."
     },
     {
-        icon: Zap,
         question: "Quelle est la rapidité de déploiement ?",
         answer: "Grâce à nos templates pré-configurés, vous pouvez lancer un agent fonctionnel en moins de 2 minutes. La personnalisation avancée (connexion à votre base de connaissances) prend généralement moins d'une heure."
     },
     {
-        icon: Package,
         question: "Dois-je savoir coder pour utiliser MAGIA ?",
         answer: "Pas du tout. MAGIA est une plateforme 100% no-code. Toute la configuration se fait via une interface visuelle intuitive. Si vous savez envoyer un email, vous savez déployer un agent MAGIA."
     },
     {
-        icon: HelpCircle,
         question: "Dans quels pays MAGIA est-il disponible ?",
         answer: "MAGIA est disponible mondialement, mais nous mettons un accent particulier sur l'Afrique francophone avec un support local et des optimisations pour les connexions internet de la région."
     }
@@ -36,10 +31,7 @@ export function FAQSection() {
     return (
         <section id="faq" className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50/50 relative overflow-hidden">
             <div className="container mx-auto max-w-4xl">
-                <div className="text-center mb-16 reveal-on-scroll">
-                    <div className="inline-block px-4 py-2 bg-blue-50 rounded-full mb-4">
-                        <span className="text-sm text-blue-600 font-bold uppercase tracking-wider">QUESTIONS FRÉQUENTES</span>
-                    </div>
+                <div className="text-center mb-16 animate-in fade-in slide-in-from-bottom-4 duration-1000">
                     <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-6 tracking-tight">
                         Tout ce qu'il faut savoir
                     </h2>
@@ -48,12 +40,12 @@ export function FAQSection() {
                     </p>
                 </div>
 
-                <div className="space-y-4 reveal-on-scroll">
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
                     {faqs.map((faq, i) => (
                         <div
                             key={i}
                             className={cn(
-                                "group bg-white border rounded-3xl transition-all duration-300 overflow-hidden",
+                                "group bg-white border rounded-xl transition-all duration-300 overflow-hidden",
                                 openIndex === i ? "border-blue-200 shadow-xl shadow-blue-500/5 ring-1 ring-blue-50" : "border-gray-100 hover:border-blue-100"
                             )}
                         >
@@ -62,12 +54,6 @@ export function FAQSection() {
                                 className="w-full flex items-center justify-between p-6 sm:p-8 text-left focus:outline-none"
                             >
                                 <div className="flex items-center gap-6">
-                                    <div className={cn(
-                                        "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300",
-                                        openIndex === i ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-gray-50 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500"
-                                    )}>
-                                        <faq.icon className="w-6 h-6" />
-                                    </div>
                                     <span className={cn(
                                         "text-lg font-bold transition-colors",
                                         openIndex === i ? "text-gray-900" : "text-gray-600"
@@ -93,12 +79,12 @@ export function FAQSection() {
                     ))}
                 </div>
 
-                <div className="mt-16 p-8 bg-blue-600 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-8 reveal-on-scroll">
+                <div className="mt-16 p-8 bg-blue-600 rounded-[1rem] flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
                     <div className="text-white text-center md:text-left">
                         <h3 className="text-2xl font-bold mb-1">D'autres questions ?</h3>
                         <p className="text-blue-100 opacity-80">Notre équipe d'experts est là pour vous accompagner.</p>
                     </div>
-                    <button className="px-8 py-4 bg-white text-blue-600 rounded-2xl font-black shadow-xl hover:bg-gray-50 transition-colors whitespace-nowrap">
+                    <button className="px-8 py-4 bg-white text-blue-600 rounded-xl font-black shadow-xl hover:bg-gray-50 transition-colors whitespace-nowrap">
                         Contacter le support
                     </button>
                 </div>

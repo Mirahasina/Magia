@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
-import { Check, Target } from "lucide-react";
 import { Slider } from "./ui/slider";
 
 export function PricingSection() {
   const [numAgents, setNumAgents] = useState(2);
   const [selectedPlan, setSelectedPlan] = useState<string>("Pro (Personnalisé)");
+  const [isAnnual, setIsAnnual] = useState(false);
 
   const basePrice = 29;
   const pricePerAgent = 15;
-  const totalPrice = basePrice + (numAgents - 1) * pricePerAgent;
+  const monthlyPrice = basePrice + (numAgents - 1) * pricePerAgent;
+  const totalPrice = isAnnual ? Math.floor(monthlyPrice * 0.8) : monthlyPrice;
   const credits = numAgents * 1000;
 
   const plans = [
@@ -73,9 +74,6 @@ export function PricingSection() {
     <section id="pricing" className="py-32 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="container mx-auto">
         <div className="text-center max-w-3xl mx-auto mb-16 reveal-on-scroll">
-          <div className="inline-block px-4 py-2 bg-blue-50 rounded-full mb-4">
-            <span className="text-sm text-blue-600 font-medium uppercase tracking-wider">Tarification Flexible</span>
-          </div>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
             Payez uniquement pour ce que vous utilisez
           </h2>
@@ -84,12 +82,9 @@ export function PricingSection() {
           </p>
         </div>
 
-        <div className="max-w-2xl mx-auto mb-16 bg-gray-50 p-8 rounded-3xl border border-gray-100 shadow-sm reveal-on-scroll">
+        <div className="max-w-2xl mx-auto mb-16 bg-gray-50 p-8 rounded-xl border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Target className="w-5 h-5 text-purple-600" />
-              </div>
               <div>
                 <div className="font-bold text-gray-900">{numAgents} Agents IA</div>
                 <div className="text-sm text-gray-500">Choisissez votre taille d'équipe</div>
@@ -97,7 +92,23 @@ export function PricingSection() {
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-gray-900">{totalPrice}€<span className="text-sm text-gray-500 font-normal">/mois</span></div>
-              <div className="text-sm text-purple-600 font-medium">Facturé mensuellement</div>
+              <div className="text-sm text-purple-600 font-medium">Facturé {isAnnual ? "annuellement" : "mensuellement"}</div>
+            </div>
+          </div>
+          <div className="flex justify-center mb-8">
+            <div className="bg-white p-1 rounded-xl border border-gray-200 inline-flex shadow-sm">
+              <button
+                onClick={() => setIsAnnual(false)}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${!isAnnual ? 'bg-purple-50 text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                Mensuel
+              </button>
+              <button
+                onClick={() => setIsAnnual(true)}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isAnnual ? 'bg-purple-50 text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                Annuel <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] uppercase">-20%</span>
+              </button>
             </div>
           </div>
           <Slider
@@ -122,15 +133,14 @@ export function PricingSection() {
           {plans.map((plan, index) => {
             const isSelected = selectedPlan === plan.name;
             return (
-              <Card
-                key={index}
-                onClick={() => setSelectedPlan(plan.name)}
-                className={`p-8 relative flex flex-col transition-all duration-300 cursor-pointer group/card reveal-on-scroll ${isSelected
-                  ? 'border-2 border-purple-600 shadow-2xl scale-105 z-10 bg-white'
-                  : 'border border-gray-100 hover:border-purple-200 bg-white/50 hover:bg-white hover-premium'
-                  }`}
-                style={{ transitionDelay: `${index * 150}ms` }}
-              >
+              <div key={index} className="h-full animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both" style={{ animationDelay: `${index * 150}ms` }}>
+                <Card
+                  onClick={() => setSelectedPlan(plan.name)}
+                  className={`h-full p-8 relative flex flex-col transition-all duration-300 cursor-pointer group/card ${isSelected
+                    ? 'border-2 border-purple-600 shadow-2xl scale-105 z-10 bg-white'
+                    : 'border border-gray-100 hover:border-purple-200 bg-white/50 hover:bg-white hover-premium'
+                    }`}
+                >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                     <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-wider shadow-lg">
@@ -158,10 +168,8 @@ export function PricingSection() {
 
                 <ul className="space-y-4 mb-8 flex-grow">
                   {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-start gap-3">
-                      <div className={`mt-1 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-purple-100' : 'bg-blue-50'}`}>
-                        <Check className={`w-3 h-3 transition-colors ${isSelected ? 'text-purple-600' : 'text-blue-600'}`} />
-                      </div>
+                    <li key={featureIndex} className="flex items-center gap-3">
+                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${isSelected ? 'bg-purple-600' : 'bg-blue-600'}`} />
                       <span className="text-sm text-gray-600">{feature}</span>
                     </li>
                   ))}
@@ -178,11 +186,12 @@ export function PricingSection() {
                   {plan.cta}
                 </Button>
               </Card>
+              </div>
             );
           })}
         </div>
 
-        <div className="text-center text-sm text-gray-500 bg-gray-50 inline-block px-10 py-4 rounded-2xl mx-auto w-full max-w-2xl border border-gray-100 italic">
+        <div className="text-center text-sm text-gray-500 bg-gray-50 inline-block px-10 py-4 rounded-xl mx-auto w-full max-w-2xl border border-gray-100 italic">
           <p>Tous les plans incluent : Installation Guidée, Support Tech 24/7, Conformité RGPD & Hébergement local.</p>
         </div>
       </div>

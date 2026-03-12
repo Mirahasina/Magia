@@ -24,7 +24,7 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
             <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] animate-in fade-in duration-300" />
                 <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-5xl z-[101] animate-in zoom-in-95 duration-300">
-                    <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl bg-gray-900 group border border-white/10">
+                    <div className="relative aspect-video rounded-xl overflow-hidden shadow-2xl bg-gray-900 group border border-white/10">
                         {/* Close Button */}
                         <button
                             onClick={onClose}

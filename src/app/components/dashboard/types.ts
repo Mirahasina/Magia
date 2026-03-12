@@ -11,4 +11,5 @@ export interface Agent {
     };
     channels: readonly ("website" | "email" | "whatsapp")[];
     avatarColor: string;
+    avatar?: string;
 }

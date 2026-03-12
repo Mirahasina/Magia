@@ -38,7 +38,7 @@ export function VideoSection() {
         </div>
 
         <div className="max-w-5xl mx-auto">
-          <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl bg-gray-900 group">
+          <div className="relative aspect-video rounded-xl overflow-hidden shadow-2xl bg-gray-900 group">
             {/* Video Element */}
             <video
               ref={videoRef}
@@ -89,21 +89,21 @@ export function VideoSection() {
           <div className="grid md:grid-cols-3 gap-6 mt-12">
             <div className="text-center p-6 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">⚡</span>
+                <span className="text-xl font-bold">01</span>
               </div>
               <h4 className="font-semibold mb-2">Interface intuitive</h4>
               <p className="text-sm text-gray-300">Déployez vos agents IA en quelques clics</p>
             </div>
             <div className="text-center p-6 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">🎯</span>
+                <span className="text-xl font-bold">02</span>
               </div>
               <h4 className="font-semibold mb-2">Contrôle total</h4>
               <p className="text-sm text-gray-300">Supervisez et ajustez vos agents en temps réel</p>
             </div>
             <div className="text-center p-6 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">📊</span>
+                <span className="text-xl font-bold">03</span>
               </div>
               <h4 className="font-semibold mb-2">Analytics puissants</h4>
               <p className="text-sm text-gray-300">Mesurez l'impact de vos agents IA</p>

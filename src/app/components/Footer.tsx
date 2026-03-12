@@ -1,4 +1,4 @@
-import { Target, Linkedin, Twitter, Facebook, Mail } from "lucide-react";
+import { Linkedin, Twitter, Facebook, Mail } from "lucide-react";
 
 const footerLinks = {
   product: [
@@ -38,39 +38,26 @@ export function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg">
-                <Target className="w-6 h-6 text-white" />
-              </div>
               <span className="text-2xl font-bold text-white">MAGIA</span>
             </div>
             <p className="text-gray-400 mb-6 max-w-sm">
               La plateforme AI Workforce qui permet aux PME africaines de déployer et orchestrer des agents IA spécialisés en 24h.
             </p>
-            <div className="flex gap-4">
-              <a
-                href="#"
-                className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
-              >
-                <Linkedin className="w-5 h-5" />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
-              >
-                <Twitter className="w-5 h-5" />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
-              >
-                <Facebook className="w-5 h-5" />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-purple-600 transition-colors"
-              >
-                <Mail className="w-5 h-5" />
-              </a>
+            <div className="flex gap-3">
+              {[
+                { icon: Linkedin, href: "#" },
+                { icon: Twitter, href: "#" },
+                { icon: Facebook, href: "#" },
+                { icon: Mail, href: "#" }
+              ].map((s, i) => (
+                <a
+                  key={i}
+                  href={s.href}
+                  className="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center hover:bg-indigo-600 transition-colors text-gray-400 hover:text-white"
+                >
+                  <s.icon className="w-4 h-4" />
+                </a>
+              ))}
             </div>
           </div>
 

@@ -16,6 +16,13 @@ export function AgentDetailView({ agent, onBack }: { agent: Agent; onBack: () =>
                     <button onClick={onBack} className="p-2 bg-white border border-gray-100 rounded-xl hover:bg-gray-50 transition-all shadow-sm">
                         <ChevronRight className="w-5 h-5 rotate-180" />
                     </button>
+                    <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-xl italic shadow-sm overflow-hidden shrink-0", agent.avatarColor || "bg-indigo-500")}>
+                        {agent.avatar ? (
+                            <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
+                        ) : (
+                            agent.name.charAt(0)
+                        )}
+                    </div>
                     <div>
                         <div className="flex items-center gap-2">
                             <h2 className="text-2xl font-bold text-gray-900">{agent.name}</h2>
@@ -33,7 +40,7 @@ export function AgentDetailView({ agent, onBack }: { agent: Agent; onBack: () =>
             </div>
 
             {/* Detail Tabs */}
-            <div className="flex items-center gap-1 p-1 bg-gray-100/50 rounded-2xl w-fit">
+            <div className="flex items-center gap-1 p-1 bg-gray-100/50 rounded-xl w-fit">
                 {["Aperçu", "Configuration", "Connaissance", "Activité"].map((tab) => (
                     <button
                         key={tab}
@@ -53,15 +60,15 @@ export function AgentDetailView({ agent, onBack }: { agent: Agent; onBack: () =>
                     <div className="lg:col-span-2 space-y-8">
                         {/* Summary Stats */}
                         <div className="grid grid-cols-3 gap-6">
-                            <div className="p-6 bg-white border border-gray-100 rounded-3xl shadow-sm">
+                            <div className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm">
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Conversations</p>
                                 <p className="text-2xl font-bold text-gray-900">{agent.stats.conversations}</p>
                             </div>
-                            <div className="p-6 bg-white border border-gray-100 rounded-3xl shadow-sm">
+                            <div className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm">
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Résolution</p>
                                 <p className="text-2xl font-bold text-gray-900">{agent.stats.resolution}</p>
                             </div>
-                            <div className="p-6 bg-white border border-gray-100 rounded-3xl shadow-sm">
+                            <div className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm">
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Leads</p>
                                 <p className="text-2xl font-bold text-gray-900">{agent.stats.leads}</p>
                             </div>
@@ -103,7 +110,7 @@ export function AgentDetailView({ agent, onBack }: { agent: Agent; onBack: () =>
                             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2"> <Globe className="w-4 h-4 text-gray-400" /> Canaux actifs</h3>
                             <div className="space-y-4">
                                 {agent.channels.map((chan) => (
-                                    <div key={chan} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                                    <div key={chan} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                                         <div className="flex items-center gap-3">
                                             {chan === 'website' && <Globe className="w-4 h-4 text-blue-500" />}
                                             {chan === 'email' && <Mail className="w-4 h-4 text-orange-500" />}
@@ -134,7 +141,7 @@ export function AgentDetailView({ agent, onBack }: { agent: Agent; onBack: () =>
                             <div>
                                 <h3 className="text-lg font-bold text-gray-900 mb-4">Instructions Système</h3>
                                 <textarea
-                                    className="w-full h-64 p-6 bg-gray-50 border border-gray-100 rounded-3xl text-sm leading-relaxed text-gray-600 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:bg-white transition-all resize-none"
+                                    className="w-full h-64 p-6 bg-gray-50 border border-gray-100 rounded-xl text-sm leading-relaxed text-gray-600 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:bg-white transition-all resize-none"
                                     defaultValue={`Tu es ${agent.name}, un ${agent.role} expert. Ta mission principale est : ${agent.category}.
 
 Directives :
@@ -175,7 +182,7 @@ Directives :
                         <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm space-y-6">
                             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2"> <Shield className="w-5 h-5 text-blue-600" /> Sécurité & État</h3>
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
                                     <div>
                                         <p className="text-sm font-bold text-gray-900">Mode Filtrage</p>
                                         <p className="text-[10px] text-gray-500">Bloque le contenu inapproprié</p>
@@ -184,7 +191,7 @@ Directives :
                                         <div className="w-4 h-4 bg-white rounded-full absolute right-1" />
                                     </div>
                                 </div>
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
                                     <div>
                                         <p className="text-sm font-bold text-gray-900">Anonymisation</p>
                                         <p className="text-[10px] text-gray-500">Masque les données sensibles</p>
@@ -223,9 +230,9 @@ Directives :
                             { name: "FAQ_Process_V2.docx", type: "Word", size: "1.1 MB", status: "Indexé", icon: BookOpen, color: "text-blue-500" },
                             { name: "https://magia.ai/docs", type: "Web", size: "45 pages", status: "Synchronisé", icon: Globe, color: "text-purple-500" }
                         ].map((file, i) => (
-                            <div key={i} className="p-6 bg-white border border-gray-100 rounded-3xl shadow-sm hover:shadow-md transition-all group">
+                            <div key={i} className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-all group">
                                 <div className="flex items-start justify-between mb-4">
-                                    <div className={cn("p-3 rounded-2xl bg-gray-50 group-hover:bg-white transition-colors border border-transparent group-hover:border-gray-100", file.color)}>
+                                    <div className={cn("p-3 rounded-xl bg-gray-50 group-hover:bg-white transition-colors border border-transparent group-hover:border-gray-100", file.color)}>
                                         <file.icon className="w-6 h-6" />
                                     </div>
                                     <span className="px-2 py-1 bg-green-50 text-green-700 text-[10px] font-bold rounded-lg uppercase tracking-wider">{file.status}</span>
@@ -240,7 +247,7 @@ Directives :
                     </div>
 
                     <div className="p-12 border-2 border-dashed border-gray-100 rounded-[3rem] bg-gray-50/50 flex flex-col items-center justify-center text-center">
-                        <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-6">
+                        <div className="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6">
                             <Database className="w-8 h-8 text-blue-100" />
                         </div>
                         <h4 className="text-lg font-bold text-gray-900 mb-2">Étendre les connaissances</h4>
@@ -261,7 +268,7 @@ Directives :
                             <input
                                 type="text"
                                 placeholder="Rechercher dans les logs..."
-                                className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/5 shadow-sm"
+                                className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/5 shadow-sm"
                             />
                         </div>
                         <div className="flex gap-3">

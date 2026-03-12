@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { Sparkles } from "lucide-react";
 import { AuthModals } from "./AuthModals";
 
 export function CTASection() {
@@ -9,14 +8,13 @@ export function CTASection() {
   return (
     <>
       <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-900 via-purple-900 to-gray-900 text-white relative overflow-hidden">
-        {/* Background Pattern */}
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
         </div>
 
         <div className="container mx-auto relative z-10">
-          <div className="max-w-4xl mx-auto text-center space-y-8 reveal-on-scroll">
+          <div className="max-w-4xl mx-auto text-center space-y-8 animate-in fade-in zoom-in duration-1000">
             <h2 className="text-5xl sm:text-6xl font-extrabold leading-[1.1] tracking-tight text-white mb-6">
               Prêt à déployer<br />votre première équipe IA ?
             </h2>
@@ -30,7 +28,6 @@ export function CTASection() {
                 className="bg-white text-gray-900 hover:bg-gray-100 px-8 h-14 rounded-xl font-bold text-lg"
                 onClick={() => setIsAuthOpen(true)}
               >
-                <Sparkles className="mr-2 w-6 h-6 text-purple-600" />
                 Créer mon compte gratuit
               </Button>
               <Button

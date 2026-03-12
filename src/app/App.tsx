@@ -31,10 +31,10 @@ export default function App() {
       <main>
         <HeroSection />
         {/* <VideoSection /> */}
-        <FeaturesSection />
+        {/* <FeaturesSection /> */}
         <ComparisonSection />
         <HowItWorksSection />
-        <AgentsSection />
+        {/* <AgentsSection /> */}
         <PricingSection />
         <FAQSection />
         <CTASection />
