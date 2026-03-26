@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f9fafb; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 24px; overflow: hidden; shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e5e7eb; }
+        .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 40px; text-align: center; }
+        .content { padding: 40px; color: #1f2937; line-height: 1.6; }
+        .footer { padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; }
+        .button { display: inline-block; padding: 16px 32px; background-color: #4f46e5; color: #ffffff !important; text-decoration: none; border-radius: 12px; font-weight: bold; margin-top: 24px; transition: background-color 0.2s; }
+        .logo { font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.025em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">MAGIA</div>
+        </div>
+        <div class="content">
+            <h1 style="font-size: 24px; font-weight: 700; margin-bottom: 16px;">Bienvenue chez MAGIA !</h1>
+            <p>Bonjour {{ first_name }},</p>
+            <p>Nous sommes ravis de vous compter parmi nous. Pour commencer à déployer vos agents IA, merci de confirmer votre adresse email en cliquant sur le bouton ci-dessous :</p>
+            <div style="text-align: center;">
+                <a href="{{ verify_link }}" class="button">Vérifier mon compte</a>
+            </div>
+            <p style="margin-top: 32px; font-size: 14px; color: #6b7280;">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>{{ verify_link }}</p>
+            <p>À très vite,<br>L'équipe MAGIA</p>
+        </div>
+        <div class="footer">
+            &copy; 2026 MAGIA AI. Tous droits réservés.
+        </div>
+    </div>
+</body>
+</html>

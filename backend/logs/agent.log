@@ -1,0 +1,359 @@
+2026-03-23 14:00:51,722 [WARNING] Bad Request: /api/email-config/1/get_auth_url/
+2026-03-23 14:02:35,362 [WARNING] Not Found: /api/whatsapp-config/1/
+2026-03-23 14:09:31,823 [WARNING] Bad Request: /api/email-config/1/get_auth_url/
+2026-03-23 14:09:34,819 [WARNING] Bad Request: /api/email-config/1/get_auth_url/
+2026-03-23 14:09:49,722 [WARNING] Bad Request: /api/email-config/1/get_auth_url/
+2026-03-23 14:09:50,397 [WARNING] Bad Request: /api/email-config/1/get_auth_url/
+2026-03-23 14:10:13,714 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:13,717 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:13,723 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:13,725 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:18,728 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:18,732 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:18,761 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:18,763 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:23,730 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:23,731 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:23,764 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:23,769 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:28,719 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:28,721 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:28,729 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:28,738 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:33,726 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:33,734 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:33,759 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:33,764 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:38,724 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:38,730 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:38,749 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:38,756 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:43,726 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:43,727 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:43,745 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:43,746 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:47,980 [WARNING] Unauthorized: /api/email-config/1/get_auth_url/
+2026-03-23 14:10:48,719 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:48,725 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:48,738 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:48,743 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:53,726 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:53,737 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:53,765 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:53,761 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:58,731 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:58,733 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:10:58,760 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:10:58,771 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:03,730 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:03,732 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:03,763 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:03,768 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:08,729 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:08,732 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:08,761 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:08,768 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:13,715 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:13,720 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:13,732 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:13,736 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:17,203 [WARNING] Unauthorized: /api/auth/subscription/
+2026-03-23 14:11:18,717 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:18,720 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:23,721 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:23,730 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:28,732 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:28,734 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:31,584 [WARNING] Unauthorized: /api/agents/
+2026-03-23 14:11:31,587 [WARNING] Unauthorized: /api/templates/
+2026-03-23 14:11:31,590 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:31,593 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:33,720 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:33,724 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:36,595 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:36,596 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:38,721 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:38,731 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:41,588 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:41,594 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:43,721 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:43,727 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:46,585 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:46,588 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:48,728 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:48,729 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:51,597 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:51,601 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:53,721 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:53,729 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:56,588 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:56,593 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:11:58,721 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:11:58,727 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:01,609 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:01,612 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:03,730 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:03,733 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:06,595 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:06,597 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:08,720 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:08,727 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:11,589 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:11,596 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:13,720 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:13,727 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:16,596 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:16,599 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:18,721 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:18,731 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:21,589 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:21,596 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:23,717 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:23,722 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:26,598 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:26,601 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:28,735 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:28,738 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:31,583 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:31,585 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:33,715 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:33,717 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:36,586 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:36,591 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:38,729 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:38,731 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:41,584 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:41,590 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:43,732 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:43,734 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:46,589 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:46,592 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:48,717 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:48,721 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:51,584 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:51,586 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:53,728 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:53,731 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:56,600 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:56,603 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:12:58,732 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:12:58,733 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:01,600 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:13:01,604 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:03,727 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:13:03,728 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:04,895 [WARNING] Unauthorized: /api/agents/
+2026-03-23 14:13:06,597 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:13:06,599 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:08,729 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:13:08,736 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:10,459 [WARNING] Unauthorized: /api/agents/
+2026-03-23 14:13:13,727 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:13:13,728 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:19,329 [WARNING] Unauthorized: /api/agents/
+2026-03-23 14:13:19,332 [WARNING] Unauthorized: /api/auth/me/
+2026-03-23 14:13:19,334 [WARNING] Unauthorized: /api/templates/
+2026-03-23 14:13:19,336 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:19,339 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:13:24,339 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:24,340 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:13:29,340 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:13:29,342 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:34,350 [WARNING] Unauthorized: /api/auth/logout/
+2026-03-23 14:13:34,366 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 14:13:34,373 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 14:17:56,138 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/llm_service.py changed, reloading.
+2026-03-23 14:26:47,640 [WARNING] Unauthorized: /api/email-config/oauth2_callback/
+2026-03-23 14:26:49,144 [WARNING] Not Found: /favicon.ico
+2026-03-23 14:27:44,358 [WARNING] Unauthorized: /api/email-config/oauth2_callback/
+2026-03-23 14:28:43,997 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 14:29:16,169 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 14:38:15,198 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:17,196 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:20,155 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:23,175 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:26,177 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:29,211 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:32,176 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:35,178 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:38,228 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:41,224 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:44,174 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:47,227 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:50,155 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:53,217 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:56,206 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:38:59,189 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:39:02,168 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:39:05,197 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:39:08,184 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:39:11,215 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:39:14,188 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:39:17,219 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:39:20,220 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:39:23,196 [WARNING] Not Found: /api/whatsapp-config/3/
+2026-03-23 14:42:05,571 [WARNING] Unauthorized: /api/agents/
+2026-03-23 14:42:30,107 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/models.py changed, reloading.
+2026-03-23 14:42:38,335 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/serializers.py changed, reloading.
+2026-03-23 14:42:55,570 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/views.py changed, reloading.
+2026-03-23 14:43:33,722 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/urls.py changed, reloading.
+2026-03-23 14:45:12,240 [WARNING] Unauthorized: /api/agents/
+2026-03-23 14:50:44,095 [WARNING] Unauthorized: /api/agents/
+2026-03-23 14:56:23,385 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/models.py changed, reloading.
+2026-03-23 14:56:31,959 [INFO] /home/mirahasina/MAGIA/Magia/backend/magia_backend/settings.py changed, reloading.
+2026-03-23 14:56:43,970 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/views.py changed, reloading.
+2026-03-23 14:56:53,187 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/views.py changed, reloading.
+2026-03-23 14:57:31,543 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/urls.py changed, reloading.
+2026-03-23 15:00:44,405 [WARNING] Forbidden: /api/auth/login/
+2026-03-23 15:01:05,514 [WARNING] Forbidden: /api/auth/login/
+2026-03-23 15:01:37,173 [WARNING] Bad Request: /api/auth/register/
+2026-03-23 15:09:13,187 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/views.py changed, reloading.
+2026-03-23 15:12:51,914 [WARNING] Unauthorized: /api/agents/
+2026-03-23 15:15:05,411 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/views.py changed, reloading.
+2026-03-23 15:22:05,700 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 15:22:27,950 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/serializers.py changed, reloading.
+2026-03-23 15:25:30,289 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 15:28:21,551 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-23 15:28:21,552 [WARNING] Unauthorized: /api/email-config/
+2026-03-23 15:28:21,564 [WARNING] Unauthorized: /api/auth/logout/
+2026-03-23 15:28:58,656 [WARNING] Bad Request: /api/auth/register/
+2026-03-23 15:29:08,529 [WARNING] Forbidden: /api/auth/login/
+2026-03-23 15:32:22,688 [WARNING] Unauthorized: /api/auth/logout/
+2026-03-23 15:37:26,624 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 15:49:53,970 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/llm_service.py changed, reloading.
+2026-03-23 15:50:15,425 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/llm_service.py changed, reloading.
+2026-03-23 15:50:29,842 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/llm_service.py changed, reloading.
+2026-03-23 15:54:24,322 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/llm_service.py changed, reloading.
+2026-03-23 15:55:30,911 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 15:55:49,224 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 15:56:08,004 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/llm_service.py changed, reloading.
+2026-03-23 16:02:23,761 [WARNING] Bad Request: /api/agents/
+2026-03-23 16:18:13,455 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/models.py changed, reloading.
+2026-03-23 16:27:34,112 [WARNING] Not Found: /api/agents/a483f537-ad4c-4c58-9fb5-f19dc5032ac5/chat//
+2026-03-23 16:28:44,282 [WARNING] Not Found: /api/agents/a483f537-ad4c-4c58-9fb5-f19dc5032ac5/chat//
+2026-03-23 16:33:09,204 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:33:11,979 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:35:53,853 [ERROR] Internal Server Error: /api/auth/subscription/
+Traceback (most recent call last):
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/views/decorators/csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/views/generic/base.py", line 105, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 515, in dispatch
+    response = self.handle_exception(exc)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 475, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 486, in raise_uncaught_exception
+    raise exc
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 512, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/accounts/views.py", line 325, in post
+    'current_plan': request.user.subscription_type
+AttributeError: 'User' object has no attribute 'subscription_type'. Did you mean: 'subscription'?
+2026-03-23 16:35:55,707 [ERROR] Internal Server Error: /api/auth/subscription/
+Traceback (most recent call last):
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/views/decorators/csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/views/generic/base.py", line 105, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 515, in dispatch
+    response = self.handle_exception(exc)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 475, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 486, in raise_uncaught_exception
+    raise exc
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 512, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/accounts/views.py", line 325, in post
+    'current_plan': request.user.subscription_type
+AttributeError: 'User' object has no attribute 'subscription_type'. Did you mean: 'subscription'?
+2026-03-23 16:35:57,744 [ERROR] Internal Server Error: /api/auth/subscription/
+Traceback (most recent call last):
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/views/decorators/csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/views/generic/base.py", line 105, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 515, in dispatch
+    response = self.handle_exception(exc)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 475, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 486, in raise_uncaught_exception
+    raise exc
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 512, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/accounts/views.py", line 325, in post
+    'current_plan': request.user.subscription_type
+AttributeError: 'User' object has no attribute 'subscription_type'. Did you mean: 'subscription'?
+2026-03-23 16:36:02,453 [ERROR] Internal Server Error: /api/auth/subscription/
+Traceback (most recent call last):
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/views/decorators/csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/django/views/generic/base.py", line 105, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 515, in dispatch
+    response = self.handle_exception(exc)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 475, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 486, in raise_uncaught_exception
+    raise exc
+  File "/home/mirahasina/MAGIA/Magia/backend/venv/lib/python3.10/site-packages/rest_framework/views.py", line 512, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "/home/mirahasina/MAGIA/Magia/backend/accounts/views.py", line 325, in post
+    'current_plan': request.user.subscription_type
+AttributeError: 'User' object has no attribute 'subscription_type'. Did you mean: 'subscription'?
+2026-03-23 16:36:49,280 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:37:54,524 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:38:08,748 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:38:38,078 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:39:32,509 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:40:44,821 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:41:33,763 [WARNING] Unauthorized: /api/agents/
+2026-03-23 16:52:56,831 [INFO] /home/mirahasina/MAGIA/Magia/backend/accounts/views.py changed, reloading.
+2026-03-23 16:55:01,395 [WARNING] Not Found: /api/agents/a483f537-ad4c-4c58-9fb5-f19dc5032ac5/chat//
+2026-03-23 16:55:27,283 [WARNING] Not Found: /api/agents/a483f537-ad4c-4c58-9fb5-f19dc5032ac5/messages/
+2026-03-23 16:55:31,073 [WARNING] Not Found: /api/agents/a483f537-ad4c-4c58-9fb5-f19dc5032ac5/messages/
+2026-03-23 16:55:32,264 [WARNING] Not Found: /api/agents/a483f537-ad4c-4c58-9fb5-f19dc5032ac5/messages/
+2026-03-23 16:55:36,523 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 16:55:50,124 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 17:00:12,798 [WARNING] Not Found: /api/agents/a483f537-ad4c-4c58-9fb5-f19dc5032ac5/chat//
+2026-03-23 17:03:00,394 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 17:03:09,970 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-23 17:03:22,401 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-26 08:41:44,355 [WARNING] Unauthorized: /api/agents/
+2026-03-26 08:41:44,355 [WARNING] Unauthorized: /api/email-config/
+2026-03-26 08:41:44,355 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-26 08:41:44,355 [WARNING] Unauthorized: /api/templates/
+2026-03-26 08:41:44,369 [WARNING] Unauthorized: /api/auth/me/
+2026-03-26 08:41:44,415 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-26 08:41:44,419 [WARNING] Unauthorized: /api/templates/
+2026-03-26 08:41:44,421 [WARNING] Unauthorized: /api/email-config/
+2026-03-26 08:41:44,422 [WARNING] Unauthorized: /api/agents/
+2026-03-26 08:41:49,294 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-26 08:41:49,296 [WARNING] Unauthorized: /api/email-config/
+2026-03-26 08:41:49,302 [WARNING] Unauthorized: /api/whatsapp-config/
+2026-03-26 08:41:49,305 [WARNING] Unauthorized: /api/email-config/
+2026-03-26 08:41:50,327 [WARNING] Unauthorized: /api/auth/logout/
+2026-03-26 08:47:15,969 [WARNING] Not Found: /api/agents/a483f537-ad4c-4c58-9fb5-f19dc5032ac5/
+2026-03-26 09:05:58,026 [WARNING] Unauthorized: /api/auth/logout/
+2026-03-26 09:11:48,045 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-26 09:13:28,991 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-26 09:13:39,712 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-26 09:16:24,273 [INFO] /home/mirahasina/MAGIA/Magia/backend/agents/views.py changed, reloading.
+2026-03-26 09:21:44,662 [INFO] AFC is enabled with max remote calls: 10.
+2026-03-26 09:21:45,451 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/Gemini%201.5%20Flash:generateContent "HTTP/1.1 400 Bad Request"
