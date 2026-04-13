@@ -1,0 +1,12 @@
+# Environnement Python
+venv/
+backend/venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# fichiers lourds
+*.pt
+*.pth
+*.zip
