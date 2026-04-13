@@ -8,7 +8,8 @@
   --card-foreground: #020617;
   --popover: #ffffff;
   --popover-foreground: #020617;
-  --primary: #0f172a; /* Dark Blue */
+  --primary: #0f172a;
+  /* Dark Blue */
   --primary-foreground: #ffffff;
   --secondary: #F8FAFC;
   --secondary-foreground: #0F172A;
@@ -26,6 +27,8 @@
   --font-weight-normal: 400;
   --ring: #1e293b;
   --radius: 0.5rem;
+  --radius-premium: 1.25rem;
+  --radius-button: 0.75rem;
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-serif: 'Playfair Display', serif;
@@ -99,7 +102,9 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius-premium);
+  --radius-2xl: calc(var(--radius-premium) + 0.5rem);
+  --radius-button: var(--radius-button);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -113,6 +118,10 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+
+  html {
+    font-size: 110%;
   }
 
   body {
@@ -177,6 +186,83 @@
 
   .magia-glass {
     @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+
+  .hd-grid {
+    background-image: linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .hd-border {
+    @apply border-black/80 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)];
+  }
+
+  .hd-glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-2xl;
+  }
+
+  .hd-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    letter-spacing: -0.025em;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .hd-accent-glow {
+    box-shadow: 0 0 15px -3px var(--primary);
+  }
+
+  .hd-shadow-glow {
+    box-shadow: 0 0 20px -5px rgba(59, 130, 246, 0.5);
+  }
+
+  .hd-data-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    @apply text-[8px] text-gray-400 font-bold uppercase tracking-[0.2em];
+  }
+
+  .hd-scanline {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hd-scanline::after {
+    @apply content-[""] absolute inset-0 pointer-events-none z-10;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%,
+        rgba(0, 0, 0, 0.02) 50%);
+    background-size: 100% 4px;
+  }
+
+  @keyframes hd-boot {
+    0% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes page-fade-in {
+    0% {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-hd-boot {
+    animation: hd-boot 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-page-fade {
+    animation: page-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }
 

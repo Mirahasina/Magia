@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { HeroSection } from "./components/HeroSection";
 import { HowItWorksSection } from "./components/HowItWorksSection";
@@ -13,9 +13,11 @@ import { useScrollReveal } from "./hooks/useScrollReveal";
 import { ResetPasswordPage } from "./components/ResetPasswordPage";
 import { AuthModals } from "./components/AuthModals";
 import { VerifyEmail } from "./components/VerifyEmail";
+import { AcceptInvitation } from "./components/AcceptInvitation";
 import { ContactModal } from "./components/ContactModal";
 import { PaymentModal } from "./components/PaymentModal";
 import { UpdateCardModal } from "./components/UpdateCardModal";
+import { AgentsProvider } from "./context/AgentsContext";
 
 export default function App() {
   useScrollReveal();
@@ -23,12 +25,13 @@ export default function App() {
   const [currentView, setCurrentView] = useState<"landing" | "dashboard">(
     (localStorage.getItem("current_view") as "landing" | "dashboard") || (!!localStorage.getItem("access_token") ? "dashboard" : "landing")
   );
-  
+
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authView, setAuthView] = useState<"login" | "signup">("signup");
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isUpdateCardOpen, setIsUpdateCardOpen] = useState(false);
+  const [initialEmail, setInitialEmail] = useState("");
 
   const [pendingOrder, setPendingOrder] = useState<{
     numAgents: number;
@@ -49,12 +52,30 @@ export default function App() {
 
   const [refreshKey, setRefreshKey] = useState(0);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const autoOpen = params.get("autoOpen");
+    const email = params.get("email");
+
+    if (autoOpen === "login" || autoOpen === "signup") {
+      setInitialEmail(email || "");
+      openAuth(autoOpen as "login" | "signup");
+      window.history.replaceState({}, document.title, "/");
+    }
+  }, []);
+
   const handleAuthSuccess = () => {
     setIsAuthOpen(false);
     setIsAuthenticated(true);
     setCurrentView("dashboard");
     localStorage.setItem("current_view", "dashboard");
+    localStorage.removeItem("active_tab");
+    localStorage.removeItem("backoffice_tab");
     setRefreshKey(prev => prev + 1);
+
+    const event = new CustomEvent('auth-success');
+    window.dispatchEvent(event);
+
     if (pendingOrder) {
       setPaymentDetails(pendingOrder);
       setIsPaymentOpen(true);
@@ -69,6 +90,12 @@ export default function App() {
   if (typeof window !== "undefined" && window.location.pathname === "/verify-email") {
     return <VerifyEmail />;
   }
+
+  if (typeof window !== "undefined" && window.location.pathname === "/accept-invitation") {
+    return <AcceptInvitation onAuthSuccess={handleAuthSuccess} openAuth={openAuth} />;
+  }
+
+
 
   const handleLogout = async () => {
     // ... same logic
@@ -90,114 +117,115 @@ export default function App() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("current_view");
+    localStorage.removeItem("active_tab");
+    localStorage.removeItem("backoffice_tab");
     setIsAuthenticated(false);
     setCurrentView("landing");
   };
 
   return (
-    <div className="min-h-screen bg-white bg-mesh relative">
-      {isAuthenticated && currentView === "dashboard" ? (
-        <Dashboard 
-          onLogout={handleLogout} 
-          refreshKey={refreshKey}
-          onUpgrade={(details) => {
-            setPaymentDetails(details);
-            setIsPaymentOpen(true);
-          }}
-          onUpdateCard={() => setIsUpdateCardOpen(true)}
-        />
-      ) : (
-        <div className="flex flex-col">
-          <Header
-            isAuthenticated={isAuthenticated}
-            onGoToDashboard={() => {
-              setCurrentView("dashboard");
-              localStorage.setItem("current_view", "dashboard");
+    <AgentsProvider>
+      <div className="min-h-screen bg-white bg-mesh relative">
+        {isAuthenticated && currentView === "dashboard" ? (
+          <Dashboard
+            onLogout={handleLogout}
+            refreshKey={refreshKey}
+            onUpgrade={(details) => {
+              setPaymentDetails(details);
+              setIsPaymentOpen(true);
             }}
-            onLogin={() => {
+            onUpdateCard={() => setIsUpdateCardOpen(true)}
+          />
+        ) : (
+          <div className="flex flex-col">
+            <Header
+              isAuthenticated={isAuthenticated}
+              onGoToDashboard={() => {
+                setCurrentView("dashboard");
+                localStorage.setItem("current_view", "dashboard");
+              }}
+              onLogin={() => {
                 const token = localStorage.getItem("access_token");
                 if (token) {
-                    setIsAuthenticated(true);
-                    setCurrentView("dashboard");
-                    localStorage.setItem("current_view", "dashboard");
+                  setIsAuthenticated(true);
+                  setCurrentView("dashboard");
+                  localStorage.setItem("current_view", "dashboard");
                 } else {
-                    openAuth("login");
+                  openAuth("login");
                 }
-            }}
-            openAuth={openAuth}
-          />
-          <main>
-            <HeroSection onStart={() => openAuth("signup")} />
-            <ComparisonSection />
-            <AgentsSection />
-            <HowItWorksSection />
-            <PricingSection
-              openAuth={openAuth}
-              openContact={() => setIsContactOpen(true)}
-              openPayment={(details) => {
-                setPaymentDetails(details);
-                setIsPaymentOpen(true);
               }}
+              openAuth={openAuth}
             />
-            <FAQSection />
-            <CTASection onAction={() => openAuth("signup")} />
-          </main>
-          <Footer />
-        </div>
-      )}
+            <main>
+              <HeroSection onStart={() => openAuth("signup")} />
+              <ComparisonSection />
+              <AgentsSection />
+              <HowItWorksSection />
+              <PricingSection
+                openAuth={openAuth}
+                openContact={() => setIsContactOpen(true)}
+                openPayment={(details) => {
+                  setPaymentDetails(details);
+                  setIsPaymentOpen(true);
+                }}
+              />
+              <FAQSection />
+              <CTASection onAction={() => openAuth("signup")} />
+            </main>
+            <Footer />
+          </div>
+        )}
 
-      {/* Global Modals */}
-      <AuthModals
-        isOpen={isAuthOpen}
-        onClose={() => {
-          setIsAuthOpen(false);
-          setPendingOrder(null);
-        }}
-        defaultView={authView}
-        onSuccess={handleAuthSuccess}
-      />
+        {/* Global Modals */}
+        <AuthModals
+          isOpen={isAuthOpen}
+          onClose={() => {
+            setIsAuthOpen(false);
+            setPendingOrder(null);
+          }}
+          defaultView={authView}
+          onSuccess={handleAuthSuccess}
+          initialEmail={initialEmail}
+        />
 
-      <ContactModal
-        isOpen={isContactOpen}
-        onClose={() => setIsContactOpen(false)}
-      />
+        <ContactModal
+          isOpen={isContactOpen}
+          onClose={() => setIsContactOpen(false)}
+        />
 
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-        planDetails={paymentDetails}
-        onSuccess={(isAlreadyAuth) => {
-          if (!isAlreadyAuth) {
-            setIsAuthOpen(true);
-          } else {
-            setRefreshKey(prev => prev + 1);
+        <PaymentModal
+          isOpen={isPaymentOpen}
+          onClose={() => setIsPaymentOpen(false)}
+          planDetails={paymentDetails}
+          onSuccess={(isAlreadyAuth) => {
+            if (!isAlreadyAuth) {
+              setIsAuthOpen(true);
+            } else {
+              window.dispatchEvent(new CustomEvent('auth-success'));
+              setRefreshKey(prev => prev + 1);
+              setIsPaymentOpen(false);
+              setCurrentView("dashboard");
+              localStorage.setItem("current_view", "dashboard");
+            }
+          }}
+          onAuthRequired={() => {
+            setPendingOrder(paymentDetails);
             setIsPaymentOpen(false);
-            setCurrentView("dashboard");
-            localStorage.setItem("current_view", "dashboard");
-          }
-        }}
-        onAuthRequired={() => {
-          setPendingOrder(paymentDetails);
-          setIsPaymentOpen(false);
-          openAuth("login");
-        }}
-      />
+            openAuth("login");
+          }}
+        />
 
-      <UpdateCardModal 
-        isOpen={isUpdateCardOpen}
-        onClose={() => setIsUpdateCardOpen(false)}
-        onSuccess={() => setRefreshKey(prev => prev + 1)}
-      />
+        <UpdateCardModal
+          isOpen={isUpdateCardOpen}
+          onClose={() => setIsUpdateCardOpen(false)}
+          onSuccess={() => setRefreshKey(prev => prev + 1)}
+        />
 
-      {/* Hack for FacturationView to access UpdateCardModal via global state if needed, 
-          but actually we'll pass it through Dashboard if we want a cleaner way. 
-          Actually, let's pass an 'onUpdateCard' prop to Dashboard.
-      */}
-      {isAuthenticated && (
-        <div className="hidden">
-           {/* This is just to satisfy the logic of passing the trigger down */}
-        </div>
-      )}
-    </div>
+        {isAuthenticated && (
+          <div className="hidden">
+          </div>
+        )}
+      </div>
+    </AgentsProvider>
   );
 }

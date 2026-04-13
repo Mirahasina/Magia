@@ -18,8 +18,9 @@ export function PricingSection({ openAuth, openContact, openPayment }: PricingSe
   const basePrice = 29;
   const pricePerAgent = 15;
   const monthlyPrice = basePrice + (numAgents - 1) * pricePerAgent;
-  const totalPrice = isAnnual ? Math.floor(monthlyPrice * 0.8) : monthlyPrice;
+  const totalPrice = isAnnual ? Math.floor(monthlyPrice * 12 * 0.8 / 12) : monthlyPrice;
   const credits = numAgents * 1000;
+  const userPlaces = numAgents * 2;
 
   const handlePlanClick = (planName: string) => {
     setSelectedPlan(planName);
@@ -56,9 +57,10 @@ export function PricingSection({ openAuth, openContact, openPayment }: PricingSe
       features: [
         `${numAgents} agents IA inclus`,
         `${credits.toLocaleString()} crédits / mois`,
-        `${numAgents * 2} places utilisateur`,
+        `${userPlaces} places utilisateur`,
+        `Puissance Machine : ${Math.min(100, 20 + numAgents * 2)}%`,
+        `Optimisation IA : ${Math.min(100, 85 + Math.floor(numAgents/2))}%`,
         "Whatsapp Business inclus",
-        "Analytics avancées",
         "API & Webhooks",
         "Support prioritaire"
       ],
@@ -86,6 +88,7 @@ export function PricingSection({ openAuth, openContact, openPayment }: PricingSe
       popular: false
     }
   ];
+
 
   return (
     <section id="pricing" className="py-32 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">

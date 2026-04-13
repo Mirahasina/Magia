@@ -57,7 +57,7 @@ export function HeroSection({ onStart }: HeroSectionProps) {
               </div>
             </div>
 
-            <div className="relative flex items-center justify-center">
+            <div className="relative flex items-center justify-center mt-12 lg:mt-0">
               <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/30 to-blue-600/30 rounded-full blur-[100px] animate-pulse"></div>
               <div
                 className="relative rounded-2xl overflow-hidden shadow-2xl w-full max-w-2xl transform transition-transform hover:scale-[1.02] duration-500 animate-[float_6s_ease-in-out_infinite]"

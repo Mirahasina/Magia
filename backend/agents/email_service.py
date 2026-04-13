@@ -69,6 +69,7 @@ def process_emails_for_agent(agent_id):
         config = agent.email_config
         
         if not config or not config.is_active or not config.email:
+            logger.debug(f"Configuration email absente ou inactive pour l'agent {agent.name}.")
             return
 
         mail = imaplib.IMAP4_SSL(config.imap_server or "imap.gmail.com")
@@ -88,19 +89,22 @@ def process_emails_for_agent(agent_id):
             mail.login(config.email, config.password)
             
         mail.select("inbox")
-        logger.info(f"Recherche d'emails non lus pour l'agent {agent.name}...")
+        logger.info(f"Recherche d'emails pour l'agent {agent.name} (Canal Email actif)...")
 
-        status, messages = mail.search(None, 'UNSEEN')
+        status, messages = mail.search(None, 'ALL')
         if status != 'OK' or not messages[0]:
-            logger.info("Aucun nouvel email non lu trouvé.")
+            logger.info("Aucun email trouvé dans la boîte de réception.")
             return
 
-        logger.info(f"{len(messages[0].split())} email(s) non lu(s) trouvé(s).")
+        all_msg_ids = messages[0].split()
+        logger.info(f"Total de {len(all_msg_ids)} emails trouvés. Analyse des 20 plus récents...")
 
-        msg_ids = messages[0].split()
-        msg_ids = list(reversed(msg_ids)) 
+        # Process the 20 most recent emails
+        msg_ids = list(reversed(all_msg_ids))[:20] 
 
         processed_count = 0
+        new_clones_count = 0
+        
         for num in msg_ids:
             if processed_count >= 10:
                 break
@@ -119,20 +123,25 @@ def process_emails_for_agent(agent_id):
                     if msg_date.tzinfo is None:
                         msg_date = msg_date.replace(tzinfo=timezone.utc)
                     
-                    if now - msg_date > timedelta(hours=24):
-                        logger.info(f"Email ignoré: trop ancien ({msg_date})")
+                    if now - msg_date > timedelta(days=2): # Processing up to 48h back
                         continue
                 except Exception as e:
                     logger.error(f"Erreur lors du parsing de la date: {str(e)}")
                     continue
             
-            status, data = mail.fetch(num, '(BODY.PEEK[])')
+            status, data = mail.fetch(num, '(FLAGS BODY.PEEK[])')
             if status != 'OK':
                 logger.error(f"Erreur lors de la récupération du corps du mail {num}")
                 continue
 
-            raw_email = data[0][1]
+            flags = b''
+            raw_email = b''
+            if len(data) > 0 and isinstance(data[0], tuple):
+                flags = data[0][0]
+                raw_email = data[0][1]
+
             msg = email.message_from_bytes(raw_email)
+            is_read = b'\\Seen' in flags
             subject = decode_mime_words(msg['Subject'])
             sender = decode_mime_words(msg['From'])
             
@@ -144,6 +153,19 @@ def process_emails_for_agent(agent_id):
                         break
             else:
                 body = msg.get_payload(decode=True).decode('utf-8', errors='replace')
+
+            # Duplicate check
+            exists = ChatMessage.objects.filter(
+                agent=agent,
+                sender='user',
+                content=body,
+                source='email'
+            ).exists()
+            
+            if exists:
+                continue
+
+            logger.info(f"Nouvel email de {sender} détecté : '{subject}'. Analyse en cours...")
 
             classification_prompt = f"""
             Analyse cet email et dis si ce message mérite une réponse de l'agent.
@@ -191,7 +213,7 @@ def process_emails_for_agent(agent_id):
             Réponds à cet email de manière professionnelle et concise en utilisant la base de connaissances.
             
             Si c'est une salutation, réponds chaleureusement.
-            Si c'est un message de remerciement, réponds de façon courtoise et très professionnelle (par exemple, en restant à disposition).
+            Si c'est un message de remerciement, réponds de façon courtoise et très professionnelle.
             Si c'est une question commerciale, utilise les informations fournies.
             Si tu ne connais pas la réponse précise, réponds EXACTEMENT "[UNKNOWN]".
             
@@ -214,13 +236,15 @@ def process_emails_for_agent(agent_id):
 
             if "[UNKNOWN]" in response_text:
                 logger.info("Réponse [UNKNOWN] détectée, utilisation du fallback")
-                response_text = "Merci de votre intérêt. Je n'ai pas la réponse précise à votre question pour le moment, mais un responsable commercial va prendre contact avec vous très rapidement. Vous pouvez aussi nous joindre par téléphone au +261 34 00 000 00."
+                response_text = "Merci de votre intérêt. Je n'ai pas la réponse précise à votre question pour le moment, mais un responsable commercial va prendre contact avec vous très rapidement."
 
-            # Classify status (pertinence)
             status = classify_pertinence(agent.role, body)
+            if "épuisé mon quota" in status.lower():
+                status = "new_lead"
 
             ChatMessage.objects.create(agent=agent, sender='user', content=body, contact_info=sender, source='email', status=status)
             ChatMessage.objects.create(agent=agent, sender=agent.name, content=response_text, contact_info=sender, source='email', status='new')
+            new_clones_count += 1
 
             success = send_email_reply(config, sender, f"Re: {subject}", response_text)
             if success:
@@ -231,6 +255,7 @@ def process_emails_for_agent(agent_id):
             
             processed_count += 1
 
+        logger.info(f"Traitement terminé pour {agent.name}. {new_clones_count} nouveaux messages clonés.")
         mail.logout()
     except Exception as e:
         logger.error(f"Erreur globale process_emails_for_agent: {str(e)}", exc_info=True)
@@ -251,7 +276,6 @@ def send_email_reply(config, recipient, subject, body):
             code, resp = server.docmd('AUTH', 'XOAUTH2 ' + auth_b64)
             
             if code != 235:
-                # Tentative de rafraîchissement
                 token = refresh_google_token(config)
                 if token:
                     auth_str = get_google_auth_string(config.email, token)
@@ -261,7 +285,6 @@ def send_email_reply(config, recipient, subject, body):
                         return False
                 else:
                     return False
-            
         else:
             if not config.password:
                 return False
@@ -273,7 +296,148 @@ def send_email_reply(config, recipient, subject, body):
     except Exception:
         return False
 
+def get_sent_folder_name(mail):
+    """
+    Tente de trouver le nom du dossier des messages envoyés sur le serveur IMAP.
+    """
+    try:
+        status, folders = mail.list()
+        if status != 'OK':
+            return None
+        
+        sent_keywords = ['sent', 'envoyé', 'envoyes', 'outbox']
+        
+        for folder_raw in folders:
+            folder_str = folder_raw.decode('utf-8', errors='replace').lower()
+            if any(keyword in folder_str for keyword in sent_keywords):
+                import re
+                match = re.search(r'"([^"]+)"\s*$', folder_str)
+                if match:
+                    return match.group(1)
+                match = re.search(r'([^\s/]+)\s*$', folder_str)
+                if match:
+                    return match.group(1)
+        
+        # Fallback pour Gmail
+        status, data = mail.select('"[Gmail]/Messages envoy&AOk-s"') 
+        if status == 'OK': return '"[Gmail]/Messages envoy&AOk-s"'
+        
+        status, data = mail.select('"[Gmail]/Sent Mail"') 
+        if status == 'OK': return '"[Gmail]/Sent Mail"'
+        
+    except Exception:
+        pass
+    return None
+
+def sync_email_history(config):
+    try:
+        if not config or not config.is_active or not config.email:
+            return
+            
+        mail = imaplib.IMAP4_SSL(config.imap_server or "imap.gmail.com")
+        if config.oauth_token:
+            try:
+                auth_string = get_google_auth_string(config.email, config.oauth_token)
+                mail.authenticate('XOAUTH2', lambda x: auth_string)
+            except imaplib.IMAP4.error:
+                token = refresh_google_token(config)
+                if token:
+                    auth_string = get_google_auth_string(config.email, token)
+                    mail.authenticate('XOAUTH2', lambda x: auth_string)
+                else:
+                    return
+        else:
+            mail.login(config.email, config.password)
+            
+        folders_to_sync = ["INBOX"]
+        sent_folder = get_sent_folder_name(mail)
+        if sent_folder:
+            folders_to_sync.append(sent_folder)
+            
+        for folder in folders_to_sync:
+            try:
+                status, data = mail.select(folder if '"' in folder else f'"{folder}"')
+                if status != 'OK':
+                    continue
+                    
+                status, messages = mail.search(None, 'ALL')
+                if status != 'OK' or not messages[0]:
+                    continue
+
+                all_msg_ids = messages[0].split()
+                msg_ids = list(reversed(all_msg_ids))[:50]
+
+                for num in msg_ids:
+                    try:
+                        status, data = mail.fetch(num, '(FLAGS BODY.PEEK[])')
+                        if status != 'OK': continue
+                        
+                        flags = b''
+                        raw_email = b''
+                        if len(data) > 0 and isinstance(data[0], tuple):
+                            flags = data[0][0]
+                            raw_email = data[0][1]
+
+                        msg = email.message_from_bytes(raw_email)
+                        is_read = b'\\Seen' in flags
+                        subject = decode_mime_words(msg['Subject'])
+                        sender_raw = decode_mime_words(msg['From'])
+                        
+                        # Détection si c'est un message envoyé par l'utilisateur
+                        is_sent_by_me = False
+                        if config.email and config.email.lower() in sender_raw.lower():
+                            is_sent_by_me = True
+                            
+                        # Pour les messages envoyés, le "contact" est le destinataire
+                        if is_sent_by_me:
+                            contact_info = decode_mime_words(msg['To'])
+                        else:
+                            contact_info = sender_raw
+                        
+                        body = ""
+                        if msg.is_multipart():
+                            for part in msg.walk():
+                                if part.get_content_type() == "text/plain":
+                                    body_bytes = part.get_payload(decode=True)
+                                    if body_bytes:
+                                        body = body_bytes.decode('utf-8', errors='replace')
+                                    break
+                        else:
+                            body_bytes = msg.get_payload(decode=True)
+                            if body_bytes:
+                                body = body_bytes.decode('utf-8', errors='replace')
+
+                        if not body:
+                            continue
+
+                        # Vérification de doublon
+                        if ChatMessage.objects.filter(user=config.user, content=body, contact_info=contact_info, source='email').exists():
+                            continue
+
+                        # Trouver l'agent lié cet email config
+                        agent = Agent.objects.filter(email_config=config).first()
+
+                        ChatMessage.objects.create(
+                            user=config.user,
+                            agent=agent,
+                            sender='ai' if is_sent_by_me else 'user',
+                            content=body,
+                            contact_info=contact_info,
+                            source='email',
+                            is_read=is_read,
+                            status='archived'
+                        )
+                    except Exception as e:
+                        logger.error(f"Erreur sync email individuel ({folder}): {e}")
+            except Exception as e:
+                logger.error(f"Erreur dossier {folder}: {e}")
+                
+        mail.logout()
+    except Exception as e:
+        logger.error(f"Erreur globale sync_email_history: {e}")
+
 def test_email_connection(config):
+# ... existing code ...
     results = {}
     try:
         mail = imaplib.IMAP4_SSL(config.imap_server or "imap.gmail.com")
@@ -307,5 +471,4 @@ def test_email_connection(config):
     return results
 
 def send_email_via_config(config, recipient, subject, body):
-    """Alias for send_email_reply compatible with views.py"""
     return send_email_reply(config, recipient, subject, body)

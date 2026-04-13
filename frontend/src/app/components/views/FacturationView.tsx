@@ -8,11 +8,21 @@ interface SubscriptionData {
     num_agents: number;
     is_annual: boolean;
     status: string;
+    active_until: string;
     created_at: string;
     card_last4?: string;
     card_brand?: string;
     card_exp_month?: string;
     card_exp_year?: string;
+}
+
+interface TransactionData {
+    id: string;
+    amount: string;
+    currency: string;
+    gateway: string;
+    status: string;
+    created_at: string;
 }
 
 export function FacturationView({ 
@@ -25,6 +35,7 @@ export function FacturationView({
     onUpdateCard?: () => void
 }) {
     const [sub, setSub] = useState<SubscriptionData | null>(null);
+    const [transactions, setTransactions] = useState<TransactionData[]>([]);
     const [loading, setLoading] = useState(true);
     const [agentsToBuy, setAgentsToBuy] = useState(2);
 
@@ -46,7 +57,23 @@ export function FacturationView({
                 setLoading(false);
             }
         };
+
+        const fetchTransactions = async () => {
+            try {
+                const token = localStorage.getItem("access_token");
+                const res = await fetch("http://localhost:8000/api/auth/payments/transactions/", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    setTransactions(await res.json());
+                }
+            } catch (err) {
+                console.error("Error fetching transactions", err);
+            }
+        };
+
         fetchSub();
+        fetchTransactions();
     }, [refreshKey]);
 
     if (loading) return <div className="p-8 text-center font-bold text-gray-400">Chargement...</div>;
@@ -56,8 +83,8 @@ export function FacturationView({
     const pricePerAgent = 15;
     const monthlyTotal = isGratuit ? 0 : (sub?.num_agents || 0) * pricePerAgent;
 
-    const nextBillDate = sub?.created_at && !isGratuit
-        ? new Date(new Date(sub.created_at).setMonth(new Date(sub.created_at).getMonth() + 1)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    const nextBillDate = sub?.active_until && !isGratuit
+        ? new Date(sub.active_until).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
         : "Sans engagement";
 
     return (
@@ -71,7 +98,7 @@ export function FacturationView({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
                 <div className={cn(
-                    "p-6 rounded-2xl text-white shadow-xl relative overflow-hidden group transition-all duration-500",
+                    "p-6 rounded-none text-white shadow-xl relative overflow-hidden group transition-all duration-500",
                     isGratuit ? "bg-slate-900" : "bg-blue-900 shadow-blue-100"
                 )}>
                     <div className="relative z-10 flex flex-col justify-between h-full min-h-[140px]">
@@ -81,7 +108,7 @@ export function FacturationView({
                                 <h3 className="text-[9px] font-black uppercase tracking-[0.2em] opacity-70">PLAN ACTUEL</h3>
                             </div>
                             <div className="text-3xl font-serif font-bold mb-1 tracking-tighter uppercase">{planDisplay}</div>
-                            <p className="text-base opacity-90 font-bold">{monthlyTotal}€ <span className="text-xs opacity-60 font-medium">/ mois</span></p>
+                            <p className="text-base opacity-90 font-bold">{(monthlyTotal * 5000).toLocaleString('fr-FR')} Ar <span className="text-xs opacity-60 font-medium">/ mois</span></p>
                         </div>
                         <div className="mt-4 space-y-2">
                             <div className="flex justify-between text-[10px] font-black uppercase tracking-widest items-center">
@@ -96,7 +123,7 @@ export function FacturationView({
                     </div>
                 </div>
 
-                <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-4">
+                <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm space-y-4">
                     <div className="flex items-center justify-between">
                         <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ajuster mon offre</h4>
                         <Zap className="w-3.5 h-3.5 text-blue-800" />
@@ -109,7 +136,7 @@ export function FacturationView({
                                 <span className="text-[10px] font-bold text-gray-400 ml-2 uppercase tracking-widest">Agents</span>
                             </div>
                             <div className="text-right">
-                                <p className="text-[9px] font-black text-blue-900 tracking-tighter">{agentsToBuy * 15}€<span className="text-[8px]">/m</span></p>
+                                <p className="text-[9px] font-black text-blue-900 tracking-tighter">{(agentsToBuy * 15 * 5000).toLocaleString('fr-FR')} Ar<span className="text-[8px]">/m</span></p>
                             </div>
                         </div>
 
@@ -135,14 +162,14 @@ export function FacturationView({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
-                <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
+                <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm">
                     <div className="flex items-center justify-between mb-4">
                         <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paiement</h4>
                         <CreditCard className="w-3.5 h-3.5 text-gray-400" />
                     </div>
                     
                     <div className="flex flex-col gap-3">
-                        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-none border border-gray-100">
                             <div className="w-10 h-6 bg-gray-900 rounded-md flex items-center justify-center text-[8px] font-black italic text-white shadow-md">
                                 {sub?.card_brand?.toUpperCase() || "VISA"}
                             </div>
@@ -163,8 +190,8 @@ export function FacturationView({
                     </div>
                 </div>
 
-                <div className="p-6 bg-gray-50/50 border border-gray-100 rounded-2xl flex flex-col justify-center items-center text-center space-y-2">
-                    <div className="p-2 bg-white rounded-lg shadow-sm">
+                <div className="p-6 bg-gray-50/50 border border-gray-100 rounded-none flex flex-col justify-center items-center text-center space-y-2">
+                    <div className="p-2 bg-white rounded-none shadow-sm">
                         <FileText className="w-5 h-5 text-blue-800" />
                     </div>
                     <div>
@@ -174,7 +201,7 @@ export function FacturationView({
                 </div>
             </div>
 
-            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
+            <div className="bg-white border border-gray-100 rounded-none overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
                 <div className="px-6 py-3 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Transactions</h3>
                     <Receipt className="w-3.5 h-3.5 text-gray-300" />
@@ -189,19 +216,28 @@ export function FacturationView({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {sub && (
-                                <tr className="hover:bg-gray-50/50 transition-colors group">
+                            {transactions.length > 0 ? transactions.map(tx => (
+                                <tr key={tx.id} className="hover:bg-gray-50/50 transition-colors group">
                                     <td className="px-6 py-4 text-[10px] font-bold text-gray-900 uppercase">
-                                        {new Date(sub.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        {new Date(tx.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </td>
-                                    <td className="px-6 py-4 text-[10px] text-gray-400 font-medium">ABONNEMENT {planDisplay.toUpperCase()}</td>
+                                    <td className="px-6 py-4 text-[10px] text-gray-400 font-medium">ABONNEMENT {sub?.plan_name?.toUpperCase() || ''} - {tx.gateway.toUpperCase()}</td>
                                     <td className="px-6 py-4 text-[10px] text-gray-900 font-black text-right">
-                                        <div className="flex items-center justify-end gap-3">
-                                            <span>{monthlyTotal},00 €</span>
-                                            <button className="text-blue-800 hover:text-blue-900">
-                                                <ArrowUpRight className="w-3.5 h-3.5" />
-                                            </button>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <span>{parseFloat(tx.amount).toLocaleString('fr-FR')} {tx.currency === 'EUR' ? '€' : tx.currency}</span>
+                                                <button className="text-blue-800 hover:text-blue-900">
+                                                    <ArrowUpRight className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                            <span className={`text-[8px] uppercase tracking-widest ${tx.status === 'completed' ? 'text-green-600' : 'text-orange-500'}`}>{tx.status}</span>
                                         </div>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan={3} className="px-6 py-8 text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                        Aucune transaction pour le moment
                                     </td>
                                 </tr>
                             )}

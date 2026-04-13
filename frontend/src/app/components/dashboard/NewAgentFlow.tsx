@@ -56,8 +56,8 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
             channels: config.channels,
             execution_mode,
             confidence_threshold,
-            whatsapp_config: config.whatsapp_config,
             email_config: config.email_config,
+            avatar: config.avatar,
             is_deployed: false
         });
 
@@ -225,6 +225,33 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                                         <option value="gpt-4o">GPT-4o</option>
                                         <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 pt-4">
+                                <label className="magia-label">Avatar de l'unité</label>
+                                <div className="flex flex-wrap gap-4">
+                                    {[1, 2, 3, 4, 5, 6].map(num => (
+                                        <button
+                                            key={num}
+                                            onClick={() => setConfig({ ...config, avatar: `/avatars/avatar_${num}.png` })}
+                                            className={cn(
+                                                "w-12 h-12 rounded-xl border-2 transition-all p-1 overflow-hidden",
+                                                config.avatar === `/avatars/avatar_${num}.png` ? "border-blue-900 bg-blue-50" : "border-gray-100 hover:border-blue-200"
+                                            )}
+                                        >
+                                            <img src={`/avatars/avatar_${num}.png`} alt={`Avatar ${num}`} className="w-full h-full object-cover rounded-lg" />
+                                        </button>
+                                    ))}
+                                    <div className="flex-1">
+                                        <input 
+                                            type="text"
+                                            value={config.avatar.startsWith('/avatars/') ? "" : config.avatar}
+                                            onChange={(e) => setConfig({ ...config, avatar: e.target.value })}
+                                            placeholder="OU URL PERSONNALISÉE..."
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-black uppercase outline-none focus:border-blue-900 transition-all"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -412,7 +439,7 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                             {[
                                 { label: 'Cluster', value: config.name },
                                 { label: 'Modèle', value: config.llm },
-                                { label: 'Nexus', value: config.channels.length || 'Web Chat' },
+                                { label: 'Nexus', value: config.channels.join(', ') || 'Web Chat' },
                                 { label: 'Mode', value: config.mode, color: 'text-blue-900' }
                             ].map((item, i) => (
                                 <div key={i} className="space-y-2">
@@ -426,7 +453,7 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                             <div className="relative z-10 space-y-8">
                                 <div className="space-y-2">
                                     <div className="text-4xl font-serif italic text-white flex items-center justify-center gap-2">
-                                        98.4<span className="text-blue-700 text-2xl">%</span>
+                                        {config.confidence}<span className="text-blue-700 text-2xl">%</span>
                                     </div>
                                     <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em]">Score de Fidélité Cognitive</p>
                                 </div>
@@ -437,7 +464,7 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                                     DÉPLOYER L'UNITÉ IA
                                     <ChevronRight className="w-4 h-4 inline ml-2 group-hover:translate-x-1 transition-transform" />
                                 </button>
-                                <p className="text-[9px] font-black text-blue-700/60 uppercase tracking-widest">Temps de synchronisation estimé : 8.2s</p>
+                                <p className="text-[9px] font-black text-blue-700/60 uppercase tracking-widest">Temps de synchronisation estimé : {Math.ceil((100 - progress) * 0.05)}s</p>
                             </div>
                             <div className="absolute top-0 left-0 w-full h-1 bg-blue-900" />
                             <Shield className="absolute -bottom-10 -right-10 w-48 h-48 text-white/5 -rotate-12 group-hover:rotate-0 transition-transform duration-1000" />

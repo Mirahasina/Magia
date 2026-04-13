@@ -111,16 +111,16 @@ export function Header({ onLogin, openAuth, isAuthenticated, onGoToDashboard }: 
           <div className="md:hidden bg-white border-b border-gray-100 animate-in slide-in-from-top duration-300">
             <div className="px-4 pt-2 pb-6 space-y-4">
               <div className="pt-2">
-                <a href="#agents" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Agents</a>
-                <a href="#how-it-works" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Comment ça marche ?</a>
-                <a href="#pricing" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Tarification</a>
-                <a href="#home" className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">À propos</a>
+                <a href="#agents" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Agents</a>
+                <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Comment ça marche ?</a>
+                <a href="#pricing" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">Tarification</a>
+                <a href="#home" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 font-medium text-gray-700 hover:text-blue-600">À propos</a>
               </div>
               <div className="flex flex-col gap-3 pt-4 border-t border-gray-50">
                 {isAuthenticated ? (
                   <Button
                     className="w-full justify-center h-12 bg-gradient-to-r from-blue-900 to-blue-900 text-white rounded-xl shadow-lg shadow-blue-800/20"
-                    onClick={onGoToDashboard}
+                    onClick={() => { onGoToDashboard?.(); setIsMobileMenuOpen(false); }}
                   >
                     Accéder au Dashboard
                   </Button>
@@ -129,13 +129,13 @@ export function Header({ onLogin, openAuth, isAuthenticated, onGoToDashboard }: 
                     <Button
                       variant="outline"
                       className="w-full justify-center h-12 rounded-xl text-gray-700 border-gray-200"
-                      onClick={() => openAuth("login")}
+                      onClick={() => { openAuth("login"); setIsMobileMenuOpen(false); }}
                     >
                       Se connecter
                     </Button>
                     <Button
                       className="w-full justify-center h-12 bg-gradient-to-r from-blue-600 to-blue-900 text-white rounded-xl shadow-lg shadow-blue-500/20"
-                      onClick={() => openAuth("signup")}
+                      onClick={() => { openAuth("signup"); setIsMobileMenuOpen(false); }}
                     >
                       Commencer gratuitement
                     </Button>

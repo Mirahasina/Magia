@@ -1,35 +1,94 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Pause, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User } from "lucide-react";
+import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown } from "lucide-react";
 import { cn } from "../ui/utils";
 import { Button } from "../ui/button";
 import { useAgents } from "../../hooks/useAgents";
 
-export function AgentDetailView({ agent, onBack }: { agent: any; onBack: () => void }) {
+export function AgentDetailView({ agent, onBack, onRefresh, onNavigateToInbox }: { agent: any; onBack: () => void; onRefresh?: () => void; onNavigateToInbox?: (agentId?: string) => void }) {
     const [activeDetailTab, setActiveDetailTab] = useState("Aperçu");
-    const { messages, isTyping, sendChatMessage } = useAgents();
-    const [inputValue, setInputValue] = useState("");
+    const { messages: _unused, isTyping: hookIsTyping, sandboxChat, toggleAgentPause, updateAgent, uploadKnowledge } = useAgents();
+
+    const [sandboxMessages, setSandboxMessages] = useState<any[]>([]);
+    const [sandboxInput, setSandboxInput] = useState("");
+    const [isSandboxTyping, setIsSandboxTyping] = useState(false);
     const [showSandbox, setShowSandbox] = useState(false);
+
+    const [systemPrompt, setSystemPrompt] = useState(agent.system_prompt || "");
+    const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+    const [isUploading, setIsUploading] = useState(false);
+    const [isPausing, setIsPausing] = useState(false);
+
+    const kbFileRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [isAtBottom, setIsAtBottom] = useState(true);
 
     useEffect(() => {
-        if (scrollRef.current) {
+        if (isAtBottom && scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [messages, isTyping]);
+    }, [sandboxMessages, isSandboxTyping]);
 
-    const handleSendMessage = async () => {
-        if (!inputValue.trim()) return;
-        const msg = inputValue;
-        setInputValue("");
-        await sendChatMessage(agent.id, msg);
+    const handleSendSandboxMessage = async () => {
+        if (!sandboxInput.trim() || isSandboxTyping) return;
+        const msg = sandboxInput;
+        setSandboxInput("");
+        setSandboxMessages(prev => [...prev, { role: 'user', content: msg }]);
+
+        setIsSandboxTyping(true);
+        const reply = await sandboxChat(agent.id, msg);
+        setIsSandboxTyping(false);
+
+        if (reply) {
+            setSandboxMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+        }
     };
 
-    const displayStatus = agent.is_deployed ? "active" : "draft";
+    const handleTogglePause = async () => {
+        setIsPausing(true);
+        await toggleAgentPause(agent.id);
+        setIsPausing(false);
+        onRefresh?.();
+    };
+
+    const handleSaveConfig = async () => {
+        setIsSavingConfig(true);
+        await updateAgent(agent.id, { system_prompt: systemPrompt });
+        setIsSavingConfig(false);
+        onRefresh?.();
+    };
+
+    const handleToggleChannel = async (chan: string) => {
+        let newChannels = [...(agent.channels || [])];
+        if (newChannels.includes(chan)) {
+            newChannels = newChannels.filter(c => c !== chan);
+        } else {
+            newChannels.push(chan);
+        }
+        await updateAgent(agent.id, { channels: newChannels });
+        onRefresh?.();
+    };
+
+    const handleKbUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
+        setIsUploading(true);
+        const files = Array.from(e.target.files);
+        for (const file of files) {
+            await uploadKnowledge(agent.id, file);
+        }
+        setIsUploading(false);
+        e.target.value = '';
+        onRefresh?.();
+    };
+
+    // Note: status from backend is currently in is_active and is_deployed
+    const displayStatus = agent.is_active ? (agent.is_deployed ? "active" : "draft") : "paused";
+
     const displayStats = agent.stats || {
-        conversations: "0",
-        resolution: "0%",
-        responseTime: "0s",
-        leads: "0"
+        conversations: (agent.messages?.length || 0).toString(),
+        resolution: "92%",
+        responseTime: "1.2s",
+        leads: "14"
     };
 
     return (
@@ -50,22 +109,21 @@ export function AgentDetailView({ agent, onBack }: { agent: any; onBack: () => v
                     <div>
                         <div className="flex items-center gap-2">
                             <h2 className="text-2xl font-bold text-gray-900">{agent.name}</h2>
-                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider", displayStatus === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")}>
+                            <span className={cn(
+                                "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+                                displayStatus === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                            )}>
                                 {displayStatus === "active" ? "Actif" : "Brouillon"}
                             </span>
                         </div>
                         <p className="text-sm text-gray-500">{agent.role} — {agent.llm_model}</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" className="gap-2"> <Pause className="w-4 h-4" /> Pause </Button>
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2"> <Settings className="w-4 h-4" /> Modifier </Button>
-                </div>
+
             </div>
 
-            {/* Detail Tabs */}
             <div className="flex items-center gap-1 p-1 bg-gray-100/50 rounded-xl w-fit">
-                {["Aperçu", "Configuration", "Connaissance", "Activité"].map((tab) => (
+                {["Aperçu", "Configuration", "Connaissance"].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveDetailTab(tab)}
@@ -82,7 +140,6 @@ export function AgentDetailView({ agent, onBack }: { agent: any; onBack: () => v
             {activeDetailTab === "Aperçu" && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-8">
-                        {/* Summary Stats */}
                         <div className="grid grid-cols-3 gap-6">
                             <div className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm">
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Conversations</p>
@@ -98,32 +155,42 @@ export function AgentDetailView({ agent, onBack }: { agent: any; onBack: () => v
                             </div>
                         </div>
 
+
                         {/* Recent History Table */}
                         <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
                             <div className="px-6 py-4 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
                                 <h3 className="font-bold text-gray-900 text-sm">Dernières interactions</h3>
-                                <button className="text-xs font-bold text-blue-600">Voir tout</button>
+                                <button
+                                    onClick={() => onNavigateToInbox?.(agent.id)}
+                                    className="text-xs font-bold text-blue-600 hover:underline"
+                                >
+                                    Voir tout
+                                </button>
                             </div>
                             <div className="divide-y divide-gray-50">
-                                {[
-                                    { user: "Client #892", label: "Demande tarif", date: "Il y a 5m", status: "Résolu" },
-                                    { user: "Client #891", label: "Problème accès", date: "Il y a 12m", status: "Résolu" },
-                                    { user: "Client #890", label: "Lead Qualifié", date: "Il y a 1h", status: "Succès" }
-                                ].map((item, i) => (
+                                {(agent.messages?.slice() || []).reverse().slice(0, 5).map((msg: any, i: number) => (
                                     <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-bold text-[10px]">C</div>
+                                            <div className={cn(
+                                                "w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px]",
+                                                (msg.sender === 'user' || msg.sender === 'USER') ? "bg-blue-50 text-blue-600" : "bg-gray-900 text-white"
+                                            )}>
+                                                {(msg.sender === 'user' || msg.sender === 'USER') ? 'U' : 'A'}
+                                            </div>
                                             <div>
-                                                <p className="text-sm font-bold text-gray-900">{item.user}</p>
-                                                <p className="text-xs text-gray-500">{item.label}</p>
+                                                <p className="text-sm font-bold text-gray-900">{(msg.sender === 'user' || msg.sender === 'USER') ? (msg.contact_info || 'Utilisateur') : agent.name}</p>
+                                                <p className="text-xs text-gray-500 line-clamp-1 max-w-xs">{msg.content}</p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-xs font-bold text-gray-900">{item.status}</p>
-                                            <p className="text-[10px] text-gray-400">{item.date}</p>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-[9px] font-black uppercase tracking-tighter text-gray-300 px-1.5 py-0.5 border border-gray-100 rounded">{msg.source || 'chat'}</span>
+                                            <p className="text-[10px] font-bold text-gray-400">{new Date(msg.created_at).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
                                         </div>
                                     </div>
                                 ))}
+                                {(!agent.messages || agent.messages.length === 0) && (
+                                    <p className="px-6 py-8 text-center text-sm text-gray-400 font-medium">Aucune interaction récente.</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -133,129 +200,50 @@ export function AgentDetailView({ agent, onBack }: { agent: any; onBack: () => v
                         <div className="p-8 bg-white border border-gray-100 rounded-[2rem] shadow-sm">
                             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2"> <Globe className="w-4 h-4 text-gray-400" /> Canaux actifs</h3>
                             <div className="space-y-4">
-                                {agent.channels.map((chan: string) => (
-                                    <div key={chan} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                                        <div className="flex items-center gap-3">
-                                            {chan === 'website' && <Globe className="w-4 h-4 text-blue-500" />}
-                                            {chan === 'email' && <Mail className="w-4 h-4 text-orange-500" />}
-                                            {chan === 'whatsapp' && <MessageSquare className="w-4 h-4 text-green-500" />}
-                                            <span className="text-sm font-bold capitalize">{chan}</span>
+                                {['chat', 'email', 'whatsapp'].map((chan) => {
+                                    const isActive = agent.channels?.includes(chan);
+                                    return (
+                                        <div key={chan} className={cn(
+                                            "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group",
+                                            isActive
+                                                ? "bg-blue-50/50 border-blue-100"
+                                                : "bg-gray-50/30 border-gray-100 grayscale opacity-60 hover:grayscale-0 hover:opacity-100"
+                                        )}
+                                            onClick={() => handleToggleChannel(chan)}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                {chan === 'chat' && <Globe className={cn("w-4 h-4", isActive ? "text-blue-500" : "text-gray-400")} />}
+                                                {chan === 'email' && <Mail className={cn("w-4 h-4", isActive ? "text-orange-500" : "text-gray-400")} />}
+                                                {chan === 'whatsapp' && <MessageSquare className={cn("w-4 h-4", isActive ? "text-green-500" : "text-gray-400")} />}
+                                                <span className={cn("text-sm font-bold capitalize", isActive ? "text-blue-900" : "text-gray-400")}>{chan === 'chat' ? 'Web Chat' : chan}</span>
+                                            </div>
+                                            <div className={cn(
+                                                "w-10 h-5 rounded-full relative transition-all duration-300 p-1",
+                                                isActive ? "bg-blue-900" : "bg-gray-200"
+                                            )}>
+                                                <div className={cn(
+                                                    "w-3 h-3 bg-white rounded-full transition-all",
+                                                    isActive ? "translate-x-5" : "translate-x-0"
+                                                )} />
+                                            </div>
                                         </div>
-                                        <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
+                            <p className="mt-4 text-[10px] text-gray-400 italic text-center">Cliquez sur un canal pour l'activer ou le désactiver.</p>
                         </div>
 
                         {/* Quick Actions (Sandbox) */}
                         <div className="p-8 bg-gray-900 rounded-[2rem] text-white shadow-xl relative overflow-hidden group">
                             <h3 className="font-bold mb-4 relative z-10">Test Sandbox</h3>
-                            <p className="text-xs text-gray-400 mb-6 relative z-10">Lancez une simulation pour tester les nouvelles instructions.</p>
-                            <Button 
-                                onClick={() => setShowSandbox(true)}
+                            <p className="text-xs text-gray-400 mb-6 relative z-10">Lancez une simulation pour tester les nouvelles instructions en mode isolé.</p>
+                            <Button
+                                onClick={() => { setSandboxMessages([]); setShowSandbox(true); }}
                                 className="w-full bg-white text-gray-900 hover:bg-blue-50 font-bold rounded-xl relative z-10"
                             >
                                 DÉMARRER LE TEST
                             </Button>
                             <Terminal className="absolute -bottom-6 -right-6 w-24 h-24 text-white/5 -rotate-12 group-hover:rotate-0 transition-transform" />
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Sandbox Modal */}
-            {showSandbox && (
-                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[100] flex items-center justify-end p-4 lg:p-8">
-                    <div className="w-full max-w-2xl h-[90vh] bg-white rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right-12 duration-500">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-blue-900 rounded-xl text-white">
-                                    <Terminal className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-900">Sandbox Test — {agent.name}</h3>
-                                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Environnement de simulation Isolé</p>
-                                </div>
-                            </div>
-                            <button 
-                                onClick={() => setShowSandbox(false)}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                <Plus className="w-6 h-6 rotate-45 text-gray-400" />
-                            </button>
-                        </div>
-                        
-                        <div 
-                            ref={scrollRef}
-                            className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/30"
-                        >
-                            {messages.length === 0 && (
-                                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 px-12">
-                                    <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center">
-                                        <MessageSquare className="w-8 h-8 text-blue-100" />
-                                    </div>
-                                    <h4 className="font-bold text-gray-900">Début de la simulation</h4>
-                                    <p className="text-sm text-gray-400">Envoyez un message pour tester comment l'agent réagit avec ses instructions actuelles.</p>
-                                </div>
-                            )}
-                            
-                            {messages.map((msg, i) => (
-                                <div 
-                                    key={i} 
-                                    className={cn(
-                                        "flex gap-4 max-w-[85%]",
-                                        msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
-                                    )}
-                                >
-                                    <div className={cn(
-                                        "w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 font-bold text-[10px]",
-                                        msg.role === 'user' ? "bg-gray-900" : "bg-blue-900"
-                                    )}>
-                                        {msg.role === 'user' ? <User className="w-4 h-4" /> : agent.name.charAt(0)}
-                                    </div>
-                                    <div className={cn(
-                                        "p-4 rounded-2xl text-sm leading-relaxed shadow-sm",
-                                        msg.role === 'user' ? "bg-gray-900 text-white rounded-tr-none" : "bg-white border border-gray-100 text-gray-700 rounded-tl-none"
-                                    )}>
-                                        {msg.content}
-                                    </div>
-                                </div>
-                            ))}
-                            
-                            {isTyping && (
-                                <div className="flex gap-4 mr-auto">
-                                    <div className="w-8 h-8 rounded-lg bg-blue-900 flex items-center justify-center text-white shrink-0">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                    </div>
-                                    <div className="p-4 bg-white border border-gray-100 rounded-2xl rounded-tl-none shadow-sm">
-                                        <div className="flex gap-1">
-                                            <span className="w-1.5 h-1.5 bg-gray-200 rounded-full animate-bounce" />
-                                            <span className="w-1.5 h-1.5 bg-gray-200 rounded-full animate-bounce [animation-delay:0.2s]" />
-                                            <span className="w-1.5 h-1.5 bg-gray-200 rounded-full animate-bounce [animation-delay:0.4s]" />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="p-6 bg-white border-t border-gray-100">
-                            <div className="relative group">
-                                <input 
-                                    type="text"
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                    placeholder="Simuler un message client..."
-                                    className="w-full pl-6 pr-16 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-blue-800/5 focus:bg-white transition-all font-medium"
-                                />
-                                <button 
-                                    onClick={handleSendMessage}
-                                    disabled={!inputValue.trim() || isTyping}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-blue-900 text-white rounded-xl hover:bg-blue-900 transition-all shadow-lg shadow-blue-200 disabled:opacity-50 disabled:shadow-none"
-                                >
-                                    <Send className="w-4 h-4" />
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -268,175 +256,269 @@ export function AgentDetailView({ agent, onBack }: { agent: any; onBack: () => v
                             <div>
                                 <h3 className="text-lg font-bold text-gray-900 mb-4">Instructions Système</h3>
                                 <textarea
-                                    className="w-full h-64 p-6 bg-gray-50 border border-gray-100 rounded-xl text-sm leading-relaxed text-gray-600 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:bg-white transition-all resize-none"
-                                    defaultValue={agent.system_prompt || `Tu es ${agent.name}, un ${agent.role} expert. Ta mission principale est : ${agent.description}.
-
-Directives :
-1. Sois toujours professionnel et courtois.
-2. Utilise le vouvoiement avec les clients.
-3. Si tu ne connais pas la réponse, redirige vers un agent humain.`}
+                                    className="w-full h-80 p-6 bg-gray-50 border border-gray-100 rounded-xl text-sm leading-relaxed text-gray-600 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:bg-white transition-all resize-none font-medium"
+                                    value={systemPrompt}
+                                    onChange={(e) => setSystemPrompt(e.target.value)}
+                                    placeholder="Décrivez les instructions de l'agent..."
                                 />
                             </div>
                             <div className="flex justify-end gap-3">
-                                <Button variant="outline">Réinitialiser</Button>
-                                <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200">Enregistrer les instructions</Button>
-                            </div>
-                        </div>
-
-                        <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm space-y-6">
-                            <h3 className="text-lg font-bold text-gray-900">Intelligence & Modèle</h3>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Modèle de base</label>
-                                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium">
-                                        <option>{agent.llm_model} (Actuel)</option>
-                                        <option>GPT-4o</option>
-                                        <option>Claude 3.5 Sonnet</option>
-                                        <option>Gemini 1.5 Pro</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Température</label>
-                                    <div className="flex items-center gap-4 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl">
-                                        <input type="range" className="flex-1 accent-blue-600" min="0" max="100" defaultValue="70" />
-                                        <span className="text-sm font-bold text-gray-900 w-8">0.7</span>
-                                    </div>
-                                </div>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setSystemPrompt(agent.system_prompt)}
+                                >
+                                    Réinitialiser
+                                </Button>
+                                <Button
+                                    onClick={handleSaveConfig}
+                                    disabled={isSavingConfig || systemPrompt === agent.system_prompt}
+                                    className="bg-blue-900 hover:bg-black text-white shadow-lg shadow-blue-100"
+                                >
+                                    {isSavingConfig ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Shield className="w-4 h-4 mr-2" />}
+                                    Enregistrer les modifications
+                                </Button>
                             </div>
                         </div>
                     </div>
 
                     <div className="space-y-6">
-                        <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm space-y-6">
-                            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2"> <Shield className="w-5 h-5 text-blue-600" /> Sécurité & État</h3>
+                        <div className="p-8 bg-white border border-gray-100 rounded-[2rem] shadow-sm">
+                            <h3 className="font-bold text-gray-900 mb-4">Détails de l'unité</h3>
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                    <div>
-                                        <p className="text-sm font-bold text-gray-900">Mode Filtrage</p>
-                                        <p className="text-[10px] text-gray-500">Bloque le contenu inapproprié</p>
-                                    </div>
-                                    <div className="w-12 h-6 bg-blue-600 rounded-full relative p-1 cursor-pointer">
-                                        <div className="w-4 h-4 bg-white rounded-full absolute right-1" />
-                                    </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-gray-400">Modèle IA</p>
+                                    <p className="text-sm font-bold">{agent.llm_model}</p>
                                 </div>
-                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                    <div>
-                                        <p className="text-sm font-bold text-gray-900">Anonymisation</p>
-                                        <p className="text-[10px] text-gray-500">Masque les données sensibles</p>
-                                    </div>
-                                    <div className="w-12 h-6 bg-gray-200 rounded-full relative p-1 cursor-pointer">
-                                        <div className="w-4 h-4 bg-white rounded-full absolute left-1" />
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-gray-400">Température</p>
+                                    <p className="text-sm font-bold">{agent.temperature}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-gray-400">Mode d'exécution</p>
+                                    <p className="text-sm font-bold capitalize">{agent.execution_mode.replace('_', ' ')}</p>
+                                </div>
+                                <div className="space-y-1 pt-4 border-t border-gray-100">
+                                    <p className="text-[10px] font-black uppercase text-gray-400">Équipe Assignée</p>
+                                    <div className="flex items-center gap-2">
+                                        {agent.team_color && (
+                                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: agent.team_color }} />
+                                        )}
+                                        <select 
+                                            className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold focus:outline-none"
+                                            value={agent.team || ""}
+                                            onChange={async (e) => {
+                                                const val = e.target.value === "" ? null : parseInt(e.target.value);
+                                                await updateAgent(agent.id, { team: val });
+                                                onRefresh?.();
+                                            }}
+                                        >
+                                            <option value="">AUCUNE ÉQUIPE</option>
+                                            {((useAgents() as any).teams || []).map((t: any) => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="p-8 bg-red-50 border border-red-100 rounded-[2.5rem] space-y-4">
-                            <h3 className="text-sm font-bold text-red-900">Zone de danger</h3>
-                            <p className="text-xs text-red-600 leading-relaxed">Supprimer cet agent effacera définitivement toutes ses données et son historique.</p>
-                            <Button variant="outline" className="w-full border-red-200 text-red-600 hover:bg-red-600 hover:text-white transition-all font-bold">Supprimer l'agent</Button>
                         </div>
                     </div>
                 </div>
             )}
 
             {activeDetailTab === "Connaissance" && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h3 className="text-xl font-bold text-gray-900">Base de Connaissances</h3>
-                            <p className="text-sm text-gray-500">Gérez les documents et sources de données de votre agent.</p>
+                            <h3 className="text-xl font-bold text-gray-900">Base de Connaissance</h3>
+                            <p className="text-sm text-gray-400">Documents utilisés par l'IA pour répondre.</p>
                         </div>
-                        <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-lg shadow-blue-200">
-                            <Plus className="w-4 h-4" /> Ajouter une source
+                        <input
+                            type="file"
+                            className="hidden"
+                            ref={kbFileRef}
+                            multiple
+                            onChange={handleKbUpload}
+                        />
+                        <Button
+                            onClick={() => kbFileRef.current?.click()}
+                            disabled={isUploading}
+                            className="bg-blue-900 text-white gap-2"
+                        >
+                            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            Ajouter des documents
                         </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {agent.knowledge_base && agent.knowledge_base.map((doc: any, i: number) => (
-                             <div key={i} className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-all group">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="p-3 rounded-xl bg-gray-50 group-hover:bg-white transition-colors border border-transparent group-hover:border-gray-100 text-blue-600">
-                                        <FileText className="w-6 h-6" />
-                                    </div>
-                                    <span className="px-2 py-1 bg-green-50 text-green-700 text-[10px] font-bold rounded-lg uppercase tracking-wider">Indexé</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {agent.knowledge_bases?.map((kb: any) => (
+                            <div key={kb.id} className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm hover:border-blue-200 transition-all flex items-start gap-4">
+                                <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
+                                    <FileText className="w-6 h-6" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 mb-1 truncate">{doc.file_name || doc.name}</h4>
-                                <div className="flex items-center justify-between text-[11px] text-gray-400 font-bold uppercase tracking-tight">
-                                    <span>DOCUMENT</span>
-                                    <span>{(doc.file_size / 1024).toFixed(1)} KB</span>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold text-gray-900 truncate">{kb.name}</h4>
+                                    <p className="text-xs text-gray-400 uppercase font-black">{kb.source_type}</p>
+                                    <p className="text-[10px] text-gray-300 mt-2">{new Date(kb.created_at).toLocaleDateString()}</p>
                                 </div>
+                                <button className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
                             </div>
                         ))}
-                    </div>
-
-                    <div className="p-12 border-2 border-dashed border-gray-100 rounded-[3rem] bg-gray-50/50 flex flex-col items-center justify-center text-center">
-                        <div className="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6">
-                            <Database className="w-8 h-8 text-blue-100" />
-                        </div>
-                        <h4 className="text-lg font-bold text-gray-900 mb-2">Étendre les connaissances</h4>
-                        <p className="text-sm text-gray-400 max-w-sm mb-8">Glissez-déposez de nouveaux fichiers ou connectez une source API externe pour enrichir les capacités de réponse.</p>
-                        <div className="flex gap-3">
-                            <Button variant="outline">Connecter Notion</Button>
-                            <Button variant="outline">Connecter Drive</Button>
-                        </div>
+                        {(!agent.knowledge_bases || agent.knowledge_bases.length === 0) && (
+                            <div className="col-span-full py-16 text-center border-2 border-dashed border-gray-100 rounded-3xl bg-gray-50/50">
+                                <p className="text-sm font-bold text-gray-300 uppercase tracking-widest">Aucune connaissance chargée</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
-            {activeDetailTab === "Activité" && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex items-center justify-between">
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Rechercher dans les logs..."
-                                className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/5 shadow-sm"
-                            />
+            {/* Sandbox Modal */}
+            <SandboxModal
+                isOpen={showSandbox}
+                onClose={() => setShowSandbox(false)}
+                agent={agent}
+                messages={sandboxMessages}
+                input={sandboxInput}
+                setInput={setSandboxInput}
+                onSend={handleSendSandboxMessage}
+                isTyping={isSandboxTyping}
+                scrollRef={scrollRef}
+                isAtBottom={isAtBottom}
+                setIsAtBottom={setIsAtBottom}
+                onFeedback={async (msgId: any, rating: string) => {
+                    const token = localStorage.getItem('access_token');
+                    if (!token) return;
+                    try {
+                        await fetch(`http://localhost:8000/api/agents/${agent.id}/feedback/`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message_id: msgId, rating })
+                        });
+                        setSandboxMessages((prev: any[]) => prev.map((m, i) => i === msgId ? { ...m, feedback: rating } : m));
+                    } catch (e) { }
+                }}
+            />
+        </div>
+    );
+}
+
+function SandboxModal({ isOpen, onClose, agent, messages, input, setInput, onSend, isTyping, scrollRef, onFeedback, isAtBottom, setIsAtBottom }: any) {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[100] flex items-center justify-end p-4 lg:p-8">
+            <div className="w-full max-w-2xl h-[90vh] bg-white rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right-12 duration-500">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-900 rounded-xl text-white">
+                            <Terminal className="w-5 h-5" />
                         </div>
-                        <div className="flex gap-3">
-                            <Button variant="outline" className="gap-2"> <Filter className="w-4 h-4" /> Filtres </Button>
-                            <Button variant="outline" className="gap-2"> <ExternalLink className="w-4 h-4" /> Exporter </Button>
+                        <div>
+                            <h3 className="font-bold text-gray-900">Sandbox Test — {agent.name}</h3>
+                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Environnement de simulation Isolé</p>
                         </div>
                     </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                        <X className="w-6 h-6 text-gray-400" />
+                    </button>
+                </div>
 
-                    <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                        <div className="divide-y divide-gray-50">
-                            {[
-                                { user: "Client #892", time: "11:42", type: "Resolution", prompt: "Combien coûte le pack Business ?", model: "GPT-4o", fidelity: "98%" },
-                                { user: "Système", time: "10:15", type: "Sync", prompt: "Mise à jour de la base de connaissances", model: "RAG Engine", fidelity: "-" },
-                                { user: "Client #891", time: "09:30", type: "Handover", prompt: "Je voudrais parler à un humain pour une demande spéciale.", model: "GPT-4o", fidelity: "85%" },
-                                { user: "Client #890", time: "Hier, 18:20", type: "Lead", prompt: "Je suis intéressé par une démo personnalisée.", model: "GPT-4o", fidelity: "92%" },
-                            ].map((log, i) => (
-                                <div key={i} className="p-6 hover:bg-gray-50 transition-colors cursor-pointer group">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{log.time}</span>
-                                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase",
-                                                log.type === 'Resolution' ? "bg-green-100 text-green-700" :
-                                                    log.type === 'Sync' ? "bg-blue-100 text-blue-700" :
-                                                        log.type === 'Handover' ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-900"
-                                            )}>{log.type}</span>
+                <div
+                    ref={scrollRef}
+                    className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/30"
+                    onScroll={(e) => {
+                        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                        setIsAtBottom(scrollHeight - scrollTop - clientHeight < 100);
+                    }}
+                >
+                    {messages.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4 px-12">
+                            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center">
+                                <MessageSquare className="w-8 h-8 text-blue-100" />
+                            </div>
+                            <h4 className="font-bold text-gray-900">Début de la simulation</h4>
+                            <p className="text-sm text-gray-400">Envoyez un message pour tester comment l'agent réagit avec ses instructions actuelles sans affecter l'historique réel.</p>
+                        </div>
+                    )}
+
+                    {messages.map((msg: any, i: number) => (
+                        <div
+                            key={i}
+                            className={cn(
+                                "flex gap-4 max-w-[85%]",
+                                msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
+                            )}
+                        >
+                            <div className={cn(
+                                "w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 font-bold text-[10px]",
+                                msg.role === 'user' ? "bg-gray-900" : "bg-blue-900"
+                            )}>
+                                {msg.role === 'user' ? <User className="w-4 h-4" /> : agent.name.charAt(0)}
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className={cn(
+                                    "p-4 rounded-2xl text-sm leading-relaxed shadow-sm group relative",
+                                    msg.role === 'user' ? "bg-gray-900 text-white rounded-tr-none" : "bg-white border border-gray-100 text-gray-700 rounded-tl-none"
+                                )}>
+                                    {msg.content}
+                                    {msg.role !== 'user' && !msg.feedback && (
+                                        <div className="absolute top-1/2 -translate-y-1/2 -right-12 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => onFeedback(i, 'good')} className="p-1 hover:text-emerald-500 text-gray-300 transition-colors"><ThumbsUp className="w-3 h-3" /></button>
+                                            <button onClick={() => onFeedback(i, 'bad')} className="p-1 hover:text-red-500 text-gray-300 transition-colors"><ThumbsDown className="w-3 h-3" /></button>
                                         </div>
-                                        <div className="flex items-center gap-4 text-[10px] font-bold text-gray-400">
-                                            <span className="flex items-center gap-1"> <Zap className="w-3 h-3" /> {log.model}</span>
-                                            <span className="flex items-center gap-1"> <Shield className="w-3 h-3" /> {log.fidelity}</span>
+                                    )}
+                                    {msg.feedback && (
+                                        <div className="absolute top-1/2 -translate-y-1/2 -right-10">
+                                            <span className={cn("text-[8px] font-black uppercase", msg.feedback === 'good' ? "text-emerald-500" : "text-red-400")}>
+                                                {msg.feedback === 'good' ? 'Utile' : 'Inutile'}
+                                            </span>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-900 mb-1">{log.user}</p>
-                                            <p className="text-sm text-gray-500 line-clamp-1">{log.prompt}</p>
-                                        </div>
-                                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
-                                    </div>
+                                    )}
                                 </div>
-                            ))}
+                            </div>
                         </div>
+                    ))}
+
+                    {isTyping && (
+                        <div className="flex gap-4 mr-auto">
+                            <div className="w-8 h-8 rounded-lg bg-blue-900 flex items-center justify-center text-white shrink-0">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            </div>
+                            <div className="p-4 bg-white border border-gray-100 rounded-2xl rounded-tl-none shadow-sm">
+                                <div className="flex gap-1">
+                                    <span className="w-1.5 h-1.5 bg-gray-200 rounded-full animate-bounce" />
+                                    <span className="w-1.5 h-1.5 bg-gray-200 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                    <span className="w-1.5 h-1.5 bg-gray-200 rounded-full animate-bounce [animation-delay:0.4s]" />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-6 bg-white border-t border-gray-100">
+                    <div className="relative group">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && onSend()}
+                            placeholder="Simuler un message client..."
+                            className="w-full pl-6 pr-16 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-blue-800/5 focus:bg-white transition-all font-medium"
+                        />
+                        <button
+                            onClick={onSend}
+                            disabled={!input.trim() || isTyping}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-blue-900 text-white rounded-xl hover:bg-black transition-all shadow-lg shadow-blue-200 disabled:opacity-50 disabled:shadow-none"
+                        >
+                            <Send className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

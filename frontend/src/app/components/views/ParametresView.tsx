@@ -4,7 +4,7 @@ import { useAgents } from "../../hooks/useAgents";
 
 const SECTIONS = [
     { id: "profile", label: "Administrateur" },
-    { id: "workspace", label: "Workspace" },
+    { id: "workspace", label: "Espace de travail" },
     { id: "integrations", label: "Intégrations" },
     { id: "security", label: "Sécurité" },
 ];
@@ -88,7 +88,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                     first_name: data.first_name || "",
                     last_name: data.last_name || "",
                     recovery_email: data.recovery_email || "",
-                    workspace_label: data.workspace_label || "Mon Workspace",
+                    workspace_label: data.workspace_label || "Mon espace de travail",
                     timezone: data.timezone || "Indian/Antananarivo",
                     avatar_url: data.avatar_url || ""
                 });
@@ -125,12 +125,18 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
             if (res.ok) {
                 onProfileUpdate?.();
                 await fetchProfile();
+                setSelectedFile(null);
+                alert("Profil mis à jour avec succès !");
+            } else {
+                const errorData = await res.json();
+                console.error("Profile save error", errorData);
+                alert("Erreur lors de la sauvegarde : " + (JSON.stringify(errorData) || res.statusText));
             }
         } catch (err) {
             console.error("Failed to save profile", err);
+            alert("Erreur réseau lors de la sauvegarde.");
         } finally {
             setIsSaving(false);
-            setSelectedFile(null);
         }
     };
 
@@ -158,15 +164,15 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
     }
 
     return (
-        <div className="max-w-5xl space-y-6 animate-in fade-in duration-500 pb-12 relative">
+        <div className="h-full flex flex-col space-y-6 animate-page-fade overflow-hidden">
             <div className="flex items-start justify-between">
                 <div className="space-y-1">
-                    <h2 className="magia-h1 uppercase">Paramètres</h2>
+                    <h2 className="magia-h1 uppercase text-2xl">Paramètres</h2>
                 </div>
             </div>
 
-            <div className="flex gap-6 items-start">
-                <div className="w-64 shrink-0 space-y-1 bg-white border border-gray-100 rounded-lg p-2 shadow-sm">
+            <div className="flex gap-6 items-start flex-1 overflow-hidden">
+                <div className="w-64 shrink-0 space-y-1 bg-white border border-gray-100 rounded-2xl p-3 shadow-sm">
                     {SECTIONS.map((s) => (
                         <button
                             key={s.id}
@@ -175,7 +181,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                 "w-full flex items-center gap-3 px-4 py-3 rounded-md text-[11px] font-black uppercase tracking-widest transition-all",
                                 activeSection === s.id
                                     ? "bg-gray-900 text-white shadow-lg shadow-gray-200"
-                                    : "text-gray-400 hover:bg-gray-50 hover:text-gray-900"
+                                    : "text-gray-400 hover:bg-gray-100 hover:text-gray-900 rounded-xl"
                             )}
                         >
                             {s.label}
@@ -183,8 +189,8 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                     ))}
                 </div>
 
-                <div className="flex-1 bg-white border border-gray-100 rounded-lg shadow-sm overflow-hidden">
-                    <div className="p-8">
+                <div className="flex-1 bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden flex flex-col h-full">
+                    <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
                         {activeSection === "profile" && (
                             <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
@@ -192,7 +198,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                     <div className="flex items-center gap-8">
                                         <div className="relative group">
                                             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-                                            <div onClick={handleAvatarClick} className="w-24 h-24 bg-gray-900 rounded-lg flex items-center justify-center text-white text-3xl font-serif font-bold shadow-xl overflow-hidden relative cursor-pointer">
+                                            <div onClick={handleAvatarClick} className="w-24 h-24 bg-gray-900 rounded-2xl flex items-center justify-center text-white text-3xl font-serif font-bold shadow-xl overflow-hidden relative cursor-pointer">
                                                 {formData.avatar_url ? (
                                                     <img src={formData.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                                                 ) : (
@@ -200,7 +206,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                 )}
                                                 <div className="absolute inset-0 bg-blue-900/20 group-hover:bg-transparent transition-colors" />
                                             </div>
-                                            <button onClick={handleAvatarClick} className="absolute -bottom-2 -right-2 p-2 bg-white border border-gray-100 shadow-lg rounded-md hover:scale-110 transition-transform">
+                                            <button onClick={handleAvatarClick} className="absolute -bottom-2 -right-2 p-2 bg-white border border-gray-100 shadow-lg rounded-xl hover:scale-110 transition-transform">
                                                 <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                             </button>
                                         </div>
@@ -226,11 +232,11 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                         <div className="space-y-4">
                                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Label du Workspace</label>
-                                            <input name="workspace_label" value={formData.workspace_label} onChange={handleChange} type="text" className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-md text-sm font-black font-serif outline-none focus:border-blue-900 transition-colors" />
+                                            <input name="workspace_label" value={formData.workspace_label} onChange={handleChange} type="text" className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm font-black font-serif outline-none focus:border-blue-900 transition-colors" />
                                         </div>
                                         <div className="space-y-4">
                                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Localisation Temporelle</label>
-                                            <select name="timezone" value={formData.timezone} onChange={handleChange} className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-md text-sm font-black font-serif outline-none focus:border-blue-900 transition-colors cursor-pointer">
+                                            <select name="timezone" value={formData.timezone} onChange={handleChange} className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm font-black font-serif outline-none focus:border-blue-900 transition-colors cursor-pointer">
                                                 <option value="Indian/Antananarivo">Antananarivo (GMT+3)</option>
                                                 <option value="Europe/Paris">Paris (GMT+1)</option>
                                                 <option value="UTC">UTC</option>
@@ -259,11 +265,11 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                         key={app}
                                                         onClick={() => isFunctional && setConfigTarget(app.toLowerCase() as any)}
                                                         className={cn(
-                                                            "p-5 bg-white border border-gray-100 rounded-lg flex items-center gap-4 hover:border-blue-200 hover:shadow-md transition-all group cursor-pointer relative overflow-hidden",
+                                                            "p-5 bg-white border border-gray-100 rounded-2xl flex items-center gap-4 hover:border-blue-200 hover:shadow-md transition-all group cursor-pointer relative overflow-hidden",
                                                             !isFunctional && "opacity-50 grayscale cursor-not-allowed"
                                                         )}
                                                     >
-                                                        <div className="w-10 h-10 bg-gray-50 rounded-md flex items-center justify-center text-sm font-black italic text-gray-300 group-hover:text-blue-900 transition-colors">
+                                                        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-sm font-black italic text-gray-300 group-hover:text-blue-900 transition-colors">
                                                             {app.charAt(0)}
                                                         </div>
                                                         <div>
@@ -286,8 +292,8 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                     Retour au Hub
                                                 </button>
                                                 <button
-                                                    onClick={() => configTarget === 'whatsapp' ? addWhatsAppConfig() : addEmailConfig()}
-                                                    className="px-4 py-2 bg-gray-900 text-white rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-blue-900 transition-colors"
+                                                    onClick={() => configTarget === 'whatsapp' ? addWhatsAppConfig({ name: 'Nouveau WhatsApp', phone_number: '' }) : addEmailConfig({ name: 'Nouveau Email', email: '' })}
+                                                    className="px-4 py-2 bg-gray-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-900 transition-colors"
                                                 >
                                                     + Nouveau {configTarget === 'whatsapp' ? 'Numéro' : 'Compte'}
                                                 </button>
@@ -295,7 +301,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
 
                                             <div className="grid grid-cols-1 gap-4">
                                                 {(configTarget === 'whatsapp' ? whatsappConfigs : emailConfigs).map((c: any) => (
-                                                    <div key={c.id} className="p-6 bg-gray-50 border border-gray-100 rounded-lg flex items-center justify-between group">
+                                                    <div key={c.id} className="p-6 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between group">
                                                         <div className="flex items-center gap-4">
                                                             <div className={cn(
                                                                 "w-3 h-3 rounded-full shadow-sm",
@@ -312,7 +318,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                 <>
                                                                     <button
                                                                         onClick={() => c.is_connected ? toggleWhatsAppConnection(c.id) : startWhatsAppPairing(c.id)}
-                                                                        className="px-4 py-2 bg-white border border-gray-100 rounded text-[9px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-sm"
+                                                                        className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-sm"
                                                                     >
                                                                         {c.is_connected ? "Déconnecter" : (c.qr_code ? "Afficher QR" : "Appairer")}
                                                                     </button>
@@ -321,12 +327,12 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                 <div className="flex items-center gap-3">
                                                                     {c.is_active ? (
                                                                         <div className="flex items-center gap-3">
-                                                                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-3 py-2 rounded border border-emerald-100">
+                                                                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
                                                                                 Connecté
                                                                             </span>
                                                                             <button
                                                                                 onClick={() => deleteEmailConfig(c.id)}
-                                                                                className="px-4 py-2 bg-white border border-gray-100 rounded text-[9px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all shadow-sm"
+                                                                                className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all shadow-sm"
                                                                             >
                                                                                 Déconnecter
                                                                             </button>
@@ -392,47 +398,47 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                 <div>
                                     <h3 className="magia-label mb-6 text-blue-900">PROTOCOLES DE SÉCURITÉ</h3>
                                     <div className="space-y-4">
-                                        <div className="p-6 bg-gray-50 border border-gray-100 rounded-lg flex items-center justify-between group">
+                                        <div className="p-6 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between group">
                                             <div>
                                                 <p className="magia-label text-gray-900 mb-1">Master API Key</p>
                                                 <p className="text-[10px] font-mono text-gray-300 group-hover:text-blue-900 transition-colors uppercase">
                                                     {securitySettings?.master_api_key || '••••••••••••••••'}
                                                 </p>
                                             </div>
-                                            <button 
+                                            <button
                                                 onClick={regenerateMasterKey}
-                                                className="px-5 py-2.5 bg-white border border-gray-100 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-sm"
+                                                className="px-5 py-2.5 bg-white border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-sm"
                                             >
                                                 RÉGÉNÉRER
                                             </button>
                                         </div>
-                                        <div className="p-6 bg-gray-900 rounded-lg flex items-center justify-between text-white">
+                                        <div className="p-6 bg-gray-900 rounded-2xl flex items-center justify-between text-white">
                                             <div>
                                                 <p className="magia-label opacity-60 mb-1 text-white">Authentification 2FA</p>
                                                 <p className="text-[11px] font-medium italic opacity-80">
                                                     {securitySettings?.is_2fa_enabled ? "Protection biométrique activée" : "Protection non activée"}
                                                 </p>
                                             </div>
-                                            <div 
-                                                onClick={toggle2FA}
+                                            <div
+                                                onClick={() => toggle2FA(!securitySettings?.is_2fa_enabled)}
                                                 className={`w-10 h-5 rounded-full flex items-center px-1 cursor-pointer transition-colors ${securitySettings?.is_2fa_enabled ? 'bg-blue-900' : 'bg-gray-700'}`}
                                             >
                                                 <div className={`w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${securitySettings?.is_2fa_enabled ? 'ml-auto' : ''}`} />
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="pt-8 mt-8 border-t border-gray-100">
-                                        <div className="p-6 bg-red-50 rounded-2xl border border-red-100 flex items-center justify-between">
+                                        <div className="p-6 bg-red-50 rounded-none border border-red-100 flex items-center justify-between">
                                             <div className="space-y-1">
                                                 <h3 className="text-sm font-bold text-red-900 uppercase tracking-wider">Zone Danger</h3>
                                                 <p className="text-[11px] text-red-600 font-medium italic">
                                                     La suppression du compte est irréversible. Toutes vos données seront effacées.
                                                 </p>
                                             </div>
-                                            <button 
+                                            <button
                                                 onClick={() => {
-                                                    if(window.confirm("Êtes-vous certain de vouloir supprimer votre compte MAGIA ? Cette action est définitive.")) {
+                                                    if (window.confirm("Êtes-vous certain de vouloir supprimer votre compte MAGIA ? Cette action est définitive.")) {
                                                         handleDeleteAccount();
                                                     }
                                                 }}
@@ -447,10 +453,10 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                         )}
                     </div>
 
-                    <div className="px-8 py-6 bg-gray-50/50 border-t border-gray-50 flex justify-end gap-3">
-                        <button className="px-8 py-2.5 rounded-md text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-gray-900 transition-all" onClick={fetchProfile}>ANNULER</button>
+                    <div className="px-8 py-6 bg-gray-50/50 border-t border-gray-50 flex justify-end gap-3 flex-shrink-0">
+                        <button className="px-8 py-2.5 rounded-xl text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-gray-900 transition-all" onClick={fetchProfile}>ANNULER</button>
                         <button
-                            className="px-10 py-2.5 bg-gray-900 text-white rounded-md font-black text-[10px] uppercase tracking-widest shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all disabled:opacity-50"
+                            className="px-10 py-2.5 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all disabled:opacity-50"
                             onClick={handleSave}
                             disabled={isSaving}
                         >
@@ -463,22 +469,22 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
             {/* WhatsApp QR Modal */}
             {whatsappConfigs.some(c => !c.is_connected && c.qr_code) && (
                 <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-xl z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
+                    <div className="bg-white rounded-none w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
                         <div className="p-8 text-center space-y-6">
                             <div className="space-y-2">
                                 <h3 className="text-xl font-bold text-gray-900 font-serif">Appairage WhatsApp</h3>
                                 <p className="text-xs text-gray-400 uppercase font-black tracking-widest">Scannez pour connecter votre agent</p>
                             </div>
 
-                            <div className="relative aspect-square bg-gray-50 rounded-2xl flex items-center justify-center p-4 border border-gray-100 group">
+                            <div className="relative aspect-square bg-gray-50 rounded-none flex items-center justify-center p-4 border border-gray-100 group">
                                 {whatsappConfigs.find(c => !c.is_connected && c.qr_code)?.qr_code ? (
                                     <div className="relative">
                                         <img
                                             src={whatsappConfigs.find(c => !c.is_connected && c.qr_code)?.qr_code}
                                             alt="QR Code"
-                                            className="w-64 h-64 rounded-xl shadow-sm border-8 border-white"
+                                            className="w-64 h-64 rounded-none shadow-sm border-8 border-white"
                                         />
-                                        <div className="absolute inset-0 border-2 border-blue-900/20 rounded-xl animate-pulse" />
+                                        <div className="absolute inset-0 border-2 border-blue-900/20 rounded-none animate-pulse" />
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center gap-4">
@@ -488,7 +494,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                 )}
                             </div>
 
-                            <div className="bg-gray-50 p-4 rounded-xl text-left border border-gray-100">
+                            <div className="bg-gray-50 p-4 rounded-none text-left border border-gray-100">
                                 <p className="text-[10px] font-medium text-gray-500 leading-relaxed italic">
                                     Ouvrez WhatsApp sur votre téléphone, allez dans <span className="font-bold text-gray-900">Appareils connectés</span> et scannez ce code.
                                 </p>

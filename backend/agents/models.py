@@ -35,10 +35,27 @@ class Agent(models.Model):
     email_config = models.ForeignKey('EmailConfig', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_deployed = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='agents', null=True, blank=True)
+    team = models.ForeignKey('AgentTeam', on_delete=models.SET_NULL, null=True, blank=True, related_name='members')
+    is_team_agent = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
+
+class AuditLog(models.Model):
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='audit_logs')
+    action = models.CharField(max_length=255)
+    details = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Journal d\'audit'
+        verbose_name_plural = 'Journaux d\'audit'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.action}"
 
 class KnowledgeBase(models.Model):
     agent = models.ForeignKey(Agent, related_name='knowledge_bases', on_delete=models.CASCADE, null=True, blank=True)
@@ -47,7 +64,6 @@ class KnowledgeBase(models.Model):
     file_binary = models.BinaryField(null=True, blank=True)
     file_extension = models.CharField(max_length=20, blank=True)
     url = models.URLField(blank=True, null=True)
-    raw_content = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -80,15 +96,78 @@ class EmailConfig(models.Model):
         return f"{self.name} ({self.email})"
 
 class ChatMessage(models.Model):
-    agent = models.ForeignKey(Agent, related_name='messages', on_delete=models.CASCADE)
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='all_messages', null=True, blank=True)
+    agent = models.ForeignKey(Agent, related_name='messages', on_delete=models.CASCADE, null=True, blank=True)
     sender = models.CharField(max_length=50)
     contact_info = models.CharField(max_length=255, blank=True, null=True)
     source = models.CharField(max_length=50, default='chat')
     content = models.TextField()
     is_whatsapp = models.BooleanField(default=False)
     whatsapp_message_id = models.CharField(max_length=255, blank=True, null=True)
+    is_read = models.BooleanField(default=False)
     status = models.CharField(max_length=50, default='new', choices=[('new', 'New'), ('pertinent', 'Pertinent'), ('archived', 'Archived')])
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.sender}: {self.content[:20]}..."
+
+class AgentFeedback(models.Model):
+    RATINGS = [(1, '1'), (2, '2'), (3, '3'), (4, '4'), (5, '5')]
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='feedbacks')
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE)
+    rating = models.IntegerField(choices=RATINGS, null=True, blank=True)
+    is_thumbs_up = models.BooleanField(null=True, blank=True)
+    comment = models.TextField(blank=True)
+    is_resolved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback for {self.agent.name} by {self.user.email}"
+
+class UserSurvey(models.Model):
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='surveys')
+    nps_score = models.IntegerField(help_text="0-10 score")
+    feedback = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"NPS {self.nps_score} from {self.user.email}"
+
+class AgentTeam(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='agent_teams')
+    color = models.CharField(max_length=20, default="#1e3a8a")
+    avatar = models.URLField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+class AgentLink(models.Model):
+    TRIGGER_TYPES = [
+        ('interest', 'Interest Detected'),
+        ('email_requested', 'Email Requested'),
+        ('whatsapp_requested', 'WhatsApp Requested'),
+        ('manual', 'Manual Delegation'),
+    ]
+    source_agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='outgoing_links')
+    target_agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='incoming_links')
+    trigger_type = models.CharField(max_length=50, choices=TRIGGER_TYPES)
+    description = models.TextField(blank=True, null=True)
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='agent_links', null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.source_agent.name} -> {self.target_agent.name} ({self.trigger_type})"
+
+class ContactAssignment(models.Model):
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='contact_assignments')
+    contact_info = models.CharField(max_length=255)
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE)
+    last_interaction = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'contact_info')
+
+    def __str__(self):
+        return f"{self.contact_info} assigned to {self.agent.name}"

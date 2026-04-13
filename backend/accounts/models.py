@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 import uuid
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -28,10 +29,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
 
     recovery_email = models.EmailField(blank=True, null=True)
-    workspace_label = models.CharField(max_length=255, blank=True, default='Mon Workspace')
+    workspace_label = models.CharField(max_length=255, blank=True, default='Mon espace de travail')
     timezone = models.CharField(max_length=100, default='Indian/Antananarivo')
 
-    # Security fields
     master_api_key = models.CharField(max_length=100, blank=True, null=True, unique=True)
     is_2fa_enabled = models.BooleanField(default=False)
     is_email_verified = models.BooleanField(default=False)
@@ -95,6 +95,11 @@ class Subscription(models.Model):
     num_agents = models.PositiveIntegerField(default=2)
     is_annual = models.BooleanField(default=False)
     status = models.CharField(max_length=20, default='active')
+    active_until = models.DateTimeField(blank=True, null=True)
+
+    gateway_customer_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID client Stripe")
+    gateway_subscription_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID abonnement Stripe")
+
     card_last4 = models.CharField(max_length=4, blank=True, null=True)
     card_brand = models.CharField(max_length=20, blank=True, null=True)
     card_exp_month = models.CharField(max_length=2, blank=True, null=True)
@@ -109,3 +114,189 @@ class Subscription(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.plan_name}"
+
+
+class PaymentTransaction(models.Model):
+    GATEWAY_CHOICES = [
+        ('stripe', 'Stripe'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('completed', 'Complété'),
+        ('failed', 'Échoué'),
+        ('refunded', 'Remboursé'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
+    subscription = models.ForeignKey(Subscription, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=10, default='EUR')
+    gateway = models.CharField(max_length=20, choices=GATEWAY_CHOICES)
+    gateway_transaction_id = models.CharField(max_length=255, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Transaction'
+        verbose_name_plural = 'Transactions'
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        old_status = None
+        if not is_new:
+            old_status = PaymentTransaction.objects.filter(pk=self.pk).values_list('status', flat=True).first()
+
+        super().save(*args, **kwargs)
+
+        if self.status == 'completed' and old_status != 'completed':
+            self.apply_to_subscription()
+
+    def apply_to_subscription(self):
+        sub = self.subscription
+        if not sub:
+            return
+
+        enterprise_threshold = 495000  
+        agent_price = 75000          
+
+        amount_val = float(self.amount)
+        
+        # If amount >= 1000, it's definitely Ariary.
+        is_ariary = amount_val >= 1000
+        
+        if is_ariary:
+            if amount_val >= enterprise_threshold:
+                sub.plan_name = 'entreprise'
+            else:
+                purchased_agents = int(amount_val / agent_price)
+                if sub.plan_name == 'pro':
+                    sub.num_agents += max(purchased_agents, 1)
+                else:
+                    sub.plan_name = 'pro'
+                    sub.num_agents = max(purchased_agents, 2)
+        else:
+            # Legacy EUR support
+            if amount_val >= 99:
+                sub.plan_name = 'entreprise'
+            else:
+                purchased_agents = int(amount_val / 15)
+                if sub.plan_name == 'pro':
+                    sub.num_agents += max(purchased_agents, 1)
+                else:
+                    sub.plan_name = 'pro'
+                    sub.num_agents = max(purchased_agents, 2)
+
+        sub.status = 'active'
+        
+        from datetime import timedelta
+        days_to_add = 365 if sub.is_annual else 30
+        if sub.active_until and sub.active_until > timezone.now():
+            sub.active_until = sub.active_until + timedelta(days=days_to_add)
+        else:
+            sub.active_until = timezone.now() + timedelta(days=days_to_add)
+            
+        sub.save()
+
+        # Create Notification
+        Notification.objects.create(
+            user=self.user,
+            title="Abonnement mis à jour",
+            message=f"Votre paiement de {self.amount} {self.currency} a été validé. Votre plan est désormais : {sub.plan_name.upper()} ({sub.num_agents} agents).",
+            type="payment"
+        )
+
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    type = models.CharField(max_length=50, default='system')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Notification'
+        verbose_name_plural = 'Notifications'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.type}] {self.title} - {self.user.email}"
+
+
+# ── Plan Limits ───────────────────────────────────────────────────────────────
+PLAN_LIMITS = {
+    'gratuit': {
+        'max_agents': 2,
+        'max_members': 0,
+        'max_kb_per_agent': 2,
+        'channels': ['email'],
+        'boite_reception': False,
+    },
+    'pro': {
+        'max_agents': 50,
+        'max_members': 3,
+        'max_kb_per_agent': 10,
+        'channels': ['email', 'whatsapp'],
+        'boite_reception': True,
+    },
+
+    'entreprise': {
+        'max_agents': None,
+        'max_members': None,
+        'max_kb_per_agent': None,
+        'channels': ['email', 'whatsapp'],
+        'boite_reception': True,
+    },
+}
+
+
+class WorkspaceInvitation(models.Model):
+    ROLE_CHOICES = [
+        ('viewer', 'Lecteur'),
+        ('editor', 'Éditeur'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace_owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_invitations')
+    invited_email = models.EmailField()
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='viewer')
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    is_used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Invitation'
+        verbose_name_plural = 'Invitations'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Invitation {self.invited_email} → {self.workspace_owner.email} ({self.role})"
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+
+class WorkspaceMember(models.Model):
+    ROLE_CHOICES = [
+        ('viewer', 'Lecteur'),
+        ('editor', 'Éditeur'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace_owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workspace_members')
+    member_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='member_of', null=True, blank=True)
+    member_email = models.EmailField()
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='viewer')
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Membre du workspace'
+        verbose_name_plural = 'Membres du workspace'
+        unique_together = [('workspace_owner', 'member_email')]
+
+    def __str__(self):
+        return f"{self.member_email} dans workspace de {self.workspace_owner.email} ({self.role})"
+

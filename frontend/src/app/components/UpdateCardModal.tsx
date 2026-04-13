@@ -71,7 +71,7 @@ export function UpdateCardModal({ isOpen, onClose, onSuccess }: UpdateCardModalP
 
     return (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-300">
+            <div className="bg-white rounded-none w-full max-w-md overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-300">
                 <button 
                     onClick={onClose}
                     className="absolute right-6 top-6 p-2 hover:bg-gray-100 rounded-full transition-colors z-10"
@@ -81,7 +81,7 @@ export function UpdateCardModal({ isOpen, onClose, onSuccess }: UpdateCardModalP
 
                 <div className="p-8">
                     <div className="flex items-center gap-4 mb-8">
-                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
+                        <div className="w-12 h-12 bg-blue-50 rounded-none flex items-center justify-center">
                             <CreditCard className="w-6 h-6 text-blue-900" />
                         </div>
                         <div>
@@ -107,7 +107,7 @@ export function UpdateCardModal({ isOpen, onClose, onSuccess }: UpdateCardModalP
                                     value={cardName}
                                     onChange={(e) => setCardName(e.target.value)}
                                     placeholder="NOM PRENOM" 
-                                    className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-800 outline-none transition-all font-bold uppercase text-xs tracking-wider" 
+                                    className="w-full h-12 px-4 rounded-none border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-800 outline-none transition-all font-bold uppercase text-xs tracking-wider" 
                                 />
                             </div>
 
@@ -119,7 +119,7 @@ export function UpdateCardModal({ isOpen, onClose, onSuccess }: UpdateCardModalP
                                         value={cardNumber}
                                         onChange={(e) => setCardNumber(e.target.value)}
                                         placeholder="0000 0000 0000 0000" 
-                                        className="w-full h-12 pl-4 pr-12 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-800 outline-none transition-all font-mono text-sm" 
+                                        className="w-full h-12 pl-4 pr-12 rounded-none border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-800 outline-none transition-all font-mono text-sm" 
                                     />
                                     <CreditCard className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
                                 </div>
@@ -133,7 +133,7 @@ export function UpdateCardModal({ isOpen, onClose, onSuccess }: UpdateCardModalP
                                         value={expiry}
                                         onChange={(e) => setExpiry(e.target.value)}
                                         placeholder="MM/YY" 
-                                        className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-800 outline-none transition-all text-sm font-bold tracking-widest" 
+                                        className="w-full h-12 px-4 rounded-none border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-800 outline-none transition-all text-sm font-bold tracking-widest" 
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -145,7 +145,7 @@ export function UpdateCardModal({ isOpen, onClose, onSuccess }: UpdateCardModalP
                                         placeholder="123" 
                                         type="password" 
                                         maxLength={3} 
-                                        className="w-full h-12 px-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-800 outline-none transition-all text-sm font-bold tracking-[0.5em]" 
+                                        className="w-full h-12 px-4 rounded-none border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-800 outline-none transition-all text-sm font-bold tracking-[0.5em]" 
                                     />
                                 </div>
                             </div>
