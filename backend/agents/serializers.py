@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, AgentFeedback, UserSurvey
+from .models import Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, AgentFeedback, UserSurvey
 
 class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
@@ -21,6 +21,12 @@ class WhatsAppConfigSerializer(serializers.ModelSerializer):
 class EmailConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailConfig
+        fields = '__all__'
+        read_only_fields = ['user']
+
+class LinkedInConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LinkedInConfig
         fields = '__all__'
         read_only_fields = ['user']
 
@@ -88,7 +94,7 @@ class AgentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'avatar', 'description', 'role', 'system_prompt', 'llm_model',
             'temperature', 'channels', 'execution_mode', 'confidence_threshold',
-            'whatsapp_config', 'email_config', 'created_at', 'is_deployed', 'is_active',
+            'whatsapp_config', 'email_config', 'linkedin_config', 'created_at', 'is_deployed', 'is_active',
             'user', 'owner_name', 'owner_email', 'knowledge_bases', 'messages', 'stats', 
             'team', 'team_name', 'team_color', 'is_team_agent'
         ]

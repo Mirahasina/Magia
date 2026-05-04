@@ -4,9 +4,90 @@ from anthropic import Anthropic
 import os
 import environ
 from PIL import Image
+import re
+import uuid
+import shutil
+from django.conf import settings
+from gradio_client import Client
 
 env = environ.Env()
 environ.Env.read_env(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
+
+def generate_video_huggingface(prompt):
+    """
+    Génère une vidéo via un Space Hugging Face gratuit.
+    """
+    try:
+        client = Client("ali-vilab/modelscope-damo-text-to-video-synthesis")
+        result = client.predict(
+            prompt=prompt,
+            api_name="/predict"
+        )
+        video_path = result
+        
+        fname = f"video_{uuid.uuid4().hex[:8]}.mp4"
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'generated')
+        os.makedirs(media_dir, exist_ok=True)
+        dest_path = os.path.join(media_dir, fname)
+        shutil.copy(video_path, dest_path)
+        
+        file_url = f"{settings.MEDIA_URL}generated/{fname}"
+        url_path = file_url if file_url.startswith('/') else f"/{file_url}"
+        
+        return f"\n<video controls width='100%' class='rounded-lg shadow-md mt-2' src='{url_path}'></video>\n"
+    except Exception as e:
+        return f"\n*Erreur lors de la génération de la vidéo: {e}*\n"
+
+def process_ai_response(response_text):
+    image_pattern = r'\[GENERATE_IMAGE:\s*(.*?)\]'
+    def replace_image(match):
+        prompt = match.group(1).strip('"').strip("'")
+        try:
+            client = OpenAI(api_key=env('OPENAI_API_KEY'))
+            res = client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                n=1,
+                size="1024x1024"
+            )
+            url = res.data[0].url
+            return f"![Image générée]({url})"
+        except Exception as e:
+            return f"\n*Erreur lors de la génération de l'image: {e}*\n"
+            
+    res = re.sub(image_pattern, replace_image, response_text)
+    
+    video_pattern = r'\[GENERATE_VIDEO:\s*(.*?)\]'
+    def replace_video(match):
+        prompt = match.group(1).strip('"').strip("'")
+        return generate_video_huggingface(prompt)
+    
+    res = re.sub(video_pattern, replace_video, res)
+    
+    file_pattern = r'\[GENERATE_FILE:\s*(.*?)\](.*?)\[/GENERATE_FILE\]'
+    def replace_file(match):
+        fname = match.group(1).strip('"').strip("'")
+        content = match.group(2).strip()
+        
+        ext = os.path.splitext(fname)[1]
+        base = os.path.splitext(fname)[0]
+        unique_filename = f"{base}_{uuid.uuid4().hex[:8]}{ext}"
+        
+        media_dir = os.path.join(settings.MEDIA_ROOT, 'generated')
+        os.makedirs(media_dir, exist_ok=True)
+        filepath = os.path.join(media_dir, unique_filename)
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+            
+        file_url = f"{settings.MEDIA_URL}generated/{unique_filename}"
+        url_path = file_url if file_url.startswith('/') else f"/{file_url}"
+        
+        preview_content = content if len(content) < 500 else content[:500] + "..."
+        return f"\n```\n{preview_content}\n```\n[📄 Télécharger {fname}]({url_path})\n"
+        
+    res = re.sub(file_pattern, replace_file, res, flags=re.DOTALL)
+    return res
 
 DEFAULT_GEMINI_MODELS = [
     'gemini-2.0-flash', 
@@ -16,7 +97,26 @@ DEFAULT_GEMINI_MODELS = [
     'gemini-flash-latest',
 ]
 
-def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, user_message, model_name='gemini-2.0-flash', image_paths=None):
+def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, user_message, model_name='gemini-2.0-flash', image_paths=None, user_plan='gratuit'):
+    m_lower = model_name.lower()
+    
+    if user_plan == 'gratuit':
+        if 'gpt' in m_lower and 'mini' not in m_lower:
+            model_name = 'gpt-4o-mini'
+        elif 'gemini' in m_lower and 'pro' in m_lower:
+            model_name = 'gemini-1.5-flash'
+        elif 'claude' in m_lower and 'sonnet' in m_lower:
+            model_name = 'claude-3-haiku-20240307'
+        elif 'o1' in m_lower:
+            model_name = 'gpt-4o-mini'
+    
+    elif user_plan == 'pro':
+        if 'o1' in m_lower:
+            model_name = 'gpt-4o'
+        elif 'ultra' in m_lower:
+            model_name = 'gemini-1.5-pro'
+            
+
     provider = 'google'
     if 'gpt' in model_name.lower():
         provider = 'openai'
@@ -35,6 +135,13 @@ def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, u
     2. Style : Minimaliste, précis, sans fioritures.
     3. Formatage : INTERDICTION FORMELLE d'utiliser du gras (**). Pas d'emojis superflus.
     4. RAG : Utilise le contexte comme source unique de vérité.
+    5. Outils (Images, Vidéos et Fichiers) :
+       - Pour générer une image, inclus EXACTEMENT ce texte sur une nouvelle ligne: [GENERATE_IMAGE: "Description détaillée en anglais"]
+       - Pour générer une vidéo, inclus EXACTEMENT ce texte sur une nouvelle ligne: [GENERATE_VIDEO: "Description détaillée en anglais"]
+       - Pour créer un fichier (CSV, Python, txt, etc) à télécharger pour l'utilisateur, inclus EXACTEMENT ce texte:
+         [GENERATE_FILE: "nom_fichier.ext"]
+         contenu brut du fichier
+         [/GENERATE_FILE]
     """
 
     try:
@@ -49,7 +156,7 @@ def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, u
             for m in models_to_try:
                 try:
                     response = client.models.generate_content(model=m, contents=content_parts)
-                    return response.text.strip()
+                    return process_ai_response(response.text.strip())
                 except Exception as e:
                     last_error = e
                     err = str(e)
@@ -74,7 +181,7 @@ def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, u
                     {"role": "user", "content": user_message}
                 ]
             )
-            return response.choices[0].message.content.strip()
+            return process_ai_response(response.choices[0].message.content.strip())
 
         elif provider == 'anthropic':
             api_key = env('ANTHROPIC_API_KEY', default=None)
@@ -86,7 +193,7 @@ def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, u
                 system=instructions,
                 messages=[{"role": "user", "content": user_message}]
             )
-            return response.content[0].text.strip()
+            return process_ai_response(response.content[0].text.strip())
 
     except Exception as e:
         print(f"LLM Error: {e}")

@@ -1,13 +1,21 @@
-import time
-from google import genai
-import environ, os
+import logging
+import os
+import re
+import shutil
+import signal
+import subprocess
 import datetime
 import json
-import subprocess
-import signal
-import requests
-import requests as req
+import threading
+import time
+import traceback
 import urllib.parse
+
+import requests
+from google import genai
+import environ
+
+logger = logging.getLogger(__name__)
 import pandas as pd
 import PyPDF2
 import docx
@@ -24,26 +32,28 @@ from odf import teletype
 from pptx import Presentation
 from google_auth_oauthlib.flow import Flow
 from .models import (
-    Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, AgentFeedback,
-    AgentTeam, AgentLink, ContactAssignment, AuditLog
+    Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, AgentFeedback,
+    AgentTeam, AgentLink, ContactAssignment, AuditLog, Contact
 )
 from .serializers import (
     AgentSerializer, KnowledgeBaseSerializer, TemplateSerializer, 
     WhatsAppConfigSerializer, ChatMessageSerializer, EmailConfigSerializer,
     AgentFeedbackSerializer, AgentTeamSerializer, AgentLinkSerializer,
-    ContactAssignmentSerializer, AuditLogSerializer
+    ContactAssignmentSerializer, AuditLogSerializer, LinkedInConfigSerializer
 )
 from .llm_service import get_llm_response, classify_pertinence, DEFAULT_GEMINI_MODELS
 from .email_service import (
     process_emails_for_agent, test_email_connection, send_email_via_config,
     sync_email_history, send_email_reply
 )
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Max as MaxAgg
 from django.db.models.functions import TruncDay
 from rest_framework.exceptions import PermissionDenied
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .rag_service import add_texts_to_knowledge_base, search_knowledge_base
+from .linkedin_service import search_linkedin_profiles, get_linkedin_profile_details
+from .linkedin_messaging_service import sync_linkedin_inbox
 
 env = environ.Env()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -52,9 +62,56 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 
 def get_whatsapp_port(user_id):
-    if user_id == 'global': return 3001
+    if user_id == 'global':
+        return 3001
     uid_str = str(user_id)
     return 3001 + (sum(ord(c) for c in uid_str) % 100)
+
+def check_ai_quota(user):
+    plan = 'gratuit'
+    if hasattr(user, 'subscription'):
+        plan = user.subscription.plan_name
+    
+    if plan == 'entreprise':
+        return True, None
+        
+    limit = 50 if plan == 'gratuit' else 1000
+    last_24h = timezone.now() - datetime.timedelta(hours=24)
+    count = ChatMessage.objects.filter(user=user, sender='ai', created_at__gt=last_24h).count()
+    
+    if count >= limit:
+        return False, f"Quota journalier atteint pour le plan {plan} ({limit} messages). Veuillez passer au plan supérieur."
+    return True, None
+
+
+def _extract_text(file_obj) -> str:
+    filename = file_obj.name.lower()
+    if filename.endswith('.txt'):
+        return file_obj.read().decode('utf-8')
+    if filename.endswith('.pdf'):
+        reader = PyPDF2.PdfReader(file_obj)
+        return ''.join(
+            (page.extract_text() or '') + '\n'
+            for page in reader.pages
+        )
+    if filename.endswith('.docx'):
+        doc = docx.Document(file_obj)
+        return '\n'.join(para.text for para in doc.paragraphs)
+    if filename.endswith(('.xlsx', '.xls')):
+        return pd.read_excel(file_obj).to_string()
+    if filename.endswith('.pptx'):
+        prs = Presentation(file_obj)
+        return '\n'.join(
+            getattr(shape, 'text', '')
+            for slide in prs.slides
+            for shape in slide.shapes
+            if getattr(shape, 'text', None) is not None
+        )
+    if filename.endswith(('.odt', '.ods', '.odp')):
+        doc = odf_load(file_obj)
+        paragraphs = doc.text.getElementsByType(P)
+        return '\n'.join(teletype.extractText(p) for p in paragraphs)
+    return ''
 
 class WhatsAppConfigViewSet(viewsets.ModelViewSet):
     serializer_class = WhatsAppConfigSerializer
@@ -118,7 +175,16 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
         config.is_connected = False
         config.qr_code = None
         config.save()
+        
+        ChatMessage.objects.filter(user=config.user, source='whatsapp').delete()
+        Contact.objects.filter(user=config.user, source='whatsapp').delete()
+        
         return Response({'status': 'disconnected'})
+
+    def perform_destroy(self, instance):
+        ChatMessage.objects.filter(user=instance.user, source='whatsapp').delete()
+        Contact.objects.filter(user=instance.user, source='whatsapp').delete()
+        super().perform_destroy(instance)
 
     @action(detail=True, methods=['post'])
     def connect(self, request, pk=None):
@@ -166,20 +232,60 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
             user_id = str(request.user.id)
             try:
                 subprocess.run(['pkill', '-f', f'node .*index.js --user {user_id}'], check=False)
-                
+
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 auth_dir = os.path.join(base_dir, f'auth_info_{user_id}')
                 if os.path.exists(auth_dir):
-                    import shutil
                     shutil.rmtree(auth_dir)
-                    
+
                 config.is_connected = False
                 config.qr_code = None
-            except Exception as e:
-                print(f"Error during disconnect: {e}")
+
+                ChatMessage.objects.filter(user=request.user, source='whatsapp').delete()
+                Contact.objects.filter(user=request.user, source='whatsapp').delete()
+
+            except Exception as exc:
+                logger.error('Error during WhatsApp disconnect: %s', exc)
                 
         config.save()
         return Response({'is_connected': config.is_connected})
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
+    def sync_whatsapp_contacts(self, request):
+        user_id = request.data.get('user_id')
+        contacts = request.data.get('contacts', [])
+        if not user_id or user_id == 'global':
+            return Response({'error': 'User ID required'}, status=400)
+            
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+
+        created_count = 0
+        updated_count = 0
+        
+        for c in contacts:
+            jid = c.get('id')
+            name = c.get('name') or c.get('notify') or c.get('verifiedName')
+            if not jid: continue
+            
+            contact_obj, created = Contact.objects.get_or_create(
+                user=user,
+                source='whatsapp',
+                contact_info=jid,
+            )
+            if created:
+                if name: contact_obj.name = name
+                contact_obj.save()
+                created_count += 1
+            else:
+                if name and contact_obj.name != name:
+                    contact_obj.name = name
+                    contact_obj.save()
+                    updated_count += 1
+                    
+        return Response({'status': 'success', 'created': created_count, 'updated': updated_count})
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
     def whatsapp_gateway(self, request):
@@ -187,7 +293,9 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
         message = request.data.get('message', '').strip()
         wa_id = request.data.get('message_id', '')
         wa_sender = request.data.get('sender', '')
+        push_name = request.data.get('push_name')
         is_historical = request.data.get('is_historical', False)
+        is_me = request.data.get('is_me', False)
         
         if not user_id or user_id == 'global':
             return Response({'error': 'User ID required'}, status=400)
@@ -202,26 +310,72 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
 
         msg = ChatMessage.objects.create(
             user=user,
-            sender='user',
+            sender='ai' if is_me else 'user',
             content=message,
             contact_info=wa_sender,
+            contact_name=push_name,
             source='whatsapp',
             whatsapp_message_id=wa_id,
+            is_read=bool(is_historical),   # historical = already read
             status='archived' if is_historical else 'new'
         )
 
-        agents = Agent.objects.filter(user=user, is_active=True)
-        responded = False
-        reply_text = ""
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
+    def whatsapp_gateway_bulk(self, request):
+        user_id = request.data.get('user_id')
+        messages = request.data.get('messages', [])
         
-        for agent in agents:
-            if agent.channels and any(c.lower() == 'whatsapp' for c in agent.channels):
-                if not msg.agent:
-                    msg.agent = agent
-                    msg.save()
-                pass
+        if not user_id or user_id == 'global':
+            return Response({'error': 'User ID required'}, status=400)
+            
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
 
-        return Response({'status': 'received', 'message_id': msg.id})
+        existing_ids = set(ChatMessage.objects.filter(user=user, source='whatsapp').values_list('whatsapp_message_id', flat=True))
+        
+        new_messages = []
+        contacts_to_update = {}
+        
+        for msg_data in messages:
+            wa_id = msg_data.get('message_id', '')
+            if not wa_id or wa_id in existing_ids:
+                continue
+                
+            wa_sender = msg_data.get('sender', '')
+            push_name = msg_data.get('push_name')
+            is_me = msg_data.get('is_me', False)
+            content = msg_data.get('message', '').strip()
+            
+            if not content: continue
+            
+            new_messages.append(ChatMessage(
+                user=user,
+                sender='ai' if is_me else 'user',
+                content=content,
+                contact_info=wa_sender,
+                contact_name=push_name,
+                source='whatsapp',
+                whatsapp_message_id=wa_id,
+                is_read=True,
+                status='archived'
+            ))
+            
+            if wa_sender not in contacts_to_update or push_name:
+                contacts_to_update[wa_sender] = push_name
+        
+        if new_messages:
+            ChatMessage.objects.bulk_create(new_messages, ignore_conflicts=True)
+            
+            for sender, name in contacts_to_update.items():
+                contact, _ = Contact.objects.get_or_create(user=user, source='whatsapp', contact_info=sender)
+                if name: 
+                    contact.name = name
+                    contact.save()
+
+        return Response({'status': 'success', 'processed': len(new_messages)})
+
 
 class EmailConfigViewSet(viewsets.ModelViewSet):
     serializer_class = EmailConfigSerializer
@@ -232,18 +386,31 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def sync_history(self, request, pk=None):
         config = self.get_object()
-        sync_email_history(config)
+        thread = threading.Thread(target=sync_email_history, args=(config,))
+        thread.daemon = True
+        thread.start()
         return Response({'status': 'sync_started'})
 
     @action(detail=False, methods=['post'])
     def sync_all_history(self, request):
         configs = EmailConfig.objects.filter(user=request.user, is_active=True)
         for config in configs:
-            sync_email_history(config)
+            thread = threading.Thread(target=sync_email_history, args=(config,))
+            thread.daemon = True
+            thread.start()
         return Response({'status': 'global_sync_started'})
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def perform_destroy(self, instance):
+        ChatMessage.objects.filter(email_config=instance).delete()
+        
+        has_other_configs = EmailConfig.objects.filter(user=instance.user).exclude(id=instance.id).exists()
+        if not has_other_configs:
+            Contact.objects.filter(user=instance.user, source='email').delete()
+            
+        super().perform_destroy(instance)
 
     @action(detail=True, methods=['post'])
     def test_connection(self, request, pk=None):
@@ -403,7 +570,6 @@ class AgentTeamViewSet(viewsets.ModelViewSet):
         Receives { history: [{role, content}], message: str }
         Returns { reply: str, ready: bool, plan: {...} | null }
         """
-        import json
 
         history = request.data.get('history', [])
         user_message = request.data.get('message', '').strip()
@@ -479,32 +645,24 @@ Triggers : interest, email_requested, whatsapp_requested, manual."""
 
             # Robust JSON extraction
             try:
-                import re
                 json_match = re.search(r'(\{.*\})', reply_text, re.DOTALL)
                 if json_match:
                     data = json.loads(json_match.group(1))
                     return Response({
-                        "reply": data.get("reply", "Plan conçu."),
-                        "options": data.get("options", []),
-                        "ready": data.get("ready", False),
-                        "plan": data.get("plan")
+                        'reply': data.get('reply', 'Plan conçu.'),
+                        'options': data.get('options', []),
+                        'ready': data.get('ready', False),
+                        'plan': data.get('plan'),
                     })
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
-            # Fallback if AI returned raw text
-            return Response({
-                "reply": reply_text,
-                "options": [],
-                "ready": False,
-                "plan": None
-            })
+            # Fallback: AI returned raw text instead of JSON
+            return Response({'reply': reply_text, 'options': [], 'ready': False, 'plan': None})
 
-        except Exception as e:
-            import traceback
-            print(f"ERROR in design_team: {str(e)}")
-            traceback.print_exc()
-            return Response({'error': f"Erreur AI : {str(e)}"}, status=500)
+        except Exception as exc:
+            logger.error('design_team error: %s\n%s', exc, traceback.format_exc())
+            return Response({'error': f'Erreur AI : {exc}'}, status=500)
 
 class AgentLinkViewSet(viewsets.ModelViewSet):
     serializer_class = AgentLinkSerializer
@@ -512,6 +670,76 @@ class AgentLinkViewSet(viewsets.ModelViewSet):
         return AgentLink.objects.filter(user=self.request.user)
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+class LinkedInConfigViewSet(viewsets.ModelViewSet):
+    serializer_class = LinkedInConfigSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return LinkedInConfig.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def search_profiles(self, request, pk=None):
+        config = self.get_object()
+        query = request.data.get('query')
+        if not query:
+            return Response({"error": "La requête de recherche est obligatoire"}, status=400)
+        
+        results = search_linkedin_profiles(config.api_key, query)
+        return Response(results)
+
+    @action(detail=True, methods=['post'])
+    def profile_details(self, request, pk=None):
+        config = self.get_object()
+        linkedin_url = request.data.get('url')
+        if not linkedin_url:
+            return Response({"error": "L'URL LinkedIn est obligatoire"}, status=400)
+        
+        details = get_linkedin_profile_details(config.api_key, linkedin_url)
+        return Response(details)
+
+    @action(detail=True, methods=['post'])
+    def sync_messages(self, request, pk=None):
+        config = self.get_object()
+        thread = threading.Thread(target=sync_linkedin_inbox, args=(config,))
+        thread.daemon = True
+        thread.start()
+        return Response({"status": "Synchronisation LinkedIn démarrée"})
+
+    @action(detail=True, methods=['get'])
+    def get_connection_url(self, request, pk=None):
+        config = self.get_object()
+        from .linkedin_messaging_service import UnipileService
+        service = UnipileService()
+        url = service.get_connection_url(request.user.id, config.id)
+        if url:
+            return Response({"url": url})
+        return Response({"error": "Impossible de générer l'URL Unipile"}, status=500)
+
+    @action(detail=True, methods=['post'])
+    def prospect(self, request, pk=None):
+        config = self.get_object()
+        query = request.data.get('query')
+        message = request.data.get('message')
+        
+        if not config.unipile_account_id:
+            return Response({"error": "Un compte LinkedIn connecté est requis pour prospecter."}, status=400)
+        
+        from .linkedin_messaging_service import UnipileService
+        service = UnipileService()
+        leads = service.search_people(config.unipile_account_id, query)
+        
+        results = []
+        for lead in leads[:5]:
+            profile_id = lead.get('provider_id')
+            if profile_id:
+                success = service.send_invitation(config.unipile_account_id, profile_id, message)
+                results.append({"name": lead.get('name'), "success": success})
+        
+        return Response({"status": "Séquence de prospection lancée", "results": results})
 
 class ContactAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = ContactAssignmentSerializer
@@ -541,49 +769,20 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         file_obj = self.request.FILES.get('file')
         instance = serializer.save()
-        
+
         if file_obj:
             try:
                 instance.file_binary = file_obj.read()
                 instance.file_extension = os.path.splitext(file_obj.name)[1].lower()
                 file_obj.seek(0)
-                
-                filename = file_obj.name.lower()
-                extracted_text = ""
-                if filename.endswith('.txt'):
-                    extracted_text = file_obj.read().decode('utf-8')
-                elif filename.endswith('.pdf'):
-                    reader = PyPDF2.PdfReader(file_obj)
-                    text = ""
-                    for page in reader.pages:
-                        extracted = page.extract_text()
-                        if extracted:
-                            text += extracted + "\n"
-                    extracted_text = text
-                elif filename.endswith('.docx'):
-                    doc = docx.Document(file_obj)
-                    extracted_text = "\n".join([para.text for para in doc.paragraphs])
-                elif filename.endswith('.xlsx') or filename.endswith('.xls'):
-                    df = pd.read_excel(file_obj)
-                    extracted_text = df.to_string()
-                elif filename.endswith('.pptx'):
-                    prs = Presentation(file_obj)
-                    text = []
-                    for slide in prs.slides:
-                        for shape in slide.shapes:
-                            if hasattr(shape, "text"):
-                                text.append(shape.text)
-                    extracted_text = "\n".join(text)
-                elif filename.endswith('.odt') or filename.endswith('.ods') or filename.endswith('.odp'):
-                    doc = odf_load(file_obj)
-                    paragraphs = doc.text.getElementsByType(P)
-                    extracted_text = "\n".join([teletype.extractText(p) for p in paragraphs])
-                
+
+                extracted_text = _extract_text(file_obj)
+
                 if extracted_text or instance.file_binary:
                     instance.save()
                     if extracted_text and instance.agent:
                         add_texts_to_knowledge_base(instance.agent.id, extracted_text, instance.name)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -762,46 +961,16 @@ class AgentViewSet(viewsets.ModelViewSet):
             kb.file_binary = file_obj.read()
             kb.file_extension = os.path.splitext(file_obj.name)[1].lower()
             file_obj.seek(0)
-            
-            filename = file_obj.name.lower()
-            extracted_text = ""
-            if filename.endswith('.txt'):
-                extracted_text = file_obj.read().decode('utf-8')
-            elif filename.endswith('.pdf'):
-                reader = PyPDF2.PdfReader(file_obj)
-                text = ""
-                for page in reader.pages:
-                    extracted = page.extract_text()
-                    if extracted:
-                        text += extracted + "\n"
-                extracted_text = text
-            elif filename.endswith('.docx'):
-                import docx
-                doc = docx.Document(file_obj)
-                extracted_text = "\n".join([para.text for para in doc.paragraphs])
-            elif filename.endswith('.xlsx') or filename.endswith('.xls'):
-                df = pd.read_excel(file_obj)
-                extracted_text = df.to_string()
-            elif filename.endswith('.pptx'):
-                prs = Presentation(file_obj)
-                text = []
-                for slide in prs.slides:
-                    for shape in slide.shapes:
-                        if hasattr(shape, "text"):
-                            text.append(shape.text)
-                extracted_text = "\n".join(text)
-            elif filename.endswith('.odt') or filename.endswith('.ods') or filename.endswith('.odp'):
-                doc = odf_load(file_obj)
-                paragraphs = doc.text.getElementsByType(P)
-                extracted_text = "\n".join([teletype.extractText(p) for p in paragraphs])
-            
+
+            extracted_text = _extract_text(file_obj)
+
             if extracted_text or kb.file_binary:
                 kb.save()
                 if extracted_text:
                     add_texts_to_knowledge_base(agent.id, extracted_text, kb.name)
             return Response({'status': 'uploaded', 'kb_id': kb.id})
-        except Exception as e:
-            return Response({'error': str(e)}, status=400)
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=400)
 
     @action(detail=True, methods=['post'])
     def deploy(self, request, pk=None):
@@ -847,13 +1016,22 @@ class AgentViewSet(viewsets.ModelViewSet):
         rag_context = search_knowledge_base(agent.id, user_message, top_k=4)
         context_for_llm = f"Documents sources (Extraits pertinents par recherche sémantique RAG) :\n{rag_context if rag_context.strip() else '[Aucun document fourni]'}\n\n[MODE SANDBOX : Ce message est un test isolé]"
         
+        user_plan = 'gratuit'
+        if hasattr(request.user, 'subscription'):
+            user_plan = request.user.subscription.plan_name
+
+        allowed, reason = check_ai_quota(request.user)
+        if not allowed:
+            return Response({'error': reason}, status=403)
+
         response = get_llm_response(
             agent_name=agent.name,
             agent_role=agent.role,
             system_prompt=agent.system_prompt,
             knowledge_context=context_for_llm,
             user_message=user_message,
-            model_name=agent.llm_model
+            model_name=agent.llm_model,
+            user_plan=user_plan
         )
 
         return Response({
@@ -876,7 +1054,7 @@ class AgentViewSet(viewsets.ModelViewSet):
         if not links.exists():
             return None
         
-        # Simple LLM check for trigger
+        # Classify trigger via LLM
         from .llm_service import classify_handoff
         for link in links:
             if classify_handoff(link.trigger_type, user_message):
@@ -912,12 +1090,22 @@ class AgentViewSet(viewsets.ModelViewSet):
 
         rag_context = search_knowledge_base(agent.id, user_message, top_k=4)
         context_for_llm = f"Documents sources (Extraits pertinents par recherche sémantique RAG) :\n{rag_context if rag_context.strip() else '[Aucun document fourni]'}\n\nHistorique récent :\n{history_str}"
+        user_plan = 'gratuit'
+        if hasattr(request.user, 'subscription'):
+            user_plan = request.user.subscription.plan_name
+
+        allowed, reason = check_ai_quota(request.user)
+        if not allowed:
+            return Response({'status': 'ignored', 'reason': 'quota_reached', 'reply': reason})
+
         response = get_llm_response(
             agent_name=effective_agent.name,
             agent_role=effective_agent.role,
             system_prompt=effective_agent.system_prompt,
             knowledge_context=context_for_llm,
-            user_message=user_message
+            user_message=user_message,
+            model_name=effective_agent.llm_model,
+            user_plan=user_plan
         )
 
         ChatMessage.objects.create(agent=effective_agent, sender='ai', content=response, contact_info=contact_info)
@@ -966,10 +1154,8 @@ class AgentViewSet(viewsets.ModelViewSet):
         wa_id = request.data.get('message_id', '')
         wa_sender = request.data.get('sender', '')
 
-        # Check if another agent is assigned
         effective_agent = self._get_assigned_agent(request.user, wa_sender, agent)
         
-        # Check for handoff for future messages
         self._check_handoff(effective_agent, message, wa_sender)
 
         config = effective_agent.whatsapp_config
@@ -1036,6 +1222,8 @@ class AgentViewSet(viewsets.ModelViewSet):
         content = request.data.get('content')
         source = request.data.get('source')
         
+        email_config_id = request.data.get('email_config_id')
+        
         if not contact_info or not content or not source:
             return Response({'error': 'Missing data'}, status=400)
             
@@ -1060,16 +1248,24 @@ class AgentViewSet(viewsets.ModelViewSet):
             return Response({'status': 'sent', 'reply': response_text})
             
         elif source == 'email':
-            if not agent.email_config:
-                return Response({'error': 'No email config'}, status=400)
-            success = send_email_reply(agent.email_config, contact_info, "Re: Contact", content)
+            config = None
+            if email_config_id:
+                config = EmailConfig.objects.filter(id=email_config_id, user=request.user).first()
+            
+            if not config and agent and agent.email_config:
+                config = agent.email_config
+
+            if not config:
+                return Response({'error': 'No email config available for reply'}, status=400)
+                
+            success = send_email_reply(config, contact_info, "Re: Contact", content)
             if not success:
                 return Response({'error': 'Failed to send email'}, status=500)
             ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
         elif source == 'whatsapp':
             try:
                 port = get_whatsapp_port(request.user.id)
-                resp = req.post(f"http://localhost:{port}/send_message", json={"to": contact_info, "text": content})
+                resp = requests.post(f"http://localhost:{port}/send_message", json={"to": contact_info, "text": content})
                 if not resp.json().get("success"):
                     return Response({'error': 'WhatsApp service error'}, status=500)
                 ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
@@ -1077,6 +1273,52 @@ class AgentViewSet(viewsets.ModelViewSet):
                 return Response({'error': str(e)}, status=500)
                 
         return Response({'status': 'sent'})
+        
+    @action(detail=False, methods=['post'])
+    def universal_reply(self, request):
+        contact_info = request.data.get('contact_info')
+        content = request.data.get('content')
+        source = request.data.get('source')
+        email_config_id = request.data.get('email_config_id')
+        
+        if not contact_info or not content or not source:
+            return Response({'error': 'Missing data'}, status=400)
+            
+        if source == 'email':
+            config = None
+            if email_config_id:
+                config = EmailConfig.objects.filter(id=email_config_id, user=request.user).first()
+            if not config:
+                config = EmailConfig.objects.filter(user=request.user).first()
+                
+            if not config:
+                return Response({'error': 'No email config available'}, status=400)
+                
+            success = send_email_reply(config, contact_info, "Re: Contact", content)
+            if not success:
+                return Response({'error': 'Failed to send email'}, status=500)
+            
+            ChatMessage.objects.create(
+                user=request.user,
+                sender='ai',
+                content=content,
+                contact_info=contact_info,
+                source=source,
+                status='pertinent',
+                email_config=config
+            )
+            return Response({'status': 'sent'})
+        elif source == 'whatsapp':
+             # Fallback simple pour WhatsApp direct
+             try:
+                port = get_whatsapp_port(request.user.id)
+                res = requests.post(f"http://localhost:{port}/send_message", json={"to": contact_info, "text": content})
+                if res.status_code == 200:
+                    ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
+                    return Response({'status': 'sent'})
+             except Exception: pass
+
+        return Response({'error': 'Source not supported for direct reply'}, status=400)
 
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
@@ -1087,44 +1329,92 @@ class AgentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def all_conversations(self, request):
-        user_agents = list(Agent.objects.filter(user=request.user).values_list('id', flat=True))
-        messages = ChatMessage.objects.filter(
+        user_agents = Agent.objects.filter(user=request.user).values_list('id', flat=True)
+        search = request.query_params.get('search', '')
+        source_filter = request.query_params.get('source', '')
+
+        # Build base queryset
+        base_qs = ChatMessage.objects.filter(
             Q(user=request.user) | Q(agent_id__in=user_agents)
-        ).exclude(contact_info='').order_by('created_at')
+        )
+        if source_filter:
+            base_qs = base_qs.filter(source=source_filter)
 
-        threads = {}
+        # Search across contacts
+        if search:
+            # Also search Contact table names
+            matched_contacts = Contact.objects.filter(
+                user=request.user,
+                name__icontains=search
+            ).values_list('contact_info', flat=True)
+            base_qs = base_qs.filter(
+                Q(contact_info__icontains=search) |
+                Q(contact_name__icontains=search) |
+                Q(contact_info__in=matched_contacts)
+            )
+
+        # Get latest message ID for each unique (source, contact_info)
+        latest_msg_ids = base_qs.values('source', 'contact_info').annotate(
+            latest_id=MaxAgg('id')
+        ).values_list('latest_id', flat=True)
+
+        messages = ChatMessage.objects.filter(
+            id__in=latest_msg_ids
+        ).select_related('agent').order_by('-created_at')
+
+        # Build a lookup for Contact names
+        contact_info_list = [m.contact_info for m in messages if m.contact_info]
+        contacts_lookup = {
+            (c.source, c.contact_info): c.name
+            for c in Contact.objects.filter(
+                user=request.user,
+                contact_info__in=contact_info_list
+            )
+        }
+
+        result = []
         for m in messages:
-            key = f"{m.source}_{m.contact_info}"
-            if key not in threads:
-                agent_data = None
-                if m.agent:
-                    agent_data = {'id': str(m.agent.id), 'name': m.agent.name}
-                    
-                threads[key] = {
-                    'contact': m.contact_info,
-                    'source': m.source,
-                    'agent': agent_data,
-                    'unread': 0,
-                    'lastMsg': None,
-                    'last_updated': m.created_at
-                }
-            
-            if m.sender != 'ai' and m.sender != getattr(m.agent, 'name', '') and not getattr(m, 'is_read', True):
-                threads[key]['unread'] += 1
-                
-            threads[key]['lastMsg'] = {
-                'id': m.id,
-                'content': m.content,
-                'sender': m.sender,
-                'created_at': m.created_at,
-                'status': m.status
-            }
-            threads[key]['last_updated'] = m.created_at
-            if m.agent and not threads[key]['agent']:
-                threads[key]['agent'] = {'id': str(m.agent.id), 'name': m.agent.name}
+            agent_data = None
+            if m.agent:
+                agent_data = {'id': str(m.agent.id), 'name': m.agent.name}
 
-        result = list(threads.values())
-        result.sort(key=lambda x: x['last_updated'], reverse=True)
+            # Best name: Contact table > message.contact_name > raw contact_info
+            display_name = (
+                contacts_lookup.get((m.source, m.contact_info))
+                or m.contact_name
+                or m.contact_info
+            )
+
+            unread = ChatMessage.objects.filter(
+                Q(user=request.user) | Q(agent_id__in=user_agents),
+                source=m.source,
+                contact_info=m.contact_info,
+                is_read=False,
+                sender='user'
+            ).count()
+
+            result.append({
+                'contact': m.contact_info,
+                'contact_name': display_name,
+                'avatar_letter': (display_name or '?')[0].upper(),
+                'source': m.source,
+                'agent': agent_data,
+                'email_config_id': (
+                    m.email_config_id
+                    if m.email_config_id
+                    else (m.agent.email_config_id if m.agent and m.agent.email_config_id else None)
+                ),
+                'unread': unread,
+                'lastMsg': {
+                    'id': m.id,
+                    'content': m.content[:120],
+                    'sender': m.sender,
+                    'created_at': m.created_at,
+                    'is_me': m.sender == 'ai',
+                },
+                'last_updated': m.created_at
+            })
+
         return Response(result)
 
     @action(detail=False, methods=['get'])
@@ -1133,16 +1423,46 @@ class AgentViewSet(viewsets.ModelViewSet):
         source = request.query_params.get('source')
         if not contact or not source:
             return Response({'error': 'Missing contact or source parameters'}, status=400)
-            
+
         user_agents = list(Agent.objects.filter(user=request.user).values_list('id', flat=True))
+        # Return ALL messages (no limit) so user can scroll back years
         messages = ChatMessage.objects.filter(
             Q(user=request.user) | Q(agent_id__in=user_agents),
             contact_info=contact,
             source=source
-        ).order_by('created_at')
-        
+        ).order_by('created_at').select_related('agent')
+
+        # Mark messages as read
+        messages.filter(is_read=False, sender='user').update(is_read=True)
+
         serializer = ChatMessageSerializer(messages, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def contacts_list(self, request):
+        """Return all known contacts sorted by latest activity, for search/autocomplete."""
+        search = request.query_params.get('search', '')
+        source = request.query_params.get('source', '')
+        contacts = Contact.objects.filter(user=request.user)
+        if source:
+            contacts = contacts.filter(source=source)
+        if search:
+            contacts = contacts.filter(
+                Q(name__icontains=search) | Q(contact_info__icontains=search)
+            )
+        contacts = contacts.order_by('-last_message_at')[:100]
+        result = [
+            {
+                'id': c.id,
+                'name': c.name or c.contact_info,
+                'contact_info': c.contact_info,
+                'source': c.source,
+                'avatar_letter': (c.name or c.contact_info or '?')[0].upper(),
+                'last_message_at': c.last_message_at,
+            }
+            for c in contacts
+        ]
+        return Response(result)
 
     @action(detail=False, methods=['get'])
     def boite_reception(self, request):

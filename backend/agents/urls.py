@@ -3,8 +3,11 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AgentViewSet, KnowledgeBaseViewSet, TemplateViewSet, 
     WhatsAppConfigViewSet, ChatMessageViewSet, EmailConfigViewSet,
-    AgentTeamViewSet, AgentLinkViewSet, ContactAssignmentViewSet, AuditLogViewSet
+    AgentTeamViewSet, AgentLinkViewSet, ContactAssignmentViewSet, AuditLogViewSet,
+    LinkedInConfigViewSet
 )
+
+from .daily_views import DailyCallViewSet
 
 router = DefaultRouter()
 router.register(r'agents', AgentViewSet, basename='agent')
@@ -17,6 +20,8 @@ router.register(r'agent-teams', AgentTeamViewSet, basename='agentteam')
 router.register(r'agent-links', AgentLinkViewSet, basename='agentlink')
 router.register(r'contact-assignments', ContactAssignmentViewSet, basename='contactassignment')
 router.register(r'audit-logs', AuditLogViewSet, basename='auditlog')
+router.register(r'linkedin-config', LinkedInConfigViewSet, basename='linkedinconfig')
+router.register(r'video-rooms', DailyCallViewSet, basename='video-rooms')
 
 urlpatterns = [
     path('', include(router.urls)),

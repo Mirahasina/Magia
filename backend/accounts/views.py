@@ -1,3 +1,14 @@
+import logging
+import datetime
+import uuid
+from django.utils import timezone
+from django.core.mail import EmailMultiAlternatives, send_mail
+from django.template.loader import render_to_string
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.tokens import default_token_generator
+from django.conf import settings
+
 from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -5,7 +16,16 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
-from .models import User, ContactRequest, Subscription, WorkspaceMember, WorkspaceInvitation, Notification, PLAN_LIMITS
+
+import requests
+
+from magia_backend.settings_constants import FRONTEND_URL
+from agents.models import Agent, ChatMessage
+from agents.serializers import UserSurveySerializer
+from .models import (
+    User, ContactRequest, Subscription, WorkspaceMember, 
+    WorkspaceInvitation, Notification, PLAN_LIMITS, EnterpriseRequest
+)
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
@@ -15,21 +35,10 @@ from .serializers import (
     ResetPasswordSerializer,
     ContactRequestSerializer,
     SubscriptionSerializer,
+    NotificationSerializer,
 )
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes, force_str
-from django.template.loader import render_to_string
-from django.core.mail import EmailMultiAlternatives
-from django.conf import settings
-from django.utils import timezone
-import requests
-import uuid
-from .serializers import NotificationSerializer
-# Combine with line 8 imports
-from agents.models import Agent
-from agents.serializers import UserSurveySerializer
-from agents.models import ChatMessage
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -59,7 +68,7 @@ class RegisterView(APIView):
         
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        verify_link = f"http://localhost:5173/verify-email?uid={uid}&token={token}"
+        verify_link = f"{FRONTEND_URL}/verify-email?uid={uid}&token={token}"
         
         subject = "Vérifiez votre compte MAGIA"
         html_content = render_to_string('emails/verification_email.html', {
@@ -72,8 +81,8 @@ class RegisterView(APIView):
             msg = EmailMultiAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, [user.email])
             msg.attach_alternative(html_content, "text/html")
             msg.send()
-        except Exception as e:
-            print(f"Error sending verification email: {e}")
+        except Exception as exc:
+            logger.error('Error sending verification email: %s', exc)
 
         return Response({
             'message': 'Compte créé. Veuillez vérifier votre email pour l\'activer.',
@@ -239,7 +248,7 @@ class ForgotPasswordView(APIView):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         
-        reset_link = f"http://localhost:5173/reset-password?uid={uid}&token={token}"
+        reset_link = f"{FRONTEND_URL}/reset-password?uid={uid}&token={token}"
         
         subject = "Réinitialisation de votre mot de passe MAGIA"
         text_content = f"""Bonjour,
@@ -275,8 +284,8 @@ L'équipe MAGIA
             msg = EmailMultiAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, [email])
             msg.attach_alternative(html_content, "text/html")
             msg.send()
-        except Exception as e:
-            print(f"Erreur lors de l'envoi de l'email: {e}")
+        except Exception as exc:
+            logger.error('Erreur lors de l’envoi de l’email: %s', exc)
 
         return Response({'message': 'Si cet email existe, un lien de réinitialisation a été envoyé.'}, status=status.HTTP_200_OK)
 
@@ -337,8 +346,8 @@ class ContactRequestCreateView(generics.CreateAPIView):
                 [settings.DEFAULT_FROM_EMAIL],
                 fail_silently=True,
             )
-        except Exception as e:
-            print(f"Erreur d'envoi d'email contact: {e}")
+        except Exception as exc:
+            logger.error('Erreur d’envoi d’email contact: %s', exc)
 
 
 class SubscriptionView(APIView):
@@ -359,7 +368,17 @@ class SubscriptionView(APIView):
         subscription, created = Subscription.objects.get_or_create(user=request.user)
         serializer = SubscriptionSerializer(subscription, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            if request.data.get('plan_name') == 'entreprise':
+                # Check if there is already a pending request
+                if EnterpriseRequest.objects.filter(user=request.user, status='pending').exists():
+                    return Response({'error': 'Vous avez déjà une demande en attente.'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                EnterpriseRequest.objects.create(user=request.user)
+                subscription.enterprise_requested = True
+                subscription.requested_at = timezone.now()
+                subscription.save()
+            else:
+                serializer.save()
             
             if request.data.get('plan_name') == 'entreprise':
                 subject = "Nouvelle demande MAGIA Enterprise"
@@ -376,8 +395,8 @@ class SubscriptionView(APIView):
                     msg = EmailMultiAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, [settings.ADMIN_EMAIL])
                     msg.attach_alternative(html_content, "text/html")
                     msg.send()
-                except Exception as e:
-                    print(f"Error sending enterprise email: {e}")
+                except Exception as exc:
+                    logger.error('Error sending enterprise email: %s', exc)
 
             return Response(serializer.data, status=status.HTTP_200_OK if not created else status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -496,10 +515,6 @@ class InviteMemberView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from .models import PLAN_LIMITS, WorkspaceInvitation
-        from django.utils import timezone
-        import datetime
-
         user = request.user
         try:
             plan = user.subscription.plan_name
@@ -537,13 +552,12 @@ class InviteMemberView(APIView):
             expires_at=expiry
         )
 
-        accept_url = f"http://localhost:5173/accept-invitation?token={invitation.token}"
+        accept_url = f"{FRONTEND_URL}/accept-invitation?token={invitation.token}"
 
         # Send email
         try:
-            from django.core.mail import EmailMultiAlternatives
             subject = f"{user.full_name} vous invite à rejoindre son workspace MAGIA"
-            text_content = f"Bonjour,\n\nVous avez été invité(e) par {user.full_name} à rejoindre son espace MAGIA en tant que {role}.\n\nCliquez ici pour accepter : {accept_url}\n\nCe lien expire dans 7 jours."
+            text_content = f"Bonjour,\n\nVous avez été invité(e) by {user.full_name} à rejoindre son espace MAGIA en tant que {role}.\n\nCliquez ici pour accepter : {accept_url}\n\nCe lien expire dans 7 jours."
             html_content = f"""<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
                 <h2 style="color:#1e1b4b">Invitation MAGIA</h2>
                 <p><strong>{user.full_name}</strong> vous invite à rejoindre son espace de travail en tant que <strong>{"Lecteur" if role == "viewer" else "Éditeur"}</strong>.</p>
@@ -555,8 +569,8 @@ class InviteMemberView(APIView):
             msg = EmailMultiAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, [email])
             msg.attach_alternative(html_content, "text/html")
             msg.send()
-        except Exception as e:
-            print(f"Error sending invitation email: {e}")
+        except Exception as exc:
+            logger.error('Error sending invitation email: %s', exc)
 
         return Response({
             'message': f"Invitation envoyée à {email}.",
@@ -656,7 +670,6 @@ class WorkspaceMembersView(APIView):
             'joined_at': m.joined_at,
         } for m in memberships]
 
-        # Teammates: all members of workspaces I have joined
         teams_data = []
         for membership in memberships:
             teammates = WorkspaceMember.objects.filter(workspace_owner=membership.workspace_owner).exclude(member_user=request.user)
@@ -679,17 +692,6 @@ class WorkspaceMembersView(APIView):
             'my_teams': teams_data
         })
 
-class UserSurveyView(APIView):
-    """POST /api/auth/survey/ — soumettre un score NPS."""
-    permission_classes = [IsAuthenticated]
-    def post(self, request):
-        serializer = UserSurveySerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
     def delete(self, request):
         member_id = request.data.get('id')
         if not member_id:
@@ -698,4 +700,16 @@ class UserSurveyView(APIView):
         if deleted:
             return Response({'message': 'Membre retiré avec succès.'})
         return Response({'error': 'Membre non trouvé.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class UserSurveyView(APIView):
+    """POST /api/auth/survey/ — soumettre un score NPS."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = UserSurveySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

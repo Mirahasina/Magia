@@ -107,25 +107,68 @@ async function connectToWhatsApp() {
     });
 
     sock.ev.on('messaging-history.set', async ({ messages, chats, contacts, isLatest }) => {
-        console.log(`Received history: ${messages.length} messages, ${chats.length} chats`);
-        const recentMessages = messages.slice(-50);
-        for (const msg of recentMessages) {
+        console.log(`Received history: ${messages.length} messages, ${chats.length} chats, ${contacts.length} contacts`);
+
+        // Sync contacts
+        if (contacts && contacts.length > 0) {
+            try {
+                await axios.post(`${API_BASE}/whatsapp-config/sync_whatsapp_contacts/`, {
+                    user_id: USER_ID,
+                    contacts: contacts
+                }, {
+                    headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+                });
+                console.log(`Synced ${contacts.length} historical contacts`);
+            } catch (err) {
+                console.error('Error syncing historical contacts:', err.message);
+            }
+        }
+
+        const formattedMessages = [];
+        for (const msg of messages) {
             const from = msg.key.remoteJid;
             const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-            if (text && !msg.key.fromMe) {
-                try {
-                    await axios.post(`${API_BASE}/whatsapp-config/whatsapp_gateway/`, {
-                        user_id: USER_ID,
-                        message: text,
-                        message_id: msg.key.id,
-                        sender: from
-                    }, {
-                        headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
-                    });
-                } catch (err) {
-                    console.error('Error in history gateway:', err.message);
-                }
+            if (text) {
+                formattedMessages.push({
+                    message: text,
+                    message_id: msg.key.id,
+                    sender: from,
+                    push_name: msg.pushName || null,
+                    is_me: !!msg.key.fromMe
+                });
             }
+        }
+        
+        console.log(`Sending ${formattedMessages.length} text messages securely to MAGIA bulk gateway...`);
+        // Batch in groups of 500
+        for (let i = 0; i < formattedMessages.length; i += 500) {
+            const batch = formattedMessages.slice(i, i + 500);
+            try {
+                await axios.post(`${API_BASE}/whatsapp-config/whatsapp_gateway_bulk/`, {
+                    user_id: USER_ID,
+                    messages: batch
+                }, {
+                    headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+                });
+                console.log(`Sent batch ${i/500 + 1}`);
+            } catch (err) {
+                console.error(`Error in bulk gateway batch ${i/500 + 1}:`, err.message);
+            }
+        }
+        console.log('Finished bulk history sync.');
+    });
+
+    sock.ev.on('contacts.upsert', async (contacts) => {
+        try {
+            await axios.post(`${API_BASE}/whatsapp-config/sync_whatsapp_contacts/`, {
+                user_id: USER_ID,
+                contacts: contacts
+            }, {
+                headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+            });
+            console.log(`Synced ${contacts.length} upserted contacts`);
+        } catch (err) {
+            console.error('Error syncing upserted contacts:', err.message);
         }
     });
 
@@ -136,7 +179,7 @@ async function connectToWhatsApp() {
                 const msgTime = msg.messageTimestamp;
                 const is_historical = (now - msgTime > 30 * 60);
 
-                if (!msg.key.fromMe && msg.message) {
+                if (msg.message) {
                     const from = msg.key.remoteJid;
                     const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
@@ -147,7 +190,9 @@ async function connectToWhatsApp() {
                                 message: text,
                                 message_id: msg.key.id,
                                 sender: from,
-                                is_historical: is_historical
+                                push_name: msg.pushName || null,
+                                is_historical: is_historical,
+                                is_me: !!msg.key.fromMe
                             }, {
                                 headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
                             });

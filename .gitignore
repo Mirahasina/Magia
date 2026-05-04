@@ -1,12 +1,37 @@
-# Environnement Python
-venv/
-backend/venv/
-
-# Python cache
-__pycache__/
-*.pyc
-
-# fichiers lourds
-*.pt
-*.pth
+# --- General ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
 *.zip
+*.tar.gz
+allfiles.txt
+
+# --- Backend (Django) ---
+backend/venv/
+backend/.env
+backend/db.sqlite3
+backend/media/
+backend/staticfiles/
+backend/__pycache__/
+backend/*.pyc
+backend/.pytest_cache/
+backend/auth_info_*/
+backend/faiss_indexes/
+backend/logs/
+
+# --- Frontend (React/Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/npm-debug.log*
+
+# --- Python General ---
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class

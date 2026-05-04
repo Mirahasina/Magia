@@ -105,6 +105,9 @@ class Subscription(models.Model):
     card_exp_month = models.CharField(max_length=2, blank=True, null=True)
     card_exp_year = models.CharField(max_length=2, blank=True, null=True)
 
+    enterprise_requested = models.BooleanField(default=False)
+    requested_at = models.DateTimeField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -164,7 +167,6 @@ class PaymentTransaction(models.Model):
 
         amount_val = float(self.amount)
         
-        # If amount >= 1000, it's definitely Ariary.
         is_ariary = amount_val >= 1000
         
         if is_ariary:
@@ -178,7 +180,6 @@ class PaymentTransaction(models.Model):
                     sub.plan_name = 'pro'
                     sub.num_agents = max(purchased_agents, 2)
         else:
-            # Legacy EUR support
             if amount_val >= 99:
                 sub.plan_name = 'entreprise'
             else:
@@ -200,13 +201,33 @@ class PaymentTransaction(models.Model):
             
         sub.save()
 
-        # Create Notification
         Notification.objects.create(
             user=self.user,
             title="Abonnement mis à jour",
             message=f"Votre paiement de {self.amount} {self.currency} a été validé. Votre plan est désormais : {sub.plan_name.upper()} ({sub.num_agents} agents).",
             type="payment"
         )
+
+class EnterpriseRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('approved', 'Approuvé'),
+        ('rejected', 'Rejeté'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enterprise_requests')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    requested_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    admin_notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = 'Demande Entreprise'
+        verbose_name_plural = 'Demandes Entreprise'
+        ordering = ['-requested_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.status}"
 
 class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

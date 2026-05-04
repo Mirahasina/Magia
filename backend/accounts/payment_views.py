@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 import json
 from rest_framework import status
 from rest_framework.views import APIView
@@ -11,6 +12,10 @@ import random
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.conf import settings
+from django.http import HttpResponse
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
 
 class CreateCheckoutIntentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -193,3 +198,137 @@ class TransactionListView(generics.ListAPIView):
 
     def get_queryset(self):
         return PaymentTransaction.objects.filter(user=self.request.user).order_by('-created_at')
+
+class DownloadInvoiceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, transaction_id):
+        transaction = PaymentTransaction.objects.filter(id=transaction_id, user=request.user).first()
+        if not transaction:
+            return Response({'error': 'Transaction non trouvée.'}, status=404)
+            
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="facture_magia_{transaction.id}.pdf"'
+        
+        p = canvas.Canvas(response, pagesize=A4)
+        width, height = A4
+        
+        # Header
+        p.setFont("Helvetica-Bold", 24)
+        p.drawString(50, height - 50, "MAGIA")
+        p.setFont("Helvetica", 10)
+        p.drawString(50, height - 65, "IA & Automatisation Premium")
+        
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(width - 200, height - 50, "FACTURE")
+        p.setFont("Helvetica", 10)
+        p.drawString(width - 200, height - 65, f"N° : {str(transaction.id)[:8].upper()}")
+        p.drawString(width - 200, height - 80, f"Date : {transaction.created_at.strftime('%d/%m/%Y')}")
+        
+        # Line
+        p.setStrokeColor(colors.lightgrey)
+        p.line(50, height - 100, width - 50, height - 100)
+        
+        # Client Info
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(50, height - 130, "DESTINATAIRE :")
+        p.setFont("Helvetica", 10)
+        p.drawString(50, height - 145, request.user.email)
+        if request.user.company:
+            p.drawString(50, height - 160, request.user.company)
+            
+        # Table Header
+        p.setFillColor(colors.whitesmoke)
+        p.rect(50, height - 220, width - 100, 20, fill=1, stroke=0)
+        p.setFillColor(colors.black)
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(60, height - 215, "Description")
+        p.drawRightString(width - 60, height - 215, "Montant")
+        
+        # Content
+        p.setFont("Helvetica", 10)
+        plan = transaction.subscription.plan_name.upper() if transaction.subscription else "PRO"
+        p.drawString(60, height - 245, f"Abonnement MAGIA {plan}")
+        p.drawRightString(width - 60, height - 245, f"{transaction.amount} {transaction.currency}")
+        
+        # Total
+        p.line(50, height - 300, width - 50, height - 300)
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(60, height - 320, "TOTAL")
+        p.drawRightString(width - 60, height - 320, f"{transaction.amount} {transaction.currency}")
+        
+        # Footer
+        p.setFont("Helvetica-Oblique", 8)
+        p.drawCentredString(width / 2, 50, "Merci de votre confiance. MAGIA - Technologie Antigravity.")
+        
+        p.showPage()
+        p.save()
+        
+        return response
+
+class DownloadFullHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        transactions = PaymentTransaction.objects.filter(user=request.user).order_by('-created_at')
+        if not transactions.exists():
+            return Response({'error': 'Aucune transaction trouvée.'}, status=404)
+            
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="historique_magia.pdf"'
+        
+        p = canvas.Canvas(response, pagesize=A4)
+        width, height = A4
+        
+        # Header
+        p.setFont("Helvetica-Bold", 24)
+        p.drawString(50, height - 50, "MAGIA")
+        p.setFont("Helvetica", 10)
+        p.drawString(50, height - 65, "Historique Complet des Paiements")
+        
+        # client
+        p.setFont("Helvetica-Bold", 10)
+        p.drawRightString(width - 50, height - 50, f"Client : {request.user.email}")
+        p.setFont("Helvetica", 8)
+        p.drawRightString(width - 50, height - 65, f"Généré le {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+        # Table Header
+        p.setStrokeColor(colors.black)
+        p.setFillColor(colors.whitesmoke)
+        p.rect(50, height - 110, width - 100, 20, fill=1)
+        p.setFillColor(colors.black)
+        p.setFont("Helvetica-Bold", 9)
+        p.drawString(60, height - 105, "Date")
+        p.drawString(120, height - 105, "N° Facture")
+        p.drawString(200, height - 105, "Description")
+        p.drawString(350, height - 105, "Statut")
+        p.drawRightString(width - 60, height - 105, "Montant")
+        
+        # Content
+        y = height - 130
+        p.setFont("Helvetica", 8)
+        for tx in transactions:
+            if y < 100:
+                p.showPage()
+                y = height - 50
+                p.setFont("Helvetica", 8)
+                
+            p.drawString(60, y, tx.created_at.strftime('%d/%m/%Y'))
+            p.drawString(120, y, str(tx.id)[:8].upper())
+            p.drawString(200, y, f"Abonnement MAGIA via {tx.gateway.upper()}")
+            p.drawString(350, y, tx.status.upper())
+            p.drawRightString(width - 60, y, f"{tx.amount} {tx.currency}")
+            y -= 20
+            
+        # Total
+        p.line(50, y, width - 50, y)
+        y -= 20
+        total_amount = sum(tx.amount for tx in transactions if tx.status == 'completed')
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(60, y, "TOTAL COMPLÉTÉ")
+        p.drawRightString(width - 60, y, f"{total_amount} EUR")
+        
+        p.showPage()
+        p.save()
+        
+        return response

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
-from .models import User, ContactRequest, Subscription, PaymentTransaction
+from .models import User, ContactRequest, Subscription, PaymentTransaction, Notification
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -46,11 +46,23 @@ class LoginSerializer(serializers.Serializer):
         data['user'] = user
         return data
 
+class SubscriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subscription
+        fields = [
+            'id', 'plan_name', 'num_agents', 'is_annual', 'status', 'active_until',
+            'card_last4', 'card_brand', 'card_exp_month', 'card_exp_year',
+            'enterprise_requested', 'requested_at',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'enterprise_requested', 'requested_at', 'created_at', 'updated_at']
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.ReadOnlyField()
     avatar_url = serializers.SerializerMethodField()
     has_password = serializers.SerializerMethodField()
+    subscription = SubscriptionSerializer(read_only=True)
 
     class Meta:
         model = User
@@ -58,7 +70,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'email', 'first_name', 'last_name', 'full_name',
             'company', 'avatar', 'avatar_url', 'is_staff', 'created_at',
             'recovery_email', 'workspace_label', 'timezone',
-            'master_api_key', 'is_2fa_enabled', 'is_email_verified', 'has_password'
+            'master_api_key', 'is_2fa_enabled', 'is_email_verified', 'has_password',
+            'subscription'
         ]
         read_only_fields = ['id', 'email', 'is_staff', 'created_at', 'master_api_key']
 
@@ -111,19 +124,10 @@ class ContactRequestSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Subscription
-        fields = [
-            'id', 'plan_name', 'num_agents', 'is_annual', 'status', 'active_until',
-            'card_last4', 'card_brand', 'card_exp_month', 'card_exp_year',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Subscription.user.field.related_model.notifications.related.related_model if False else __import__('accounts.models', fromlist=['Notification']).Notification
+        model = Notification
         fields = ['id', 'title', 'message', 'type', 'is_read', 'created_at']
         read_only_fields = ['id', 'created_at']
 

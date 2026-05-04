@@ -1,10 +1,24 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown } from "lucide-react";
+import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown, Linkedin, AlertTriangle } from "lucide-react";
 import { cn } from "../ui/utils";
 import { Button } from "../ui/button";
 import { useAgents } from "../../hooks/useAgents";
 
-export function AgentDetailView({ agent, onBack, onRefresh, onNavigateToInbox }: { agent: any; onBack: () => void; onRefresh?: () => void; onNavigateToInbox?: (agentId?: string) => void }) {
+interface Agent {
+    id: string;
+    name: string;
+    role: string;
+    llm_model: string;
+    system_prompt: string;
+    avatar?: string;
+    is_active: boolean;
+    is_deployed: boolean;
+    channels: string[];
+    messages?: any[];
+    stats?: any;
+}
+
+export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToInbox }: { user?: any; agent: Agent; onBack: () => void; onRefresh?: () => void; onNavigateToInbox?: (agentId?: string) => void }) {
     const [activeDetailTab, setActiveDetailTab] = useState("Aperçu");
     const { messages: _unused, isTyping: hookIsTyping, sandboxChat, toggleAgentPause, updateAgent, uploadKnowledge } = useAgents();
 
@@ -200,7 +214,7 @@ export function AgentDetailView({ agent, onBack, onRefresh, onNavigateToInbox }:
                         <div className="p-8 bg-white border border-gray-100 rounded-[2rem] shadow-sm">
                             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2"> <Globe className="w-4 h-4 text-gray-400" /> Canaux actifs</h3>
                             <div className="space-y-4">
-                                {['chat', 'email', 'whatsapp'].map((chan) => {
+                                {['chat', 'email', 'whatsapp', 'linkedin'].map((chan) => {
                                     const isActive = agent.channels?.includes(chan);
                                     return (
                                         <div key={chan} className={cn(
@@ -215,6 +229,7 @@ export function AgentDetailView({ agent, onBack, onRefresh, onNavigateToInbox }:
                                                 {chan === 'chat' && <Globe className={cn("w-4 h-4", isActive ? "text-blue-500" : "text-gray-400")} />}
                                                 {chan === 'email' && <Mail className={cn("w-4 h-4", isActive ? "text-orange-500" : "text-gray-400")} />}
                                                 {chan === 'whatsapp' && <MessageSquare className={cn("w-4 h-4", isActive ? "text-green-500" : "text-gray-400")} />}
+                                                {chan === 'linkedin' && <Linkedin className={cn("w-4 h-4", isActive ? "text-blue-700" : "text-gray-400")} />}
                                                 <span className={cn("text-sm font-bold capitalize", isActive ? "text-blue-900" : "text-gray-400")}>{chan === 'chat' ? 'Web Chat' : chan}</span>
                                             </div>
                                             <div className={cn(
@@ -287,7 +302,45 @@ export function AgentDetailView({ agent, onBack, onRefresh, onNavigateToInbox }:
                             <div className="space-y-4">
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black uppercase text-gray-400">Modèle IA</p>
-                                    <p className="text-sm font-bold">{agent.llm_model}</p>
+                                    <select
+                                        className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold focus:outline-none"
+                                        value={agent.llm_model || ""}
+                                        onChange={async (e) => {
+                                            await updateAgent(agent.id, { llm_model: e.target.value });
+                                            onRefresh?.();
+                                        }}
+                                    >
+                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Gratuit)</option>
+                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (PRO)</option>
+                                        <option value="gpt-4o-mini">GPT-4o Mini (Gratuit)</option>
+                                        <option value="gpt-4o">GPT-4o (PRO)</option>
+                                        <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (PRO)</option>
+                                        <option value="o1-preview">OpenAI o1 (ENTREPRISE)</option>
+                                    </select>
+                                    {/* Plan Logic Feedback */}
+                                    {(() => {
+                                        const plan = user?.subscription?.plan_name || 'gratuit';
+                                        const model = agent.llm_model;
+                                        const isProModel = model === 'gemini-1.5-pro' || model === 'gpt-4o' || model === 'claude-3-5-sonnet-20240620';
+                                        const isEnterpriseModel = model === 'o1-preview';
+                                        
+                                        if (plan === 'gratuit' && (isProModel || isEnterpriseModel)) {
+                                            return <p className="text-[9px] text-orange-500 font-bold mt-1 animate-pulse flex items-center gap-1">
+                                                <Zap className="w-2.5 h-2.5" /> Modèle dégradé (Plan Gratuit)
+                                            </p>
+                                        }
+                                        if (plan === 'pro' && isEnterpriseModel) {
+                                            return <p className="text-[9px] text-orange-500 font-bold mt-1 animate-pulse flex items-center gap-1">
+                                                <Zap className="w-2.5 h-2.5" /> Modèle dégradé (Plan PRO)
+                                            </p>
+                                        }
+                                        if ((plan === 'pro' && isProModel) || (plan === 'entreprise')) {
+                                            return <p className="text-[9px] text-emerald-500 font-bold mt-1 flex items-center gap-1">
+                                                <Sparkles className="w-2.5 h-2.5" /> Performance Maximale
+                                            </p>
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black uppercase text-gray-400">Température</p>
@@ -303,7 +356,7 @@ export function AgentDetailView({ agent, onBack, onRefresh, onNavigateToInbox }:
                                         {agent.team_color && (
                                             <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: agent.team_color }} />
                                         )}
-                                        <select 
+                                        <select
                                             className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold focus:outline-none"
                                             value={agent.team || ""}
                                             onChange={async (e) => {
@@ -374,7 +427,6 @@ export function AgentDetailView({ agent, onBack, onRefresh, onNavigateToInbox }:
                 </div>
             )}
 
-            {/* Sandbox Modal */}
             <SandboxModal
                 isOpen={showSandbox}
                 onClose={() => setShowSandbox(false)}

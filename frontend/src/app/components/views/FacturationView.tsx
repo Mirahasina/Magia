@@ -25,12 +25,12 @@ interface TransactionData {
     created_at: string;
 }
 
-export function FacturationView({ 
-    refreshKey = 0, 
+export function FacturationView({
+    refreshKey = 0,
     onUpgrade,
     onUpdateCard
-}: { 
-    refreshKey?: number, 
+}: {
+    refreshKey?: number,
     onUpgrade?: (details: any) => void,
     onUpdateCard?: () => void
 }) {
@@ -72,14 +72,71 @@ export function FacturationView({
             }
         };
 
+        const handleDownloadInvoice = async (transactionId: string) => {
+            try {
+                const token = localStorage.getItem("access_token");
+                const response = await fetch(`http://localhost:8000/api/auth/payments/transactions/${transactionId}/download/`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const blob = await response.json();
+                }
+            } catch (err) {
+                console.error("Error downloading invoice", err);
+            }
+        };
+
         fetchSub();
         fetchTransactions();
     }, [refreshKey]);
+
+    const handleDownload = async (id: string) => {
+        try {
+            const token = localStorage.getItem("access_token");
+            const response = await fetch(`http://localhost:8000/api/auth/payments/transactions/${id}/download/`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `facture_${id.substring(0, 8)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            }
+        } catch (err) {
+            console.error("Download failed", err);
+        }
+    };
+
+    const handleDownloadFull = async () => {
+        try {
+            const token = localStorage.getItem("access_token");
+            const response = await fetch(`http://localhost:8000/api/auth/payments/transactions/download-history/`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `historique_magia.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            }
+        } catch (err) {
+            console.error("Full history download failed", err);
+        }
+    };
 
     if (loading) return <div className="p-8 text-center font-bold text-gray-400">Chargement...</div>;
 
     const planDisplay = sub?.plan_name === 'pro' ? 'Business Pro' : sub?.plan_name === 'entreprise' ? 'Entreprise' : 'Gratuit';
     const isGratuit = sub?.plan_name === 'gratuit';
+    const isEnterprise = sub?.plan_name === 'entreprise';
     const pricePerAgent = 15;
     const monthlyTotal = isGratuit ? 0 : (sub?.num_agents || 0) * pricePerAgent;
 
@@ -112,7 +169,7 @@ export function FacturationView({
                         </div>
                         <div className="mt-4 space-y-2">
                             <div className="flex justify-between text-[10px] font-black uppercase tracking-widest items-center">
-                                <span className="opacity-70">{sub?.num_agents} Agents configurés</span>
+                                <span className="opacity-70">{sub?.plan_name === 'entreprise' ? 'Agents Illimités' : `${sub?.num_agents} Agents configurés`}</span>
                                 <div className="px-2 py-0.5 bg-white/10 rounded-full backdrop-blur-md italic font-black text-[8px]">ACTIF</div>
                             </div>
                             <div className="h-1 bg-white/10 rounded-full overflow-hidden">
@@ -123,42 +180,44 @@ export function FacturationView({
                     </div>
                 </div>
 
-                <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ajuster mon offre</h4>
-                        <Zap className="w-3.5 h-3.5 text-blue-800" />
-                    </div>
-                    
-                    <div className="space-y-4">
-                        <div className="flex items-end justify-between">
-                            <div className="space-y-0.5">
-                                <span className="text-3xl font-serif font-black text-gray-900">{agentsToBuy}</span>
-                                <span className="text-[10px] font-bold text-gray-400 ml-2 uppercase tracking-widest">Agents</span>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[9px] font-black text-blue-900 tracking-tighter">{(agentsToBuy * 15 * 5000).toLocaleString('fr-FR')} Ar<span className="text-[8px]">/m</span></p>
-                            </div>
+                {!isEnterprise && (
+                    <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ajuster mon offre</h4>
+                            <Zap className="w-3.5 h-3.5 text-blue-800" />
                         </div>
 
-                        <div className="relative pt-2 pb-1">
-                            <input 
-                                type="range" 
-                                min="2" 
-                                max="50" 
-                                value={agentsToBuy} 
-                                onChange={(e) => setAgentsToBuy(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-900"
-                            />
-                        </div>
+                        <div className="space-y-4">
+                            <div className="flex items-end justify-between">
+                                <div className="space-y-0.5">
+                                    <span className="text-3xl font-serif font-black text-gray-900">{agentsToBuy}</span>
+                                    <span className="text-[10px] font-bold text-gray-400 ml-2 uppercase tracking-widest">Agents</span>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[9px] font-black text-blue-900 tracking-tighter">{(agentsToBuy * 15 * 5000).toLocaleString('fr-FR')} Ar<span className="text-[8px]">/m</span></p>
+                                </div>
+                            </div>
 
-                        <Button 
-                            onClick={() => onUpgrade?.({ numAgents: agentsToBuy, isAnnual: sub?.is_annual || false, totalPrice: agentsToBuy * 15 })}
-                            className="w-full h-10 bg-blue-900 hover:bg-blue-900 text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-blue-100 border-none mt-2"
-                        >
-                            {isGratuit ? 'Passer au Plan Pro' : 'Mettre à jour'}
-                        </Button>
+                            <div className="relative pt-2 pb-1">
+                                <input
+                                    type="range"
+                                    min="2"
+                                    max="50"
+                                    value={agentsToBuy}
+                                    onChange={(e) => setAgentsToBuy(parseInt(e.target.value))}
+                                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-900"
+                                />
+                            </div>
+
+                            <Button
+                                onClick={() => onUpgrade?.({ numAgents: agentsToBuy, isAnnual: sub?.is_annual || false, totalPrice: agentsToBuy * 15 })}
+                                className="w-full h-10 bg-blue-900 hover:bg-blue-900 text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-blue-100 border-none mt-2"
+                            >
+                                {isGratuit ? 'Passer au Plan Pro' : 'Mettre à jour'}
+                            </Button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
@@ -167,7 +226,7 @@ export function FacturationView({
                         <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paiement</h4>
                         <CreditCard className="w-3.5 h-3.5 text-gray-400" />
                     </div>
-                    
+
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-none border border-gray-100">
                             <div className="w-10 h-6 bg-gray-900 rounded-md flex items-center justify-center text-[8px] font-black italic text-white shadow-md">
@@ -180,9 +239,9 @@ export function FacturationView({
                                 </p>
                             </div>
                         </div>
-                        <Button 
+                        <Button
                             onClick={onUpdateCard}
-                            variant="outline" 
+                            variant="outline"
                             className="h-9 px-4 border border-gray-100 hover:bg-gray-50 text-gray-900 font-black text-[9px] uppercase tracking-widest rounded-xl transition-all"
                         >
                             MODIFIER LA CARTE
@@ -190,13 +249,21 @@ export function FacturationView({
                     </div>
                 </div>
 
-                <div className="p-6 bg-gray-50/50 border border-gray-100 rounded-none flex flex-col justify-center items-center text-center space-y-2">
-                    <div className="p-2 bg-white rounded-none shadow-sm">
+                <div 
+                    onClick={handleDownloadFull}
+                    className={cn(
+                        "p-6 bg-gray-50/50 border border-gray-100 rounded-none flex flex-col justify-center items-center text-center space-y-2 transition-all duration-300",
+                        transactions.length > 0 ? "cursor-pointer hover:bg-white hover:shadow-md hover:border-blue-200 group" : "opacity-50"
+                    )}
+                >
+                    <div className="p-2 bg-white rounded-none shadow-sm group-hover:scale-110 transition-transform">
                         <FileText className="w-5 h-5 text-blue-800" />
                     </div>
                     <div>
                         <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Facturation Simplifiée</p>
-                        <p className="text-[9px] text-gray-500 font-medium max-w-[180px]">Téléchargez vos factures PDF directement depuis l'historique.</p>
+                        <p className="text-[9px] text-gray-500 font-medium max-w-[180px]">
+                            {transactions.length > 0 ? "Cliquez ici pour télécharger votre historique complet." : "Aucune facture disponible pour le moment."}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -211,7 +278,9 @@ export function FacturationView({
                         <thead className="sticky top-0 bg-white z-10">
                             <tr className="border-b border-gray-100">
                                 <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Objet</th>
+                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">N° Facture</th>
+                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Description</th>
+                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Statut</th>
                                 <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Montant</th>
                             </tr>
                         </thead>
@@ -221,22 +290,36 @@ export function FacturationView({
                                     <td className="px-6 py-4 text-[10px] font-bold text-gray-900 uppercase">
                                         {new Date(tx.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </td>
-                                    <td className="px-6 py-4 text-[10px] text-gray-400 font-medium">ABONNEMENT {sub?.plan_name?.toUpperCase() || ''} - {tx.gateway.toUpperCase()}</td>
+                                    <td className="px-6 py-4 text-[10px] text-gray-400 font-mono font-bold">
+                                        {tx.id.substring(0, 8).toUpperCase()}
+                                    </td>
+                                    <td className="px-6 py-4 text-[10px] text-gray-900 font-medium">
+                                        Abonnement MAGIA {sub?.plan_name?.toUpperCase() || ''}
+                                        <span className="block text-[8px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Via {tx.gateway.toUpperCase()}</span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className={cn(
+                                            "inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter",
+                                            tx.status === 'completed' ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+                                        )}>
+                                            {tx.status === 'completed' ? 'Payé' : tx.status}
+                                        </div>
+                                    </td>
                                     <td className="px-6 py-4 text-[10px] text-gray-900 font-black text-right">
-                                        <div className="flex flex-col items-end gap-1">
-                                            <div className="flex items-center gap-2">
-                                                <span>{parseFloat(tx.amount).toLocaleString('fr-FR')} {tx.currency === 'EUR' ? '€' : tx.currency}</span>
-                                                <button className="text-blue-800 hover:text-blue-900">
-                                                    <ArrowUpRight className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                            <span className={`text-[8px] uppercase tracking-widest ${tx.status === 'completed' ? 'text-green-600' : 'text-orange-500'}`}>{tx.status}</span>
+                                        <div className="flex items-center justify-end gap-3">
+                                            <span>{parseFloat(tx.amount).toLocaleString('fr-FR')} {tx.currency === 'EUR' ? '€' : tx.currency}</span>
+                                            <button 
+                                                onClick={() => handleDownload(tx.id)}
+                                                className="p-1.5 bg-gray-50 hover:bg-white hover:shadow-md rounded-lg text-blue-800 transition-all active:scale-95 group-hover:bg-white"
+                                            >
+                                                <FileText className="w-3.5 h-3.5" />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan={3} className="px-6 py-8 text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                    <td colSpan={5} className="px-6 py-8 text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest">
                                         Aucune transaction pour le moment
                                     </td>
                                 </tr>

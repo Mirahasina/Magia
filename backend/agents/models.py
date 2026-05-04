@@ -33,6 +33,7 @@ class Agent(models.Model):
     confidence_threshold = models.IntegerField(default=85)
     whatsapp_config = models.ForeignKey('WhatsAppConfig', on_delete=models.SET_NULL, null=True, blank=True)
     email_config = models.ForeignKey('EmailConfig', on_delete=models.SET_NULL, null=True, blank=True)
+    linkedin_config = models.ForeignKey('LinkedInConfig', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_deployed = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -95,17 +96,33 @@ class EmailConfig(models.Model):
     def __str__(self):
         return f"{self.name} ({self.email})"
 
+class LinkedInConfig(models.Model):
+    name = models.CharField(max_length=255, default="Default LinkedIn")
+    is_connected = models.BooleanField(default=False)
+    api_key = models.CharField(max_length=255, blank=True, null=True, help_text="Clé API Proxycurl")
+    unipile_account_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID du compte Unipile")
+    li_at_cookie = models.TextField(blank=True, null=True, help_text="LinkedIn Session Cookie (fallback)")
+    is_messaging_active = models.BooleanField(default=False)
+    last_sync_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='linkedin_configs', null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.user.email if self.user else 'No user'})"
+
 class ChatMessage(models.Model):
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='all_messages', null=True, blank=True)
     agent = models.ForeignKey(Agent, related_name='messages', on_delete=models.CASCADE, null=True, blank=True)
     sender = models.CharField(max_length=50)
-    contact_info = models.CharField(max_length=255, blank=True, null=True)
+    contact_info = models.CharField(max_length=255, null=True, blank=True)
+    contact_name = models.CharField(max_length=255, null=True, blank=True)
     source = models.CharField(max_length=50, default='chat')
     content = models.TextField()
     is_whatsapp = models.BooleanField(default=False)
     whatsapp_message_id = models.CharField(max_length=255, blank=True, null=True)
     is_read = models.BooleanField(default=False)
     status = models.CharField(max_length=50, default='new', choices=[('new', 'New'), ('pertinent', 'Pertinent'), ('archived', 'Archived')])
+    email_config = models.ForeignKey(EmailConfig, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -171,3 +188,19 @@ class ContactAssignment(models.Model):
 
     def __str__(self):
         return f"{self.contact_info} assigned to {self.agent.name}"
+
+class Contact(models.Model):
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='contacts')
+    source = models.CharField(max_length=50)
+    contact_info = models.CharField(max_length=255) 
+    name = models.CharField(max_length=255, null=True, blank=True)
+    avatar = models.URLField(null=True, blank=True)
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    is_blocked = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'source', 'contact_info')
+
+    def __str__(self):
+        return f"{self.name or self.contact_info} ({self.source})"

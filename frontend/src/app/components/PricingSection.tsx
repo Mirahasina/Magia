@@ -7,10 +7,11 @@ import { ScrollReveal } from "./ScrollReveal";
 interface PricingSectionProps {
   openAuth: (view: "login" | "signup") => void;
   openContact: () => void;
+  onRequestEnterprise: () => void;
   openPayment: (details: { numAgents: number; isAnnual: boolean; totalPrice: number }) => void;
 }
 
-export function PricingSection({ openAuth, openContact, openPayment }: PricingSectionProps) {
+export function PricingSection({ openAuth, openContact, onRequestEnterprise, openPayment }: PricingSectionProps) {
   const [numAgents, setNumAgents] = useState(2);
   const [selectedPlan, setSelectedPlan] = useState<string>("Pro (Personnalisé)");
   const [isAnnual, setIsAnnual] = useState(false);
@@ -28,7 +29,7 @@ export function PricingSection({ openAuth, openContact, openPayment }: PricingSe
 
   const handleCTA = (planName: string) => {
     if (planName === "Gratuit") openAuth("signup");
-    else if (planName === "Sur mesure") openContact();
+    else if (planName === "Sur mesure") onRequestEnterprise();
     else openPayment({ numAgents, isAnnual, totalPrice });
   };
 

@@ -39,6 +39,48 @@ def decode_mime_words(s):
             decoded_parts.append(part)
     return "".join(decoded_parts)
 
+def extract_email_body(msg):
+    """
+    Extracts the body of an email message, prioritizing HTML if available.
+    More robust version to handle deep nested parts and prevent empty overwrites.
+    """
+    body_text = None
+    body_html = None
+    
+    if msg.is_multipart():
+        for part in msg.walk():
+            content_type = part.get_content_type()
+            content_disposition = str(part.get("Content-Disposition"))
+
+            if "attachment" in content_disposition:
+                continue
+
+            if content_type == "text/plain":
+                payload = part.get_payload(decode=True)
+                if payload:
+                    decoded = payload.decode('utf-8', errors='replace').strip()
+                    if decoded and (not body_text or len(decoded) > len(body_text or "")):
+                        body_text = decoded
+            elif content_type == "text/html":
+                payload = part.get_payload(decode=True)
+                if payload:
+                    decoded = payload.decode('utf-8', errors='replace').strip()
+                    if decoded and (not body_html or len(decoded) > len(body_html or "")):
+                        body_html = decoded
+    else:
+        content_type = msg.get_content_type()
+        payload = msg.get_payload(decode=True)
+        if payload:
+            decoded = payload.decode('utf-8', errors='replace').strip()
+            if content_type == "text/html":
+                body_html = decoded
+            else:
+                body_text = decoded
+
+    if body_html is not None and len(body_html) > 50:
+        return body_html
+    return body_html if body_html else (body_text if body_text else "")
+
 def get_google_auth_string(user, token):
     return f"user={user}\x01auth=Bearer {token}\x01\x01"
 
@@ -97,18 +139,14 @@ def process_emails_for_agent(agent_id):
             return
 
         all_msg_ids = messages[0].split()
-        logger.info(f"Total de {len(all_msg_ids)} emails trouvés. Analyse des 20 plus récents...")
+        logger.info(f"Total de {len(all_msg_ids)} emails trouvés. Analyse des 50 plus récents...")
 
-        # Process the 20 most recent emails
-        msg_ids = list(reversed(all_msg_ids))[:20] 
+        msg_ids = list(reversed(all_msg_ids))[:50] 
 
-        processed_count = 0
+        ai_processed_count = 0
         new_clones_count = 0
         
         for num in msg_ids:
-            if processed_count >= 10:
-                break
-                
             status, data = mail.fetch(num, '(BODY.PEEK[HEADER.FIELDS (DATE FROM SUBJECT)])')
             if status != 'OK' or not data[0]:
                 continue
@@ -116,6 +154,7 @@ def process_emails_for_agent(agent_id):
             msg_header = email.message_from_bytes(data[0][1])
             date_header = msg_header.get('Date')
             
+            is_recent = True
             if date_header:
                 try:
                     msg_date = parsedate_to_datetime(date_header)
@@ -123,11 +162,10 @@ def process_emails_for_agent(agent_id):
                     if msg_date.tzinfo is None:
                         msg_date = msg_date.replace(tzinfo=timezone.utc)
                     
-                    if now - msg_date > timedelta(days=2): # Processing up to 48h back
-                        continue
+                    if now - msg_date > timedelta(days=2):
+                        is_recent = False
                 except Exception as e:
                     logger.error(f"Erreur lors du parsing de la date: {str(e)}")
-                    continue
             
             status, data = mail.fetch(num, '(FLAGS BODY.PEEK[])')
             if status != 'OK':
@@ -145,26 +183,37 @@ def process_emails_for_agent(agent_id):
             subject = decode_mime_words(msg['Subject'])
             sender = decode_mime_words(msg['From'])
             
-            body = ""
-            if msg.is_multipart():
-                for part in msg.walk():
-                    if part.get_content_type() == "text/plain":
-                        body = part.get_payload(decode=True).decode('utf-8', errors='replace')
-                        break
-            else:
-                body = msg.get_payload(decode=True).decode('utf-8', errors='replace')
+            body = extract_email_body(msg)
 
             # Duplicate check
             exists = ChatMessage.objects.filter(
-                agent=agent,
-                sender='user',
+                user=config.user,
                 content=body,
+                contact_info=sender,
                 source='email'
             ).exists()
             
             if exists:
                 continue
 
+            # Save the email so the user can manually reply if needed
+            chat_msg = ChatMessage.objects.create(
+                user=config.user,
+                agent=agent,
+                sender='user',
+                content=body,
+                contact_info=sender,
+                source='email',
+                is_read=is_read,
+                status='new' if is_recent else 'archived',
+                email_config=config
+            )
+
+            # AI processing is only for recent emails, limited to 10 per run
+            if not is_recent or ai_processed_count >= 10:
+                continue
+
+            ai_processed_count += 1
             logger.info(f"Nouvel email de {sender} détecté : '{subject}'. Analyse en cours...")
 
             classification_prompt = f"""
@@ -191,7 +240,8 @@ def process_emails_for_agent(agent_id):
                 agent_role="Analyseur de leads",
                 system_prompt="Tu es un expert en qualification de leads. Tu dois dire si un message mérite une réponse commerciale ou de politesse.",
                 knowledge_context="",
-                user_message=classification_prompt
+                user_message=classification_prompt,
+                model_name=agent.llm_model
             )
             logger.info(f"Classification Email pour '{subject}': {is_relevant}")
 
@@ -201,6 +251,8 @@ def process_emails_for_agent(agent_id):
 
             if 'OUI' not in is_relevant.upper():
                 logger.info(f"Email de {sender} ignoré (non pertinent)")
+                chat_msg.status = 'new' # Leave as new for manual processing
+                chat_msg.save()
                 mail.store(num, '+FLAGS', '\\Seen')
                 continue
 
@@ -226,7 +278,8 @@ def process_emails_for_agent(agent_id):
                 agent_role=agent.role,
                 system_prompt=agent.system_prompt,
                 knowledge_context=context,
-                user_message=response_prompt
+                user_message=response_prompt,
+                model_name=agent.llm_model
             )
             logger.info(f"Réponse générée (50 cars): {response_text[:50]}...")
 
@@ -238,11 +291,15 @@ def process_emails_for_agent(agent_id):
                 logger.info("Réponse [UNKNOWN] détectée, utilisation du fallback")
                 response_text = "Merci de votre intérêt. Je n'ai pas la réponse précise à votre question pour le moment, mais un responsable commercial va prendre contact avec vous très rapidement."
 
-            status = classify_pertinence(agent.role, body)
-            if "épuisé mon quota" in status.lower():
-                status = "new_lead"
+            status_val = classify_pertinence(agent.role, body)
+            if "épuisé mon quota" in status_val.lower():
+                status_val = "new_lead"
 
-            ChatMessage.objects.create(agent=agent, sender='user', content=body, contact_info=sender, source='email', status=status)
+            # Update the original message status
+            chat_msg.status = status_val
+            chat_msg.save()
+
+            # Create the AI's reply message
             ChatMessage.objects.create(agent=agent, sender=agent.name, content=response_text, contact_info=sender, source='email', status='new')
             new_clones_count += 1
 
@@ -252,8 +309,6 @@ def process_emails_for_agent(agent_id):
                 mail.store(num, '+FLAGS', '\\Seen')
             else:
                 logger.error(f"ÉCHEC de l'envoi de la réponse à {sender}")
-            
-            processed_count += 1
 
         logger.info(f"Traitement terminé pour {agent.name}. {new_clones_count} nouveaux messages clonés.")
         mail.logout()
@@ -318,12 +373,18 @@ def get_sent_folder_name(mail):
                 if match:
                     return match.group(1)
         
-        # Fallback pour Gmail
+        # Fallback pour Gmail et standard
         status, data = mail.select('"[Gmail]/Messages envoy&AOk-s"') 
         if status == 'OK': return '"[Gmail]/Messages envoy&AOk-s"'
         
         status, data = mail.select('"[Gmail]/Sent Mail"') 
         if status == 'OK': return '"[Gmail]/Sent Mail"'
+
+        status, data = mail.select("Sent")
+        if status == 'OK': return "Sent"
+
+        status, data = mail.select("Sent Messages")
+        if status == 'OK': return "Sent Messages"
         
     except Exception:
         pass
@@ -365,7 +426,7 @@ def sync_email_history(config):
                     continue
 
                 all_msg_ids = messages[0].split()
-                msg_ids = list(reversed(all_msg_ids))[:50]
+                msg_ids = list(reversed(all_msg_ids))
 
                 for num in msg_ids:
                     try:
@@ -394,18 +455,7 @@ def sync_email_history(config):
                         else:
                             contact_info = sender_raw
                         
-                        body = ""
-                        if msg.is_multipart():
-                            for part in msg.walk():
-                                if part.get_content_type() == "text/plain":
-                                    body_bytes = part.get_payload(decode=True)
-                                    if body_bytes:
-                                        body = body_bytes.decode('utf-8', errors='replace')
-                                    break
-                        else:
-                            body_bytes = msg.get_payload(decode=True)
-                            if body_bytes:
-                                body = body_bytes.decode('utf-8', errors='replace')
+                        body = extract_email_body(msg)
 
                         if not body:
                             continue
@@ -425,7 +475,8 @@ def sync_email_history(config):
                             contact_info=contact_info,
                             source='email',
                             is_read=is_read,
-                            status='archived'
+                            status='archived',
+                            email_config=config
                         )
                     except Exception as e:
                         logger.error(f"Erreur sync email individuel ({folder}): {e}")

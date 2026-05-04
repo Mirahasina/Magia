@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { getToken } from "../../lib/storage";
 
 interface PlanLimits {
   max_agents: number | null;
@@ -26,30 +27,37 @@ interface PlanContextType {
   refresh: () => void;
 }
 
-
 const defaultLimits: PlanLimits = {
-  max_agents: 2, max_members: 0, max_kb_per_agent: 2, max_credits: 500,
-  channels: ['email'], boite_reception: false,
+  max_agents: 2,
+  max_members: 0,
+  max_kb_per_agent: 2,
+  max_credits: 500,
+  channels: ["email"],
+  boite_reception: false,
 };
 
 const PlanContext = createContext<PlanContextType>({
-  plan: 'gratuit', limits: defaultLimits, usage: { agents: 0, members: 0, credits: 0 },
-  canCreateAgent: true, canInviteMembers: false, canUseWhatsApp: false, canUseInbox: false,
+  plan: "gratuit",
+  limits: defaultLimits,
+  usage: { agents: 0, members: 0, credits: 0 },
+  canCreateAgent: true,
+  canInviteMembers: false,
+  canUseWhatsApp: false,
+  canUseInbox: false,
   refresh: () => {},
 });
 
 export function PlanProvider({ children }: { children: ReactNode }) {
-  const [plan, setPlan] = useState('gratuit');
+  const [plan, setPlan] = useState("gratuit");
   const [limits, setLimits] = useState<PlanLimits>(defaultLimits);
   const [usage, setUsage] = useState<PlanUsage>({ agents: 0, members: 0, credits: 0 });
 
-
   const fetchLimits = async () => {
-    const token = localStorage.getItem('access_token');
+    const token = getToken();
     if (!token) return;
     try {
-      const res = await fetch('http://localhost:8000/api/auth/plan-limits/', {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch("http://localhost:8000/api/auth/plan-limits/", {
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -57,23 +65,37 @@ export function PlanProvider({ children }: { children: ReactNode }) {
         setLimits(data.limits);
         setUsage(data.usage);
       }
-    } catch (e) {}
+    } catch {
+      /* network failure — limits stay at defaults */
+    }
   };
 
-  useEffect(() => { 
+  useEffect(() => {
     fetchLimits();
-    const handleAuthSuccess = () => fetchLimits();
-    window.addEventListener('auth-success', handleAuthSuccess);
-    return () => window.removeEventListener('auth-success', handleAuthSuccess);
+    window.addEventListener("auth-success", fetchLimits);
+    return () => window.removeEventListener("auth-success", fetchLimits);
   }, []);
 
   const canCreateAgent = limits.max_agents === null || usage.agents < limits.max_agents;
-  const canInviteMembers = limits.max_members === null || (limits.max_members > 0 && usage.members < limits.max_members);
-  const canUseWhatsApp = limits.channels.includes('whatsapp');
+  const canInviteMembers =
+    limits.max_members === null ||
+    (limits.max_members > 0 && usage.members < limits.max_members);
+  const canUseWhatsApp = limits.channels.includes("whatsapp");
   const canUseInbox = limits.boite_reception;
 
   return (
-    <PlanContext.Provider value={{ plan, limits, usage, canCreateAgent, canInviteMembers, canUseWhatsApp, canUseInbox, refresh: fetchLimits }}>
+    <PlanContext.Provider
+      value={{
+        plan,
+        limits,
+        usage,
+        canCreateAgent,
+        canInviteMembers,
+        canUseWhatsApp,
+        canUseInbox,
+        refresh: fetchLimits,
+      }}
+    >
       {children}
     </PlanContext.Provider>
   );

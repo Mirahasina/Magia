@@ -27,6 +27,9 @@ const adminMenu = [
     { label: "Utilisateurs", icon: Users },
     { label: "Agents", icon: Bot },
     { label: "Transactions", icon: CreditCard },
+    { label: "Demandes", icon: Shield },
+    { label: "Historique", icon: FileText },
+    { label: "Contacts", icon: FileText },
     { label: "Journal", icon: Activity },
 ];
 

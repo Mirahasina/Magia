@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1a1a1a; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 12px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .content { background: #f9f9f9; padding: 25px; border-radius: 8px; }
+        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #888; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #312e81; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; }
+        .highlight { color: #312e81; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="color: #312e81;">MAGIA Enterprise</h1>
+        </div>
+        <div class="content">
+            <p>Bonjour <span class="highlight">{{ first_name }}</span>,</p>
+            <p>Nous avons le plaisir de vous annoncer que votre demande pour le <strong>Mode Entreprise</strong> a été approuvée par notre équipe !</p>
+            <p>Vous avez désormais accès à toutes les fonctionnalités premium, incluant :</p>
+            <ul>
+                <li>Nombre d'agents illimité</li>
+                <li>Membres d'équipe illimités</li>
+                <li>Accès prioritaire aux nouveaux modèles IA</li>
+                <li>Support dédié 24/7</li>
+            </ul>
+            <p>Vous pouvez commencer à explorer vos nouveaux avantages dès maintenant sur votre tableau de bord.</p>
+            <div style="text-align: center;">
+                <a href="https://magia.ai/dashboard" class="button">Accéder à mon espace</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 MAGIA. Tous droits réservés.</p>
+        </div>
+    </div>
+</body>
+</html>

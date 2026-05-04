@@ -17,21 +17,32 @@ import { AcceptInvitation } from "./components/AcceptInvitation";
 import { ContactModal } from "./components/ContactModal";
 import { PaymentModal } from "./components/PaymentModal";
 import { UpdateCardModal } from "./components/UpdateCardModal";
+import { EnterpriseModal } from "./components/EnterpriseModal";
 import { AgentsProvider } from "./context/AgentsContext";
+import { StorageKeys, clearSession } from "../lib/storage";
+
+const noop = () => {};
 
 export default function App() {
   useScrollReveal();
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem("access_token"));
+
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    !!localStorage.getItem(StorageKeys.ACCESS_TOKEN)
+  );
   const [currentView, setCurrentView] = useState<"landing" | "dashboard">(
-    (localStorage.getItem("current_view") as "landing" | "dashboard") || (!!localStorage.getItem("access_token") ? "dashboard" : "landing")
+    (localStorage.getItem(StorageKeys.CURRENT_VIEW) as "landing" | "dashboard") ||
+      (!!localStorage.getItem(StorageKeys.ACCESS_TOKEN) ? "dashboard" : "landing")
   );
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authView, setAuthView] = useState<"login" | "signup">("signup");
   const [isContactOpen, setIsContactOpen] = useState(false);
+  const [isEnterpriseOpen, setIsEnterpriseOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isUpdateCardOpen, setIsUpdateCardOpen] = useState(false);
   const [initialEmail, setInitialEmail] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [pendingEnterpriseRequest, setPendingEnterpriseRequest] = useState(false);
 
   const [pendingOrder, setPendingOrder] = useState<{
     numAgents: number;
@@ -42,7 +53,7 @@ export default function App() {
   const [paymentDetails, setPaymentDetails] = useState({
     numAgents: 2,
     isAnnual: false,
-    totalPrice: 44
+    totalPrice: 44,
   });
 
   const openAuth = (view: "login" | "signup") => {
@@ -50,7 +61,14 @@ export default function App() {
     setIsAuthOpen(true);
   };
 
-  const [refreshKey, setRefreshKey] = useState(0);
+  const handleRequestEnterprise = () => {
+    if (isAuthenticated) {
+      setIsEnterpriseOpen(true);
+    } else {
+      setPendingEnterpriseRequest(true);
+      openAuth("login");
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -68,57 +86,53 @@ export default function App() {
     setIsAuthOpen(false);
     setIsAuthenticated(true);
     setCurrentView("dashboard");
-    localStorage.setItem("current_view", "dashboard");
-    localStorage.removeItem("active_tab");
-    localStorage.removeItem("backoffice_tab");
-    setRefreshKey(prev => prev + 1);
-
-    const event = new CustomEvent('auth-success');
-    window.dispatchEvent(event);
+    localStorage.setItem(StorageKeys.CURRENT_VIEW, "dashboard");
+    localStorage.removeItem(StorageKeys.ACTIVE_TAB);
+    localStorage.removeItem(StorageKeys.BACKOFFICE_TAB);
+    setRefreshKey((prev) => prev + 1);
+    window.dispatchEvent(new CustomEvent("auth-success"));
 
     if (pendingOrder) {
       setPaymentDetails(pendingOrder);
       setIsPaymentOpen(true);
       setPendingOrder(null);
     }
+
+    if (pendingEnterpriseRequest) {
+      setIsEnterpriseOpen(true);
+      setPendingEnterpriseRequest(false);
+    }
   };
 
-  if (typeof window !== "undefined" && window.location.pathname === "/reset-password") {
+  if (window.location.pathname === "/reset-password") {
     return <ResetPasswordPage />;
   }
 
-  if (typeof window !== "undefined" && window.location.pathname === "/verify-email") {
+  if (window.location.pathname === "/verify-email") {
     return <VerifyEmail />;
   }
 
-  if (typeof window !== "undefined" && window.location.pathname === "/accept-invitation") {
+  if (window.location.pathname === "/accept-invitation") {
     return <AcceptInvitation onAuthSuccess={handleAuthSuccess} openAuth={openAuth} />;
   }
 
-
-
   const handleLogout = async () => {
-    // ... same logic
-    const refreshToken = localStorage.getItem("refresh_token");
+    const refreshToken = localStorage.getItem(StorageKeys.REFRESH_TOKEN);
     if (refreshToken) {
       try {
         await fetch("http://localhost:8000/api/auth/logout/", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+            Authorization: `Bearer ${localStorage.getItem(StorageKeys.ACCESS_TOKEN)}`,
           },
           body: JSON.stringify({ refresh: refreshToken }),
         });
-      } catch (e) {
-        console.error("Logout error", e);
+      } catch (error) {
+        console.error("Logout error", error);
       }
     }
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("current_view");
-    localStorage.removeItem("active_tab");
-    localStorage.removeItem("backoffice_tab");
+    clearSession();
     setIsAuthenticated(false);
     setCurrentView("landing");
   };
@@ -142,14 +156,14 @@ export default function App() {
               isAuthenticated={isAuthenticated}
               onGoToDashboard={() => {
                 setCurrentView("dashboard");
-                localStorage.setItem("current_view", "dashboard");
+                localStorage.setItem(StorageKeys.CURRENT_VIEW, "dashboard");
               }}
               onLogin={() => {
-                const token = localStorage.getItem("access_token");
+                const token = localStorage.getItem(StorageKeys.ACCESS_TOKEN);
                 if (token) {
                   setIsAuthenticated(true);
                   setCurrentView("dashboard");
-                  localStorage.setItem("current_view", "dashboard");
+                  localStorage.setItem(StorageKeys.CURRENT_VIEW, "dashboard");
                 } else {
                   openAuth("login");
                 }
@@ -164,13 +178,14 @@ export default function App() {
               <PricingSection
                 openAuth={openAuth}
                 openContact={() => setIsContactOpen(true)}
+                onRequestEnterprise={handleRequestEnterprise}
                 openPayment={(details) => {
                   setPaymentDetails(details);
                   setIsPaymentOpen(true);
                 }}
               />
               <FAQSection />
-              <CTASection onAction={() => openAuth("signup")} />
+              <CTASection onAction={() => openAuth("signup")} onContact={() => setIsContactOpen(true)} />
             </main>
             <Footer />
           </div>
@@ -188,9 +203,12 @@ export default function App() {
           initialEmail={initialEmail}
         />
 
-        <ContactModal
-          isOpen={isContactOpen}
-          onClose={() => setIsContactOpen(false)}
+        <ContactModal isOpen={isContactOpen} onClose={() => setIsContactOpen(false)} />
+
+        <EnterpriseModal
+          isOpen={isEnterpriseOpen}
+          onClose={() => setIsEnterpriseOpen(false)}
+          onSuccess={() => setRefreshKey(prev => prev + 1)}
         />
 
         <PaymentModal
@@ -201,11 +219,11 @@ export default function App() {
             if (!isAlreadyAuth) {
               setIsAuthOpen(true);
             } else {
-              window.dispatchEvent(new CustomEvent('auth-success'));
-              setRefreshKey(prev => prev + 1);
+              window.dispatchEvent(new CustomEvent("auth-success"));
+              setRefreshKey((prev) => prev + 1);
               setIsPaymentOpen(false);
               setCurrentView("dashboard");
-              localStorage.setItem("current_view", "dashboard");
+              localStorage.setItem(StorageKeys.CURRENT_VIEW, "dashboard");
             }
           }}
           onAuthRequired={() => {
@@ -218,13 +236,8 @@ export default function App() {
         <UpdateCardModal
           isOpen={isUpdateCardOpen}
           onClose={() => setIsUpdateCardOpen(false)}
-          onSuccess={() => setRefreshKey(prev => prev + 1)}
+          onSuccess={() => setRefreshKey((prev) => prev + 1)}
         />
-
-        {isAuthenticated && (
-          <div className="hidden">
-          </div>
-        )}
       </div>
     </AgentsProvider>
   );

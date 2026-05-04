@@ -14,6 +14,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('profil');
+    const [linkedInTab, setLinkedInTab] = useState<'prospecting' | 'messaging'>('prospecting');
 
     const handleDeleteAccount = async () => {
         try {
@@ -59,10 +60,16 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
         testEmailConnection,
         fetchWhatsAppConfigs,
         fetchEmailConfigs,
+        linkedinConfigs,
+        addLinkedInConfig,
+        deleteLinkedInConfig,
+        updateLinkedInConfig,
+        syncLinkedInMessages,
+        getLinkedInConnectionUrl,
         securitySettings, fetchSecuritySettings, regenerateMasterKey, toggle2FA
     } = useAgents();
 
-    const [configTarget, setConfigTarget] = useState<"whatsapp" | "email" | null>(null);
+    const [configTarget, setConfigTarget] = useState<"whatsapp" | "email" | "linkedin" | null>(null);
     const [activeConfig, setActiveConfig] = useState<any>(null);
 
     useEffect(() => {
@@ -255,18 +262,17 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
 
                                     {configTarget === null ? (
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                            {['Slack', 'HubSpot', 'Salesforce', 'WhatsApp', 'Zendesk', 'Email'].map((app) => {
-                                                const isFunctional = app === 'WhatsApp' || app === 'Email';
-                                                const configs = app === 'WhatsApp' ? whatsappConfigs : emailConfigs;
-                                                const isConnected = configs.some(c => c.is_connected || c.is_active);
+                                            {['WhatsApp', 'Email', 'LinkedIn'].map((app) => {
+                                                const isFunctional = true;
+                                                const configs = app === 'WhatsApp' ? whatsappConfigs : (app === 'Email' ? emailConfigs : linkedinConfigs);
+                                                const isConnected = configs.some((c: any) => c.is_connected || c.is_active);
 
                                                 return (
                                                     <div
                                                         key={app}
-                                                        onClick={() => isFunctional && setConfigTarget(app.toLowerCase() as any)}
+                                                        onClick={() => setConfigTarget(app.toLowerCase() as any)}
                                                         className={cn(
-                                                            "p-5 bg-white border border-gray-100 rounded-2xl flex items-center gap-4 hover:border-blue-200 hover:shadow-md transition-all group cursor-pointer relative overflow-hidden",
-                                                            !isFunctional && "opacity-50 grayscale cursor-not-allowed"
+                                                            "p-5 bg-white border border-gray-100 rounded-2xl flex items-center gap-4 hover:border-blue-200 hover:shadow-md transition-all group cursor-pointer relative overflow-hidden"
                                                         )}
                                                     >
                                                         <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-sm font-black italic text-gray-300 group-hover:text-blue-900 transition-colors">
@@ -292,15 +298,19 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                     Retour au Hub
                                                 </button>
                                                 <button
-                                                    onClick={() => configTarget === 'whatsapp' ? addWhatsAppConfig({ name: 'Nouveau WhatsApp', phone_number: '' }) : addEmailConfig({ name: 'Nouveau Email', email: '' })}
+                                                    onClick={() => {
+                                                        if (configTarget === 'whatsapp') addWhatsAppConfig({ name: 'Nouveau WhatsApp', phone_number: '' });
+                                                        else if (configTarget === 'email') addEmailConfig({ name: 'Nouveau Email', email: '' });
+                                                        else addLinkedInConfig({ name: 'Nouveau LinkedIn', api_key: '' });
+                                                    }}
                                                     className="px-4 py-2 bg-gray-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-900 transition-colors"
                                                 >
-                                                    + Nouveau {configTarget === 'whatsapp' ? 'Numéro' : 'Compte'}
+                                                    + Nouveau {configTarget === 'whatsapp' ? 'Numéro' : (configTarget === 'email' ? 'Compte' : 'Accès')}
                                                 </button>
                                             </div>
 
                                             <div className="grid grid-cols-1 gap-4">
-                                                {(configTarget === 'whatsapp' ? whatsappConfigs : emailConfigs).map((c: any) => (
+                                                {(configTarget === 'whatsapp' ? whatsappConfigs : (configTarget === 'email' ? emailConfigs : linkedinConfigs)).map((c: any) => (
                                                     <div key={c.id} className="p-6 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between group">
                                                         <div className="flex items-center gap-4">
                                                             <div className={cn(
@@ -323,7 +333,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                         {c.is_connected ? "Déconnecter" : (c.qr_code ? "Afficher QR" : "Appairer")}
                                                                     </button>
                                                                 </>
-                                                            ) : (
+                                                            ) : configTarget === 'email' ? (
                                                                 <div className="flex items-center gap-3">
                                                                     {c.is_active ? (
                                                                         <div className="flex items-center gap-3">
@@ -376,9 +386,71 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                         </button>
                                                                     )}
                                                                 </div>
+                                                            ) : (
+                                                                <div className="flex flex-col gap-4 w-full">
+                                                                    <div className="flex border-b border-gray-100 mb-2">
+                                                                        <button 
+                                                                            onClick={(e) => { e.stopPropagation(); setLinkedInTab('prospecting'); }} 
+                                                                            className={cn("px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all", linkedInTab === 'prospecting' ? "border-b-2 border-blue-900 text-blue-900" : "text-gray-400 hover:text-gray-600")}
+                                                                        >
+                                                                            Prospection
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={(e) => { e.stopPropagation(); setLinkedInTab('messaging'); }} 
+                                                                            className={cn("px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all", linkedInTab === 'messaging' ? "border-b-2 border-blue-900 text-blue-900" : "text-gray-400 hover:text-gray-600")}
+                                                                        >
+                                                                            Messagerie
+                                                                        </button>
+                                                                    </div>
+                                                                    
+                                                                    {linkedInTab === 'prospecting' ? (
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="relative group/key flex-1">
+                                                                                <input
+                                                                                    type="password"
+                                                                                    placeholder="Clé API Proxycurl"
+                                                                                    defaultValue={c.api_key || ""}
+                                                                                    onBlur={(e) => {
+                                                                                        if (e.target.value !== c.api_key) {
+                                                                                            updateLinkedInConfig(c.id, { api_key: e.target.value });
+                                                                                        }
+                                                                                    }}
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-[10px] focus:outline-none focus:border-blue-900"
+                                                                                />
+                                                                            </div>
+                                                                            <span className="text-[8px] font-black uppercase text-blue-900 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">
+                                                                                Proxycurl
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex flex-col gap-3">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <button
+                                                                                    onClick={async (e) => {
+                                                                                        e.stopPropagation();
+                                                                                        const url = await getLinkedInConnectionUrl(c.id);
+                                                                                        if (url) window.location.assign(url);
+                                                                                    }}
+                                                                                    className="flex-1 flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all group"
+                                                                                >
+                                                                                    <div className="w-5 h-5 bg-[#0A66C2] rounded flex items-center justify-center">
+                                                                                        <svg className="w-3 h-3 text-white fill-current" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                                                                                    </div>
+                                                                                    <span className="text-[10px] font-bold text-gray-700">Connecter mon compte LinkedIn</span>
+                                                                                </button>
+                                                                            </div>
+                                                                            <p className="text-[8px] text-gray-400 italic">Connexion sécurisée via Unipile (SaaS Pro).</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             )}
                                                             <button
-                                                                onClick={() => configTarget === 'whatsapp' ? deleteWhatsAppConfig(c.id) : deleteEmailConfig(c.id)}
+                                                                onClick={() => {
+                                                                    if (configTarget === 'whatsapp') deleteWhatsAppConfig(c.id);
+                                                                    else if (configTarget === 'email') deleteEmailConfig(c.id);
+                                                                    else deleteLinkedInConfig(c.id);
+                                                                }}
                                                                 className="p-2 text-gray-300 hover:text-red-500 transition-colors"
                                                             >
                                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>

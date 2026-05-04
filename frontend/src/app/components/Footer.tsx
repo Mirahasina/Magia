@@ -2,31 +2,21 @@ import { Linkedin, Twitter, Facebook, Mail } from "lucide-react";
 
 const footerLinks = {
   product: [
-    { name: "Comment ça marche ?", href: "#features" },
+    { name: "Comment ça marche ?", href: "#how-it-works" },
     { name: "Agents IA", href: "#agents" },
-    { name: "Tarifs", href: "#pricing" },
-    { name: "Marketplace", href: "#" },
-    { name: "API", href: "#" }
+    { name: "Tarifs", href: "#pricing" }
   ],
   company: [
     { name: "À propos", href: "#about" },
-    { name: "Blog", href: "#" },
-    { name: "Carrières", href: "#" },
-    { name: "Contact", href: "#" },
-    { name: "Partenaires", href: "#" }
+    { name: "Contact", href: "#contact" }
   ],
   resources: [
-    { name: "Documentation", href: "#" },
-    { name: "Guides", href: "#" },
-    { name: "Support", href: "#" },
-    { name: "Statut", href: "#" },
-    { name: "Communauté", href: "#" }
+    { name: "Documentation", href: "#documentation" },
+    { name: "Support", href: "#support" }
   ],
   legal: [
-    { name: "Confidentialité", href: "#" },
-    { name: "Conditions", href: "#" },
-    { name: "Sécurité", href: "#" },
-    { name: "Cookies", href: "#" }
+    { name: "Confidentialité", href: "#privacy" },
+    { name: "Conditions", href: "#cgu" }
   ]
 };
 
@@ -35,7 +25,6 @@ export function Footer() {
     <footer className="bg-gray-900 text-gray-300 py-16 px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto">
         <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-8 mb-12">
-          {/* Brand */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <span className="text-2xl font-bold text-white">MAGIA</span>
@@ -61,7 +50,6 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Links */}
           <div>
             <h3 className="text-white font-semibold mb-4">Produit</h3>
             <ul className="space-y-3">
@@ -122,9 +110,9 @@ export function Footer() {
               © 2026 MAGIA - Madagascar. Par Andreas LOVATIANA
             </p>
             <div className="flex items-center gap-6 text-gray-400 text-sm">
-              <a href="#" className="hover:text-white transition-colors">CGU</a>
-              <a href="#" className="hover:text-white transition-colors">Contact</a>
-              <a href="#" className="hover:text-white transition-colors">Politique de confidentialité</a>
+              <a href="#cgu" className="hover:text-white transition-colors">CGU</a>
+              <a href="#contact" className="hover:text-white transition-colors">Contact</a>
+              <a href="#privacy" className="hover:text-white transition-colors">Politique de confidentialité</a>
             </div>
           </div>
         </div>

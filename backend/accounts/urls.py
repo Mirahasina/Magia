@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
@@ -11,7 +12,8 @@ from .views import (
 
 from .payment_views import (
     CreateCheckoutIntentView, StripeWebhookView,
-    SendPaymentOTPView, ConfirmSavedCardPaymentView, TransactionListView
+    SendPaymentOTPView, ConfirmSavedCardPaymentView, TransactionListView,
+    DownloadInvoiceView, DownloadFullHistoryView
 )
 
 urlpatterns = [
@@ -42,4 +44,6 @@ urlpatterns = [
     path('payments/confirm-saved/', ConfirmSavedCardPaymentView.as_view(), name='payment_confirm_saved'),
     path('payments/webhook/stripe/', StripeWebhookView.as_view(), name='payment_stripe_webhook'),
     path('payments/transactions/', TransactionListView.as_view(), name='payment_transactions_list'),
+    path('payments/transactions/<uuid:transaction_id>/download/', DownloadInvoiceView.as_view(), name='payment_invoice_download'),
+    path('payments/transactions/download-history/', DownloadFullHistoryView.as_view(), name='payment_history_download'),
 ]

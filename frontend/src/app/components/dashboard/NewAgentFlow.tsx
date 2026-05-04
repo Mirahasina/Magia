@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Target, Mail, Clock, MessageSquare, Zap, Database, Globe, Terminal, FileText, Check, Sparkles, Shield, Plus, Loader2 } from "lucide-react";
+import { ChevronRight, Target, Mail, Clock, MessageSquare, Zap, Database, Globe, Terminal, FileText, Check, Sparkles, Shield, Plus, Loader2, Linkedin } from "lucide-react";
 import { cn } from "../ui/utils";
 import { useAgents } from "../../hooks/useAgents";
 
-export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void; onCancel: () => void }) {
+interface NewAgentFlowProps {
+    user?: any;
+    onComplete: () => void;
+    onCancel: () => void;
+}
+
+export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) {
     const {
         whatsappConfigs,
         emailConfigs,
@@ -220,11 +226,36 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                                         onChange={(e) => setConfig({ ...config, llm: e.target.value })}
                                         className="w-full px-0 py-3 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-black transition-colors cursor-pointer"
                                     >
-                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                                        <option value="gpt-4o">GPT-4o</option>
-                                        <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
+                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Gratuit)</option>
+                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (PRO)</option>
+                                        <option value="gpt-4o-mini">GPT-4o Mini (Gratuit)</option>
+                                        <option value="gpt-4o">GPT-4o (PRO)</option>
+                                        <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (PRO)</option>
+                                        <option value="o1-preview">OpenAI o1 (ENTREPRISE)</option>
                                     </select>
+                                    {/* Plan Logic Feedback */}
+                                    {(() => {
+                                        const plan = user?.subscription?.plan_name || 'gratuit';
+                                        const isProModel = config.llm === 'gemini-1.5-pro' || config.llm === 'gpt-4o' || config.llm === 'claude-3-5-sonnet-20240620';
+                                        const isEnterpriseModel = config.llm === 'o1-preview';
+                                        
+                                        if (plan === 'gratuit' && (isProModel || isEnterpriseModel)) {
+                                            return <p className="text-[10px] text-orange-500 font-bold mt-2 animate-pulse flex items-center gap-1">
+                                                <Zap className="w-3 h-3" /> Note: Ce modèle sera dégradé en version "Flash" pour votre plan gratuit.
+                                            </p>
+                                        }
+                                        if (plan === 'pro' && isEnterpriseModel) {
+                                            return <p className="text-[10px] text-orange-500 font-bold mt-2 animate-pulse flex items-center gap-1">
+                                                <Zap className="w-3 h-3" /> Note: Ce modèle sera dégradé en GPT-4o pour votre plan PRO.
+                                            </p>
+                                        }
+                                        if ((plan === 'pro' && isProModel) || (plan === 'entreprise')) {
+                                            return <p className="text-[10px] text-emerald-500 font-bold mt-2 flex items-center gap-1">
+                                                <Sparkles className="w-3 h-3" /> Performance Maximale activée pour ce modèle.
+                                            </p>
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
                             </div>
 
@@ -244,7 +275,7 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                                         </button>
                                     ))}
                                     <div className="flex-1">
-                                        <input 
+                                        <input
                                             type="text"
                                             value={config.avatar.startsWith('/avatars/') ? "" : config.avatar}
                                             onChange={(e) => setConfig({ ...config, avatar: e.target.value })}
@@ -287,6 +318,7 @@ export function NewAgentFlow({ onComplete, onCancel }: { onComplete: () => void;
                         {[
                             { id: 'email', name: 'Email Protocol', icon: Mail, configs: emailConfigs },
                             { id: 'whatsapp', name: 'WhatsApp API', icon: MessageSquare, configs: whatsappConfigs },
+                            { id: 'linkedin', name: 'LinkedIn Search', icon: Linkedin, configs: [] }, // Configs to be implemented later
                         ].map((c: any) => (
                             <div key={c.id} className="space-y-4">
                                 <div
