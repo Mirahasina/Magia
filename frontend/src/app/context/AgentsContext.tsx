@@ -65,7 +65,15 @@ export interface LinkedInConfig {
   id: number;
   name: string;
   is_connected: boolean;
-  api_key?: string;
+  unipile_account_id?: string;
+  updated_at: string;
+}
+
+export interface FacebookConfig {
+  id: number;
+  name: string;
+  is_connected: boolean;
+  unipile_account_id?: string;
   updated_at: string;
 }
 
@@ -76,6 +84,7 @@ interface AgentsContextType {
   whatsappConfigs: WhatsAppConfig[];
   emailConfigs: EmailConfig[];
   linkedinConfigs: LinkedInConfig[];
+  facebookConfigs: FacebookConfig[];
   messages: unknown[];
   setMessages: React.Dispatch<React.SetStateAction<unknown[]>>;
   isTyping: boolean;
@@ -87,6 +96,7 @@ interface AgentsContextType {
   fetchWhatsAppConfigs: () => Promise<void>;
   fetchEmailConfigs: () => Promise<void>;
   fetchLinkedInConfigs: () => Promise<void>;
+  fetchFacebookConfigs: () => Promise<void>;
   createAgent: (data: Partial<Agent>) => Promise<Agent | null>;
   updateAgent: (agentId: string, payload: Partial<Agent>) => Promise<boolean>;
   deleteAgent: (agentId: string) => Promise<boolean>;
@@ -94,15 +104,25 @@ interface AgentsContextType {
   toggleAgentPause: (agentId: string) => Promise<void>;
   uploadKnowledge: (agentId: string, file: File) => Promise<void>;
   sandboxChat: (agentId: string, message: string) => Promise<string | null>;
-  startWhatsAppPairing: (configId: number) => Promise<void>;
   sendChatMessage: (agentId: string, content: string, contactInfo: string, source: string) => Promise<void>;
   deployAgent: (agentId: string) => Promise<boolean>;
   testEmailConnection: (configId: number) => Promise<boolean>;
-  getEmailAuthUrl: (configId: number) => Promise<string | null>;
+  addEmailConfig: (data: Record<string, unknown>) => Promise<void>;
   deleteEmailConfig: (id: number) => Promise<void>;
+  getEmailConnectionUrl: (id: number) => Promise<string | null>;
+  refreshEmailConnection: (id: number) => Promise<void>;
+  addWhatsAppConfig: (data: Record<string, unknown>) => Promise<void>;
   deleteWhatsAppConfig: (id: number) => Promise<void>;
+  getWhatsAppConnectionUrl: (id: number) => Promise<string | null>;
+  refreshWhatsAppConnection: (id: number) => Promise<void>;
   addLinkedInConfig: (data: Record<string, unknown>) => Promise<void>;
   deleteLinkedInConfig: (id: number) => Promise<void>;
+  getLinkedInConnectionUrl: (id: number) => Promise<string | null>;
+  refreshLinkedInConnection: (id: number) => Promise<void>;
+  addFacebookConfig: (data: Record<string, unknown>) => Promise<void>;
+  deleteFacebookConfig: (id: number) => Promise<void>;
+  getFacebookConnectionUrl: (id: number) => Promise<string | null>;
+  refreshFacebookConnection: (id: number) => Promise<void>;
   fetchSecuritySettings: () => Promise<void>;
   fetchTeams: () => Promise<void>;
   fetchLinks: () => Promise<void>;
@@ -113,6 +133,7 @@ interface AgentsContextType {
   syncLinkedInMessages: (id: number) => Promise<void>;
   getLinkedInConnectionUrl: (id: number) => Promise<string | null>;
   startLinkedInProspecting: (id: number, query: string, message: string) => Promise<void>;
+  refreshLinkedInConnection: (id: number) => Promise<void>;
 }
 
 
@@ -124,6 +145,7 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   const [whatsappConfigs, setWhatsappConfigs] = useState<WhatsAppConfig[]>([]);
   const [emailConfigs, setEmailConfigs] = useState<EmailConfig[]>([]);
   const [linkedinConfigs, setLinkedinConfigs] = useState<LinkedInConfig[]>([]);
+  const [facebookConfigs, setFacebookConfigs] = useState<FacebookConfig[]>([]);
   const [messages, setMessages] = useState<unknown[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [securitySettings, setSecuritySettings] = useState<unknown>(null);
@@ -182,6 +204,16 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch(`${API_BASE}/linkedin-config/`, { headers: getAuthHeadersOnly() });
       if (res.ok) setLinkedinConfigs(await res.json());
+    } catch {
+    }
+  };
+
+  const fetchFacebookConfigs = async () => {
+    const token = requireToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/facebook-config/`, { headers: getAuthHeadersOnly() });
+      if (res.ok) setFacebookConfigs(await res.json());
     } catch {
     }
   };
@@ -342,18 +374,39 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   };
 
 
-  const startWhatsAppPairing = async (id: number): Promise<void> => {
+  const addWhatsAppConfig = async (data: Record<string, unknown>) => {
     try {
-      const res = await fetch(`${API_BASE}/whatsapp-config/${id}/connect/`, {
+      const res = await fetch(`${API_BASE}/whatsapp-config/`, {
         method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (res.ok) fetchWhatsAppConfigs();
+    } catch {
+    }
+  };
+
+  const getWhatsAppConnectionUrl = async (id: number): Promise<string | null> => {
+    try {
+      const res = await fetch(`${API_BASE}/whatsapp-config/${id}/get_connection_url/`, {
         headers: getAuthHeadersOnly(),
       });
       if (res.ok) {
-        if (pollRef.current) clearInterval(pollRef.current);
-        pollRef.current = setInterval(fetchWhatsAppConfigs, 3000);
+        const data = await res.json();
+        return data.url;
       }
     } catch {
-      /* network failure */
+    }
+    return null;
+  };
+
+  const refreshWhatsAppConnection = async (id: number): Promise<void> => {
+    try {
+      const res = await fetch(`${API_BASE}/whatsapp-config/${id}/refresh_connection/`, {
+        headers: getAuthHeadersOnly(),
+      });
+      if (res.ok) fetchWhatsAppConfigs();
+    } catch {
     }
   };
 
@@ -450,6 +503,74 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshLinkedInConnection = async (id: number): Promise<void> => {
+    try {
+      const res = await fetch(`${API_BASE}/linkedin-config/${id}/refresh_connection/`, {
+        method: "GET",
+        headers: getAuthHeadersOnly(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'connected') {
+          fetchLinkedInConfigs();
+        } else {
+          alert("Aucun compte correspondant trouvé. Assurez-vous d'avoir bien terminé la connexion sur LinkedIn.");
+        }
+      } else {
+        alert("Erreur lors de la synchronisation.");
+      }
+    } catch {
+      alert("Erreur réseau lors de la synchronisation.");
+    }
+  };
+
+  const addFacebookConfig = async (data: Record<string, unknown>) => {
+    try {
+      const res = await fetch(`${API_BASE}/facebook-config/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (res.ok) fetchFacebookConfigs();
+    } catch {
+    }
+  };
+
+  const deleteFacebookConfig = async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/facebook-config/${id}/`, {
+        method: "DELETE",
+        headers: getAuthHeadersOnly(),
+      });
+      if (res.ok) fetchFacebookConfigs();
+    } catch {
+    }
+  };
+
+  const getFacebookConnectionUrl = async (id: number): Promise<string | null> => {
+    try {
+      const res = await fetch(`${API_BASE}/facebook-config/${id}/get_connection_url/`, {
+        headers: getAuthHeadersOnly(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.url;
+      }
+    } catch {
+    }
+    return null;
+  };
+
+  const refreshFacebookConnection = async (id: number): Promise<void> => {
+    try {
+      const res = await fetch(`${API_BASE}/facebook-config/${id}/refresh_connection/`, {
+        headers: getAuthHeadersOnly(),
+      });
+      if (res.ok) fetchFacebookConfigs();
+    } catch {
+    }
+  };
+
   const deleteEmailConfig = async (id: number): Promise<void> => {
     try {
       const res = await fetch(`${API_BASE}/email-config/${id}/`, {
@@ -474,9 +595,21 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const getEmailAuthUrl = async (id: number): Promise<string | null> => {
+  const addEmailConfig = async (data: Record<string, unknown>) => {
     try {
-      const res = await fetch(`${API_BASE}/email-config/${id}/get_auth_url/`, {
+      const res = await fetch(`${API_BASE}/email-config/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (res.ok) fetchEmailConfigs();
+    } catch {
+    }
+  };
+
+  const getEmailConnectionUrl = async (id: number): Promise<string | null> => {
+    try {
+      const res = await fetch(`${API_BASE}/email-config/${id}/get_connection_url/`, {
         headers: getAuthHeadersOnly(),
       });
       if (res.ok) {
@@ -484,9 +617,18 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         return data.url;
       }
     } catch {
-      /* network failure */
     }
     return null;
+  };
+
+  const refreshEmailConnection = async (id: number): Promise<void> => {
+    try {
+      const res = await fetch(`${API_BASE}/email-config/${id}/refresh_connection/`, {
+        headers: getAuthHeadersOnly(),
+      });
+      if (res.ok) fetchEmailConfigs();
+    } catch {
+    }
   };
 
 
@@ -589,12 +731,15 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     fetchWhatsAppConfigs();
     fetchEmailConfigs();
     fetchLinkedInConfigs();
+    fetchFacebookConfigs();
     fetchTeams();
     fetchLinks();
 
     const interval = setInterval(() => {
       fetchWhatsAppConfigs();
       fetchEmailConfigs();
+      fetchLinkedInConfigs();
+      fetchFacebookConfigs();
     }, 5000);
 
     return () => {
@@ -610,6 +755,8 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         templates,
         whatsappConfigs,
         emailConfigs,
+        linkedinConfigs,
+        facebookConfigs,
         messages,
         setMessages,
         isTyping,
@@ -619,23 +766,35 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         fetchWhatsAppConfigs,
         fetchEmailConfigs,
         fetchLinkedInConfigs,
+        fetchFacebookConfigs,
         createAgent,
         updateAgent,
         deleteAgent,
         toggleAgentPause,
         uploadKnowledge,
         sandboxChat,
-        updateLinkedInConfig,
-        startWhatsAppPairing,
         sendChatMessage,
         deployAgent,
         testEmailConnection,
-        getEmailAuthUrl,
+        addEmailConfig,
         deleteEmailConfig,
+        getEmailConnectionUrl,
+        refreshEmailConnection,
+        addWhatsAppConfig,
         deleteWhatsAppConfig,
-        linkedinConfigs,
+        getWhatsAppConnectionUrl,
+        refreshWhatsAppConnection,
         addLinkedInConfig,
         deleteLinkedInConfig,
+        updateLinkedInConfig,
+        getLinkedInConnectionUrl,
+        refreshLinkedInConnection,
+        syncLinkedInMessages,
+        startLinkedInProspecting,
+        addFacebookConfig,
+        deleteFacebookConfig,
+        getFacebookConnectionUrl,
+        refreshFacebookConnection,
         fetchSecuritySettings,
         teams,
         links,
@@ -645,9 +804,6 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         deleteTeam,
         createLink,
         deleteLink,
-        syncLinkedInMessages,
-        getLinkedInConnectionUrl,
-        startLinkedInProspecting,
       }}
     >
       {children}

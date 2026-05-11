@@ -78,16 +78,6 @@ export function FAQSection() {
                         </div>
                     ))}
                 </div>
-
-                <div className="mt-16 p-8 bg-blue-600 rounded-[1rem] flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-                    <div className="text-white text-center md:text-left">
-                        <h3 className="text-2xl font-bold mb-1">D'autres questions ?</h3>
-                        <p className="text-blue-100 opacity-80">Notre équipe d'experts est là pour vous accompagner.</p>
-                    </div>
-                    <button className="px-8 py-4 bg-white text-blue-600 rounded-xl font-black shadow-xl hover:bg-gray-50 transition-colors whitespace-nowrap">
-                        Contacter le support
-                    </button>
-                </div>
             </div>
         </section>
     );

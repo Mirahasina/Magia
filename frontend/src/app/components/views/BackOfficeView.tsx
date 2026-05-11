@@ -13,12 +13,12 @@ import {
     Eye,
     MessageSquare
 } from "lucide-react";
-import { 
-    BarChart, 
-    Bar, 
-    XAxis, 
-    YAxis, 
-    Tooltip, 
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    Tooltip,
     ResponsiveContainer,
     AreaChart,
     Area
@@ -35,6 +35,12 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
     const [notifForm, setNotifForm] = useState({ title: "", message: "", type: "system" });
+    const [userPlanFilter, setUserPlanFilter] = useState("all");
+    const [agentStatusFilter, setAgentStatusFilter] = useState("all");
+    const [agentModelFilter, setAgentModelFilter] = useState("all");
+    const [transactionStatusFilter, setTransactionStatusFilter] = useState("all");
+    const [requestStatusFilter, setRequestStatusFilter] = useState("all");
+    const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
 
     useEffect(() => {
         if (initialTab) {
@@ -122,11 +128,12 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
     };
 
     const handleExport = () => {
-        if (!dataList.length) return;
-        const headers = Object.keys(dataList[0]);
+        const filteredData = getFilteredData();
+        if (!filteredData.length) return;
+        const headers = Object.keys(filteredData[0]);
         const csvContent = [
             headers.join(','),
-            ...dataList.map(row => headers.map(header => JSON.stringify(row[header] || "")).join(','))
+            ...filteredData.map(row => headers.map(header => JSON.stringify(row[header] || "")).join(','))
         ].join('\n');
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -231,12 +238,12 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                                 <AreaChart data={charts.revenue}>
                                     <defs>
                                         <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                                     <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
                                     <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRev)" />
                                 </AreaChart>
@@ -252,9 +259,9 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                         <div className="flex-1 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={charts.users}>
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
-                                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                    <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
                                     <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -306,19 +313,138 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
         );
     };
 
+    const getFilteredData = () => {
+        return dataList.filter(item => {
+            const matchesSearch = Object.values(item).some(val => 
+                String(val).toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            
+            if (activeTab === "Utilisateurs") {
+                const matchesPlan = userPlanFilter === "all" || item.plan === userPlanFilter;
+                return matchesSearch && matchesPlan;
+            }
+            
+            if (activeTab === "Agents") {
+                const matchesStatus = agentStatusFilter === "all" || 
+                    (agentStatusFilter === "deployed" ? item.is_deployed : !item.is_deployed);
+                const matchesModel = agentModelFilter === "all" || item.llm_model === agentModelFilter;
+                return matchesSearch && matchesStatus && matchesModel;
+            }
+            
+            if (activeTab === "Transactions") {
+                const matchesStatus = transactionStatusFilter === "all" || item.status === transactionStatusFilter;
+                return matchesSearch && matchesStatus;
+            }
+
+            if (activeTab === "Demandes") {
+                const matchesStatus = requestStatusFilter === "all" || item.status === requestStatusFilter;
+                return matchesSearch && matchesStatus;
+            }
+
+            if (activeTab === "Historique") {
+                const matchesStatus = historyStatusFilter === "all" || item.status === historyStatusFilter;
+                return matchesSearch && matchesStatus;
+            }
+            
+            return matchesSearch;
+        });
+    };
+
     const renderTable = () => (
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden animate-in fade-in duration-500">
             <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder={`Rechercher dans ${activeTab.toLowerCase()}...`}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-500/20 text-sm transition-all"
-                    />
+                <div className="flex items-center gap-4 flex-1">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder={`Rechercher dans ${activeTab.toLowerCase()}...`}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-11 pr-4 py-3 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-500/20 text-sm transition-all"
+                        />
+                    </div>
+                    
+                    {activeTab === "Utilisateurs" && (
+                        <select 
+                            value={userPlanFilter}
+                            onChange={(e) => setUserPlanFilter(e.target.value)}
+                            className="px-4 py-3 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-blue-500/20"
+                        >
+                            <option value="all">Tous les plans</option>
+                            <option value="gratuit">Gratuit</option>
+                            <option value="pro">Pro</option>
+                            <option value="entreprise">Entreprise</option>
+                        </select>
+                    )}
+
+                    {activeTab === "Agents" && (
+                        <div className="flex gap-2">
+                            <select 
+                                value={agentStatusFilter}
+                                onChange={(e) => setAgentStatusFilter(e.target.value)}
+                                className="px-4 py-3 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-blue-500/20"
+                            >
+                                <option value="all">Tous les statuts</option>
+                                <option value="deployed">Déployés</option>
+                                <option value="not_deployed">Non déployés</option>
+                            </select>
+                            <select 
+                                value={agentModelFilter}
+                                onChange={(e) => setAgentModelFilter(e.target.value)}
+                                className="px-4 py-3 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-blue-500/20"
+                            >
+                                <option value="all">Tous les modèles</option>
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5</option>
+                                <option value="claude-3-opus">Claude 3 Opus</option>
+                                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {activeTab === "Transactions" && (
+                        <select 
+                            value={transactionStatusFilter}
+                            onChange={(e) => setTransactionStatusFilter(e.target.value)}
+                            className="px-4 py-3 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-blue-500/20"
+                        >
+                            <option value="all">Tous les statuts</option>
+                            <option value="completed">Complétées</option>
+                            <option value="pending">En attente</option>
+                            <option value="failed">Échouées</option>
+                            <option value="refunded">Remboursées</option>
+                        </select>
+                    )}
+
+                    {activeTab === "Demandes" && (
+                        <select 
+                            value={requestStatusFilter}
+                            onChange={(e) => setRequestStatusFilter(e.target.value)}
+                            className="px-4 py-3 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-blue-500/20"
+                        >
+                            <option value="all">Tous les statuts</option>
+                            <option value="pending">En attente</option>
+                            <option value="approved">Approuvées</option>
+                            <option value="rejected">Rejetées</option>
+                        </select>
+                    )}
+
+                    {activeTab === "Historique" && (
+                        <select 
+                            value={historyStatusFilter}
+                            onChange={(e) => setHistoryStatusFilter(e.target.value)}
+                            className="px-4 py-3 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-blue-500/20"
+                        >
+                            <option value="all">Tous les statuts</option>
+                            <option value="approved">Approuvées</option>
+                            <option value="rejected">Rejetées</option>
+                        </select>
+                    )}
                 </div>
+
                 <button onClick={handleExport} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2">
                     <ArrowDownRight className="w-4 h-4" /> Exporter (CSV)
                 </button>
@@ -330,6 +456,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                         <tr className="bg-gray-50/50 text-gray-500 text-xs font-semibold uppercase tracking-wider">
                             <th className="px-6 py-4">Détails</th>
                             {activeTab === "Utilisateurs" && <th className="px-6 py-4">Plan</th>}
+                            {activeTab === "Agents" && <th className="px-6 py-4">Modèle</th>}
                             {activeTab === "Agents" && <th className="px-6 py-4">Propriétaire</th>}
                             {activeTab === "Transactions" && <th className="px-6 py-4">Montant</th>}
                             {activeTab === "Demandes" && <th className="px-6 py-4">Entreprise</th>}
@@ -340,7 +467,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {dataList.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(searchQuery.toLowerCase()))).map((item, idx) => (
+                        {getFilteredData().map((item, idx) => (
                             <tr key={idx} className="hover:bg-gray-50/50 transition-colors group">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
@@ -362,6 +489,13 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                                             item.plan === 'entreprise' ? "bg-purple-100 text-purple-700" : item.plan === 'pro' ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
                                         )}>
                                             {item.plan}
+                                        </span>
+                                    </td>
+                                )}
+                                {activeTab === "Agents" && (
+                                    <td className="px-6 py-4">
+                                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">
+                                            {item.llm_model || "N/A"}
                                         </span>
                                     </td>
                                 )}
@@ -398,7 +532,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                                     ) : (
                                         <>
                                             {activeTab === "Transactions" && item.status === 'completed' && (
-                                                <button 
+                                                <button
                                                     onClick={() => handleRefund(item.id)}
                                                     className="px-3 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-200 transition-colors mr-2"
                                                 >
@@ -421,25 +555,26 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
 
     return (
         <div className="h-full flex flex-col gap-8 max-w-7xl mx-auto pb-12">
-                <div className="flex items-end justify-between">
-                    <div>
-                        <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Magia Back-office</h2>
-                        <p className="text-gray-500 mt-2 font-medium">Console d'administration globale</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => setIsNotifModalOpen(true)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors flex items-center gap-2"
-                        >
-                            <MessageSquare className="w-4 h-4" />
-                            Notification Globale
-                        </button>
+            <div className="flex items-end justify-between">
+                <div>
+                    <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Magia Back-office</h2>
+                    <p className="text-gray-500 mt-2 font-medium">Console d'administration globale</p>
+                </div>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => setIsNotifModalOpen(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    >
+                        <MessageSquare className="w-4 h-4" />
+                    </button>
+                    {activeTab === "Tableau de bord" && (
                         <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
                             <Search className="w-4 h-4 text-gray-400 ml-2" />
                             <input type="text" placeholder="Recherche globale..." className="border-none focus:ring-0 text-sm w-64 bg-transparent" />
                         </div>
-                    </div>
+                    )}
                 </div>
+            </div>
 
             {isLoading && !stats ? (
                 <div className="flex-1 flex items-center justify-center">
@@ -473,7 +608,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
                     <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                            <h3 className="font-bold text-lg">Notification globale</h3>
+                            <h3 className="font-bold text-lg"> </h3>
                             <button onClick={() => setIsNotifModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
                                 <Shield className="w-5 h-5 text-gray-400" />
                             </button>
@@ -481,21 +616,21 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                         <div className="p-6 space-y-4">
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Titre</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-500/20"
                                     placeholder="Ex: Maintenance"
                                     value={notifForm.title}
-                                    onChange={e => setNotifForm({...notifForm, title: e.target.value})}
+                                    onChange={e => setNotifForm({ ...notifForm, title: e.target.value })}
                                 />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Message</label>
-                                <textarea 
+                                <textarea
                                     className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-500/20 h-32"
                                     placeholder="Contenu..."
                                     value={notifForm.message}
-                                    onChange={e => setNotifForm({...notifForm, message: e.target.value})}
+                                    onChange={e => setNotifForm({ ...notifForm, message: e.target.value })}
                                 />
                             </div>
                         </div>

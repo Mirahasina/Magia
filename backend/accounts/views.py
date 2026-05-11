@@ -484,10 +484,11 @@ class PlanLimitsView(APIView):
 
         limits = PLAN_LIMITS.get(plan, PLAN_LIMITS['gratuit']).copy()
         
-        if plan == 'pro':
+        if plan == 'entreprise':
             limits['max_agents'] = num_agents_choice
-            limits['max_members'] = num_agents_choice * 2
-            limits['max_credits'] = num_agents_choice * 1000
+            limits['max_credits'] = num_agents_choice * 2000
+        elif plan == 'pro':
+            limits['max_credits'] = 1000
         elif plan == 'gratuit':
             limits['max_credits'] = 500
         else:

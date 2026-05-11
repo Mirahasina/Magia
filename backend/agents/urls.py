@@ -4,7 +4,7 @@ from .views import (
     AgentViewSet, KnowledgeBaseViewSet, TemplateViewSet, 
     WhatsAppConfigViewSet, ChatMessageViewSet, EmailConfigViewSet,
     AgentTeamViewSet, AgentLinkViewSet, ContactAssignmentViewSet, AuditLogViewSet,
-    LinkedInConfigViewSet
+    LinkedInConfigViewSet, FacebookConfigViewSet
 )
 
 from .daily_views import DailyCallViewSet
@@ -21,6 +21,7 @@ router.register(r'agent-links', AgentLinkViewSet, basename='agentlink')
 router.register(r'contact-assignments', ContactAssignmentViewSet, basename='contactassignment')
 router.register(r'audit-logs', AuditLogViewSet, basename='auditlog')
 router.register(r'linkedin-config', LinkedInConfigViewSet, basename='linkedinconfig')
+router.register(r'facebook-config', FacebookConfigViewSet, basename='facebookconfig')
 router.register(r'video-rooms', DailyCallViewSet, basename='video-rooms')
 
 urlpatterns = [

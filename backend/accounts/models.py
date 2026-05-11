@@ -246,7 +246,6 @@ class Notification(models.Model):
         return f"[{self.type}] {self.title} - {self.user.email}"
 
 
-# ── Plan Limits ───────────────────────────────────────────────────────────────
 PLAN_LIMITS = {
     'gratuit': {
         'max_agents': 2,
@@ -256,8 +255,8 @@ PLAN_LIMITS = {
         'boite_reception': False,
     },
     'pro': {
-        'max_agents': 50,
-        'max_members': 3,
+        'max_agents': 2,
+        'max_members': 0,
         'max_kb_per_agent': 10,
         'channels': ['email', 'whatsapp'],
         'boite_reception': True,
@@ -267,7 +266,7 @@ PLAN_LIMITS = {
         'max_agents': None,
         'max_members': None,
         'max_kb_per_agent': None,
-        'channels': ['email', 'whatsapp'],
+        'channels': ['email', 'whatsapp', 'linkedin', 'facebook'],
         'boite_reception': True,
     },
 }

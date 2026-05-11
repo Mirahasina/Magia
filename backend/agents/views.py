@@ -1,3 +1,4 @@
+from .unipile_service import UnipileService, sync_linkedin_inbox, sync_unipile_inbox
 import logging
 import os
 import re
@@ -32,14 +33,15 @@ from odf import teletype
 from pptx import Presentation
 from google_auth_oauthlib.flow import Flow
 from .models import (
-    Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, AgentFeedback,
+    Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentFeedback,
     AgentTeam, AgentLink, ContactAssignment, AuditLog, Contact
 )
 from .serializers import (
     AgentSerializer, KnowledgeBaseSerializer, TemplateSerializer, 
     WhatsAppConfigSerializer, ChatMessageSerializer, EmailConfigSerializer,
     AgentFeedbackSerializer, AgentTeamSerializer, AgentLinkSerializer,
-    ContactAssignmentSerializer, AuditLogSerializer, LinkedInConfigSerializer
+    ContactAssignmentSerializer, AuditLogSerializer, LinkedInConfigSerializer,
+    FacebookConfigSerializer
 )
 from .llm_service import get_llm_response, classify_pertinence, DEFAULT_GEMINI_MODELS
 from .email_service import (
@@ -52,8 +54,8 @@ from rest_framework.exceptions import PermissionDenied
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .rag_service import add_texts_to_knowledge_base, search_knowledge_base
-from .linkedin_service import search_linkedin_profiles, get_linkedin_profile_details
-from .linkedin_messaging_service import sync_linkedin_inbox
+
+
 
 env = environ.Env()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -122,170 +124,54 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
-    def update_qr(self, request):
-        user_id = request.data.get('user_id')
-        qr_code = request.data.get('qr_code')
+    @action(detail=True, methods=['get'])
+    def get_connection_url(self, request, pk=None):
+        config = self.get_object()
+        service = UnipileService()
         
-        if user_id and user_id != 'global':
-            config = WhatsAppConfig.objects.filter(user_id=user_id).first()
-        else:
-            config = WhatsAppConfig.objects.first()
-
-        if not config:
-            return Response({'error': 'Config not found'}, status=404)
+        if not service.api_key:
+            return Response({"error": "La clé UNIPILE_API_KEY est manquante dans la configuration serveur (.env)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
-        if qr_code is not None:
-            config.qr_code = qr_code
-            config.is_connected = False
+        url = service.get_connection_url('whatsapp', request.user.id, config.id)
+        if url:
+            return Response({"url": url})
+        return Response({"error": "Impossible de générer l'URL de connexion WhatsApp. Veuillez vérifier vos accès Unipile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'])
+    def refresh_connection(self, request, pk=None):
+        config = self.get_object()
+        service = UnipileService()
+        
+        accounts = service.fetch_accounts()
+        target_name = f"WHATSAPP_{request.user.id}_{config.id}"
+        found_account = next((a for a in accounts if a.get('name') == target_name), None)
+        
+        if not found_account:
+            used_ids = set(WhatsAppConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
+            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) == 'WHATSAPP']
+            if potential_accounts:
+                found_account = potential_accounts[0]
+
+        if found_account:
+            config.unipile_account_id = found_account.get('id')
+            config.is_connected = True
             config.save()
-        return Response({'status': 'updated'})
-
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
-    def set_connected(self, request):
-        user_id = request.data.get('user_id')
-        phone = request.data.get('phone_number')
-        
-        if user_id and user_id != 'global':
-            config = WhatsAppConfig.objects.filter(user_id=user_id).first()
-        else:
-            config = WhatsAppConfig.objects.first()
-
-        if not config:
-            return Response({'error': 'Config not found'}, status=404)
+            return Response({"status": "connected", "unipile_account_id": config.unipile_account_id})
             
-        config.is_connected = True
-        config.qr_code = None
-        if phone:
-            config.phone_number = phone
-        config.save()
-        return Response({'status': 'connected'})
+        return Response({"status": "not_found", "message": "Aucun compte WhatsApp correspondant trouvé sur Unipile."}, status=200)
 
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
-    def set_disconnected(self, request):
-        user_id = request.data.get('user_id')
-        if user_id and user_id != 'global':
-            config = WhatsAppConfig.objects.filter(user_id=user_id).first()
-        else:
-            config = WhatsAppConfig.objects.first()
-
-        if not config:
-            return Response({'error': 'Config not found'}, status=404)
-            
-        config.is_connected = False
-        config.qr_code = None
-        config.save()
-        
-        ChatMessage.objects.filter(user=config.user, source='whatsapp').delete()
-        Contact.objects.filter(user=config.user, source='whatsapp').delete()
-        
-        return Response({'status': 'disconnected'})
+    @action(detail=True, methods=['post'])
+    def sync_messages(self, request, pk=None):
+        config = self.get_object()
+        thread = threading.Thread(target=sync_unipile_inbox, args=(config, 'whatsapp'))
+        thread.daemon = True
+        thread.start()
+        return Response({"status": "Synchronisation WhatsApp démarrée"})
 
     def perform_destroy(self, instance):
         ChatMessage.objects.filter(user=instance.user, source='whatsapp').delete()
         Contact.objects.filter(user=instance.user, source='whatsapp').delete()
         super().perform_destroy(instance)
-
-    @action(detail=True, methods=['post'])
-    def connect(self, request, pk=None):
-        config = self.get_object()
-        config.qr_code = None
-        config.is_connected = False
-        config.save()
-        
-        try:
-            user_id = str(request.user.id)
-            proc_check = subprocess.run(['pgrep', '-f', f'node.*whatsapp_service/index.js.*--user {user_id}'], capture_output=True, text=True)
-            
-            if not proc_check.stdout.strip():
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                service_path = os.path.join(base_dir, 'whatsapp_service', 'index.js')
-                
-                user = request.user
-                if not user.master_api_key:
-                    user.generate_master_api_key()
-                token = user.master_api_key
-                
-                log_file = os.path.join(base_dir, 'logs', f'whatsapp_{user_id}.log')
-                os.makedirs(os.path.dirname(log_file), exist_ok=True)
-                
-                with open(log_file, 'a') as f:
-                    subprocess.Popen(
-                        ['node', service_path, '--user', user_id, '--token', token],
-                        stdout=f,
-                        stderr=f,
-                        preexec_fn=os.setpgrp
-                    )
-        except Exception:
-            pass
-            
-        return Response({'status': 'waiting_for_qr'})
-
-    @action(detail=True, methods=['post'])
-    def toggle_connection(self, request, pk=None):
-        config = self.get_object()
-        old_connected = config.is_connected
-        config.is_connected = not config.is_connected
-        
-        if not config.is_connected:
-            config.qr_code = None
-            user_id = str(request.user.id)
-            try:
-                subprocess.run(['pkill', '-f', f'node .*index.js --user {user_id}'], check=False)
-
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                auth_dir = os.path.join(base_dir, f'auth_info_{user_id}')
-                if os.path.exists(auth_dir):
-                    shutil.rmtree(auth_dir)
-
-                config.is_connected = False
-                config.qr_code = None
-
-                ChatMessage.objects.filter(user=request.user, source='whatsapp').delete()
-                Contact.objects.filter(user=request.user, source='whatsapp').delete()
-
-            except Exception as exc:
-                logger.error('Error during WhatsApp disconnect: %s', exc)
-                
-        config.save()
-        return Response({'is_connected': config.is_connected})
-
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
-    def sync_whatsapp_contacts(self, request):
-        user_id = request.data.get('user_id')
-        contacts = request.data.get('contacts', [])
-        if not user_id or user_id == 'global':
-            return Response({'error': 'User ID required'}, status=400)
-            
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=404)
-
-        created_count = 0
-        updated_count = 0
-        
-        for c in contacts:
-            jid = c.get('id')
-            name = c.get('name') or c.get('notify') or c.get('verifiedName')
-            if not jid: continue
-            
-            contact_obj, created = Contact.objects.get_or_create(
-                user=user,
-                source='whatsapp',
-                contact_info=jid,
-            )
-            if created:
-                if name: contact_obj.name = name
-                contact_obj.save()
-                created_count += 1
-            else:
-                if name and contact_obj.name != name:
-                    contact_obj.name = name
-                    contact_obj.save()
-                    updated_count += 1
-                    
-        return Response({'status': 'success', 'created': created_count, 'updated': updated_count})
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
     def whatsapp_gateway(self, request):
@@ -316,7 +202,7 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
             contact_name=push_name,
             source='whatsapp',
             whatsapp_message_id=wa_id,
-            is_read=bool(is_historical),   # historical = already read
+            is_read=bool(is_historical),
             status='archived' if is_historical else 'new'
         )
 
@@ -383,125 +269,114 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return EmailConfig.objects.filter(user=self.request.user)
 
-    @action(detail=True, methods=['post'])
-    def sync_history(self, request, pk=None):
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['get'])
+    def get_connection_url(self, request, pk=None):
         config = self.get_object()
-        thread = threading.Thread(target=sync_email_history, args=(config,))
+        service = UnipileService()
+        
+        if not service.api_key:
+            return Response({"error": "La clé UNIPILE_API_KEY est manquante dans la configuration serveur (.env)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        url = service.get_connection_url('gmail', request.user.id, config.id)
+        if url:
+            return Response({"url": url})
+        return Response({"error": "Impossible de générer l'URL de connexion Email. Veuillez vérifier vos accès Unipile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'])
+    def refresh_connection(self, request, pk=None):
+        config = self.get_object()
+        service = UnipileService()
+        
+        accounts = service.fetch_accounts()
+        target_name = f"GMAIL_{request.user.id}_{config.id}"
+        found_account = next((a for a in accounts if a.get('name') == target_name), None)
+        
+        if not found_account:
+            used_ids = set(EmailConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
+            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) in ['GMAIL', 'OUTLOOK', 'IMAP']]
+            if potential_accounts:
+                found_account = potential_accounts[0]
+
+        if found_account:
+            config.unipile_account_id = found_account.get('id')
+            config.is_active = True
+            config.save()
+            return Response({"status": "connected", "unipile_account_id": config.unipile_account_id})
+            
+        return Response({"status": "not_found", "message": "Aucun compte Email correspondant trouvé sur Unipile."}, status=200)
+
+    @action(detail=True, methods=['post'])
+    def sync_messages(self, request, pk=None):
+        config = self.get_object()
+        thread = threading.Thread(target=sync_unipile_inbox, args=(config, 'email'))
         thread.daemon = True
         thread.start()
-        return Response({'status': 'sync_started'})
+        return Response({"status": "Synchronisation Email démarrée"})
 
-    @action(detail=False, methods=['post'])
-    def sync_all_history(self, request):
-        configs = EmailConfig.objects.filter(user=request.user, is_active=True)
-        for config in configs:
-            thread = threading.Thread(target=sync_email_history, args=(config,))
-            thread.daemon = True
-            thread.start()
-        return Response({'status': 'global_sync_started'})
+    def perform_destroy(self, instance):
+        ChatMessage.objects.filter(email_config=instance).delete()
+        super().perform_destroy(instance)
+
+class FacebookConfigViewSet(viewsets.ModelViewSet):
+    serializer_class = FacebookConfigSerializer
+
+    def get_queryset(self):
+        return FacebookConfig.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    def perform_destroy(self, instance):
-        ChatMessage.objects.filter(email_config=instance).delete()
-        
-        has_other_configs = EmailConfig.objects.filter(user=instance.user).exclude(id=instance.id).exists()
-        if not has_other_configs:
-            Contact.objects.filter(user=instance.user, source='email').delete()
-            
-        super().perform_destroy(instance)
-
-    @action(detail=True, methods=['post'])
-    def test_connection(self, request, pk=None):
+    @action(detail=True, methods=['get'])
+    def get_connection_url(self, request, pk=None):
         config = self.get_object()
-        results = test_email_connection(config)
-        return Response(results)
+        service = UnipileService()
+        
+        if not service.api_key:
+            return Response({"error": "La clé UNIPILE_API_KEY est manquante dans la configuration serveur (.env)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        url = service.get_connection_url('facebook', request.user.id, config.id)
+        if url:
+            return Response({"url": url})
+        return Response({"error": "Impossible de générer l'URL de connexion Facebook. Veuillez vérifier vos accès Unipile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['get'])
-    def get_auth_url(self, request, pk=None):
+    def refresh_connection(self, request, pk=None):
         config = self.get_object()
+        service = UnipileService()
         
-        client_id = env('GOOGLE_CLIENT_ID', default=None)
-        client_secret = env('GOOGLE_CLIENT_SECRET', default=None)
-        redirect_uri = env('GOOGLE_REDIRECT_URI', default=None)
+        accounts = service.fetch_accounts()
+        target_name = f"FACEBOOK_{request.user.id}_{config.id}"
+        found_account = next((a for a in accounts if a.get('name') == target_name), None)
         
-        if not client_id or not client_secret:
-            return Response({'error': 'Google OAuth2 credentials not configured in .env'}, status=status.HTTP_400_BAD_REQUEST)
+        if not found_account:
+            used_ids = set(FacebookConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
+            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) == 'FACEBOOK']
+            if potential_accounts:
+                found_account = potential_accounts[0]
 
-        auth_params = {
-            'client_id': client_id,
-            'redirect_uri': redirect_uri,
-            'response_type': 'code',
-            'scope': 'https://mail.google.com/ https://www.googleapis.com/auth/userinfo.email openid',
-            'access_type': 'offline',
-            'prompt': 'consent',
-            'include_granted_scopes': 'true',
-            'state': json.dumps({'config_id': config.id})
-        }
-        
-        query_string = urllib.parse.urlencode(auth_params)
-        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query_string}"
-        
-        return Response({'url': auth_url})
-
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
-    def oauth2_callback(self, request):
-        os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
-        state_data = json.loads(request.query_params.get('state'))
-        config_id = state_data.get('config_id')
-        code = request.query_params.get('code')
-        
-        config = EmailConfig.objects.get(id=config_id)
-        client_id = env('GOOGLE_CLIENT_ID', default=None)
-        client_secret = env('GOOGLE_CLIENT_SECRET', default=None)
-        redirect_uri = env('GOOGLE_REDIRECT_URI', default=None)
-        
-        client_config = {
-            "web": {
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-            }
-        }
-        
-        flow = Flow.from_client_config(
-            client_config, 
-            scopes=['https://mail.google.com/', 'https://www.googleapis.com/auth/userinfo.email', 'openid'], 
-            redirect_uri=redirect_uri
-        )
-        flow.code_verifier = None
-        
-        try:
-            flow.fetch_token(code=code)
-        except Exception:
-            return redirect(f"http://localhost:5173/dashboard?view=settings&email_config_id={config.id}&tab=email&status=error&message=Code_expire_ou_invalide_Veuillez_reessayer")
-        
-        credentials = flow.credentials
-        config.oauth_token = credentials.token
-        config.refresh_token = credentials.refresh_token
-        
-        try:
-            userinfo_response = requests.get(
-                'https://www.googleapis.com/oauth2/v3/userinfo',
-                headers={'Authorization': f'Bearer {credentials.token}'}
-            )
-            if userinfo_response.status_code == 200:
-                user_data = userinfo_response.json()
-                config.email = user_data.get('email', config.email)
-        except Exception:
-            pass
+        if found_account:
+            config.unipile_account_id = found_account.get('id')
+            config.is_connected = True
+            config.save()
+            return Response({"status": "connected", "unipile_account_id": config.unipile_account_id})
             
-        config.is_active = True
-        config.save()
-        
-        try:
-            sync_email_history(config)
-        except Exception:
-            pass
+        return Response({"status": "not_found", "message": "Aucun compte Facebook correspondant trouvé sur Unipile."}, status=200)
 
-        return redirect(f"http://localhost:5173/dashboard?view=settings&email_config_id={config.id}&tab=email&status=success")
+    @action(detail=True, methods=['post'])
+    def sync_messages(self, request, pk=None):
+        config = self.get_object()
+        thread = threading.Thread(target=sync_unipile_inbox, args=(config, 'facebook'))
+        thread.daemon = True
+        thread.start()
+        return Response({"status": "Synchronisation Facebook démarrée"})
+
+    def perform_destroy(self, instance):
+        ChatMessage.objects.filter(user=instance.user, source='facebook').delete()
+        Contact.objects.filter(user=instance.user, source='facebook').delete()
+        super().perform_destroy(instance)
 
 class AgentTeamViewSet(viewsets.ModelViewSet):
     serializer_class = AgentTeamSerializer
@@ -681,25 +556,47 @@ class LinkedInConfigViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    @action(detail=True, methods=['post'])
-    def search_profiles(self, request, pk=None):
+    @action(detail=True, methods=['get'])
+    def refresh_connection(self, request, pk=None):
         config = self.get_object()
-        query = request.data.get('query')
-        if not query:
-            return Response({"error": "La requête de recherche est obligatoire"}, status=400)
+        service = UnipileService()
         
-        results = search_linkedin_profiles(config.api_key, query)
-        return Response(results)
+        accounts = service.fetch_accounts()
+        logger.info(f"Fetched {len(accounts)} accounts from Unipile for user {request.user.id}")
+        if accounts:
+            logger.info(f"Sample account structure: {accounts[0]}")
+            
+        for acc in accounts:
+            logger.info(f"Unipile Account: ID={acc.get('id')}, Name='{acc.get('name')}', Provider={acc.get('provider') or acc.get('type')}")
+            
+        target_name = f"LinkedIn_{request.user.id}_{config.id}"
+        logger.info(f"Searching for account with name: '{target_name}'")
+        
+        found_account = next((a for a in accounts if a.get('name') == target_name), None)
+        
+        # Fallback: Si pas de match exact (Unipile peut renommer avec le nom du profil LinkedIn)
+        if not found_account:
+            logger.info("No exact name match found. Trying fallback matching...")
+            # On cherche un compte qui n'est pas encore utilisé par une autre config LinkedIn
+            used_ids = set(LinkedInConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
+            potential_accounts = [a for a in accounts if a.get('id') not in used_ids]
+            
+            if potential_accounts:
+                # On prend le premier disponible
+                found_account = potential_accounts[0]
+                logger.info(f"Fallback found account: {found_account.get('id')} ({found_account.get('name')})")
 
-    @action(detail=True, methods=['post'])
-    def profile_details(self, request, pk=None):
-        config = self.get_object()
-        linkedin_url = request.data.get('url')
-        if not linkedin_url:
-            return Response({"error": "L'URL LinkedIn est obligatoire"}, status=400)
-        
-        details = get_linkedin_profile_details(config.api_key, linkedin_url)
-        return Response(details)
+        if found_account:
+            config.unipile_account_id = found_account.get('id')
+            config.is_connected = True
+            config.save()
+            return Response({
+                "status": "connected", 
+                "unipile_account_id": config.unipile_account_id,
+                "name": found_account.get('name')
+            })
+            
+        return Response({"status": "not_found", "message": "Aucun compte correspondant trouvé sur Unipile."}, status=200)
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
@@ -712,12 +609,15 @@ class LinkedInConfigViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
         config = self.get_object()
-        from .linkedin_messaging_service import UnipileService
         service = UnipileService()
-        url = service.get_connection_url(request.user.id, config.id)
+        
+        if not service.api_key:
+            return Response({"error": "La clé UNIPILE_API_KEY est manquante dans la configuration serveur (.env)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        url = service.get_connection_url('linkedin', request.user.id, config.id)
         if url:
             return Response({"url": url})
-        return Response({"error": "Impossible de générer l'URL Unipile"}, status=500)
+        return Response({"error": "Impossible de générer l'URL de connexion LinkedIn. Veuillez vérifier vos accès Unipile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def prospect(self, request, pk=None):
@@ -728,7 +628,6 @@ class LinkedInConfigViewSet(viewsets.ModelViewSet):
         if not config.unipile_account_id:
             return Response({"error": "Un compte LinkedIn connecté est requis pour prospecter."}, status=400)
         
-        from .linkedin_messaging_service import UnipileService
         service = UnipileService()
         leads = service.search_people(config.unipile_account_id, query)
         

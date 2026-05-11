@@ -7,24 +7,59 @@ from PIL import Image
 import re
 import uuid
 import shutil
+import requests
+import urllib.parse
 from django.conf import settings
 from gradio_client import Client
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import io
 
 env = environ.Env()
 environ.Env.read_env(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
-def generate_video_huggingface(prompt):
+def create_pdf_from_text(text, filepath):
     """
-    Génère une vidéo via un Space Hugging Face gratuit.
+    Crée un fichier PDF simple à partir d'un texte.
     """
     try:
-        client = Client("ali-vilab/modelscope-damo-text-to-video-synthesis")
+        c = canvas.Canvas(filepath, pagesize=letter)
+        width, height = letter
+        c.setFont("Helvetica", 12)
+        
+        x_margin = 50
+        y_position = height - 50
+        line_height = 14
+        
+        for line in text.split('\n'):
+            if y_position < 50:
+                c.showPage()
+                c.setFont("Helvetica", 12)
+                y_position = height - 50
+            
+            c.drawString(x_margin, y_position, line)
+            y_position -= line_height
+            
+        c.save()
+        return True
+    except Exception as e:
+        print(f"PDF Error: {e}")
+        return False
+
+def generate_video_huggingface(prompt):
+    
+    try:
+        client = Client("damo-vilab/text-to-video-ms-1.7b")
         result = client.predict(
-            prompt=prompt,
+            prompt,	# prompt (str)
+            16,	# n_frames (int)
             api_name="/predict"
         )
         video_path = result
         
+        if not video_path:
+            return "\n*Note: La génération vidéo gratuite est actuellement saturée. Veuillez réessayer dans quelques minutes ou configurer un service Pro.*\n"
+            
         fname = f"video_{uuid.uuid4().hex[:8]}.mp4"
         media_dir = os.path.join(settings.MEDIA_ROOT, 'generated')
         os.makedirs(media_dir, exist_ok=True)
@@ -42,18 +77,72 @@ def process_ai_response(response_text):
     image_pattern = r'\[GENERATE_IMAGE:\s*(.*?)\]'
     def replace_image(match):
         prompt = match.group(1).strip('"').strip("'")
-        try:
-            client = OpenAI(api_key=env('OPENAI_API_KEY'))
-            res = client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                n=1,
-                size="1024x1024"
-            )
-            url = res.data[0].url
-            return f"![Image générée]({url})"
-        except Exception as e:
-            return f"\n*Erreur lors de la génération de l'image: {e}*\n"
+        
+        # 1. Tentative avec OpenAI (DALL-E 3) si la clé est présente
+        openai_key = env('OPENAI_API_KEY', default=None)
+        if openai_key and openai_key.startswith('sk-'):
+            try:
+                client = OpenAI(api_key=openai_key)
+                res = client.images.generate(
+                    model="dall-e-3",
+                    prompt=prompt,
+                    n=1,
+                    size="1024x1024"
+                )
+                url = res.data[0].url
+                return f"![Image générée]({url})"
+            except Exception as oe:
+                print(f"OpenAI Image Error: {oe}")
+                pass
+
+        gemini_key = env('GEMINI_API_KEY', default=None)
+        if gemini_key:
+            try:
+                client = genai.Client(api_key=gemini_key)
+                response = client.models.generate_images(
+                    model='imagen-4.0-fast-generate-001',
+                    prompt=prompt,
+                )
+                
+                if response.generated_images:
+                    image_obj = response.generated_images[0]
+                    fname = f"img_{uuid.uuid4().hex[:8]}.png"
+                    media_dir = os.path.join(settings.MEDIA_ROOT, 'generated')
+                    os.makedirs(media_dir, exist_ok=True)
+                    dest_path = os.path.join(media_dir, fname)
+                    
+                    img_bytes = None
+                    if hasattr(image_obj, 'image') and hasattr(image_obj.image, 'image_bytes'):
+                        img_bytes = image_obj.image.image_bytes
+                    elif hasattr(image_obj, 'image_bytes'):
+                        img_bytes = image_obj.image_bytes
+                    
+                    if img_bytes:
+                        with open(dest_path, 'wb') as f:
+                            f.write(img_bytes)
+                    elif hasattr(image_obj, 'save'):
+                        image_obj.save(dest_path)
+                    else:
+                        return f"\n*Image générée mais format de données inconnu.*\n"
+                    
+                    file_url = f"{settings.MEDIA_URL}generated/{fname}"
+                    url_path = file_url if file_url.startswith('/') else f"/{file_url}"
+                    return f"![Image générée]({url_path})"
+            except Exception as e:
+                # 3. Fallback avec Pollinations.ai (Service gratuit sans clé)
+                try:
+                    encoded_prompt = urllib.parse.quote(prompt)
+                    # On génère une URL unique pour éviter le cache si nécessaire, mais Pollinations est déterministe par prompt
+                    pollinations_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+                    
+                    # On vérifie rapidement si le service répond (optionnel)
+                    return f"![Image générée (Fallback)]({pollinations_url})"
+                except Exception as pe:
+                    if not openai_key:
+                        return f"\n*Erreur: Clé OpenAI manquante et échec du fallback Gemini ({e}). Fallback Pollinations échoué ({pe}).*\n"
+                    return f"\n*Erreur lors de la génération de l'image: {e}*\n"
+
+        return "\n*Erreur: Aucune clé API configurée pour la génération d'images (OpenAI ou Gemini requises).*\n"
             
     res = re.sub(image_pattern, replace_image, response_text)
     
@@ -69,7 +158,7 @@ def process_ai_response(response_text):
         fname = match.group(1).strip('"').strip("'")
         content = match.group(2).strip()
         
-        ext = os.path.splitext(fname)[1]
+        ext = os.path.splitext(fname)[1].lower()
         base = os.path.splitext(fname)[0]
         unique_filename = f"{base}_{uuid.uuid4().hex[:8]}{ext}"
         
@@ -77,8 +166,19 @@ def process_ai_response(response_text):
         os.makedirs(media_dir, exist_ok=True)
         filepath = os.path.join(media_dir, unique_filename)
         
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(content)
+        success = False
+        if ext == '.pdf':
+            success = create_pdf_from_text(content, filepath)
+        else:
+            try:
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                success = True
+            except Exception:
+                success = False
+            
+        if not success:
+            return f"\n*Erreur lors de la création du fichier {fname}*\n"
             
         file_url = f"{settings.MEDIA_URL}generated/{unique_filename}"
         url_path = file_url if file_url.startswith('/') else f"/{file_url}"
@@ -136,12 +236,14 @@ def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, u
     3. Formatage : INTERDICTION FORMELLE d'utiliser du gras (**). Pas d'emojis superflus.
     4. RAG : Utilise le contexte comme source unique de vérité.
     5. Outils (Images, Vidéos et Fichiers) :
-       - Pour générer une image, inclus EXACTEMENT ce texte sur une nouvelle ligne: [GENERATE_IMAGE: "Description détaillée en anglais"]
-       - Pour générer une vidéo, inclus EXACTEMENT ce texte sur une nouvelle ligne: [GENERATE_VIDEO: "Description détaillée en anglais"]
-       - Pour créer un fichier (CSV, Python, txt, etc) à télécharger pour l'utilisateur, inclus EXACTEMENT ce texte:
+       IMPORTANT: Tu as la capacité de générer des assets. Si l'utilisateur demande une image, une vidéo ou un fichier, tu DOIS utiliser ces tags EXACTEMENT :
+       - Pour une IMAGE : [GENERATE_IMAGE: "Description détaillée en anglais"]
+       - Pour une VIDÉO : [GENERATE_VIDEO: "Description détaillée en anglais"]
+       - Pour un FICHIER (PDF, CSV, Python, txt, etc) :
          [GENERATE_FILE: "nom_fichier.ext"]
-         contenu brut du fichier
+         Contenu du fichier ici
          [/GENERATE_FILE]
+       Note: Pour les PDF, écris simplement le texte que tu veux voir dans le document.
     """
 
     try:

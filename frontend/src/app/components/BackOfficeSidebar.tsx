@@ -30,7 +30,6 @@ const adminMenu = [
     { label: "Demandes", icon: Shield },
     { label: "Historique", icon: FileText },
     { label: "Contacts", icon: FileText },
-    { label: "Journal", icon: Activity },
 ];
 
 export function BackOfficeSidebar({

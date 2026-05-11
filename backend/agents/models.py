@@ -34,6 +34,7 @@ class Agent(models.Model):
     whatsapp_config = models.ForeignKey('WhatsAppConfig', on_delete=models.SET_NULL, null=True, blank=True)
     email_config = models.ForeignKey('EmailConfig', on_delete=models.SET_NULL, null=True, blank=True)
     linkedin_config = models.ForeignKey('LinkedInConfig', on_delete=models.SET_NULL, null=True, blank=True)
+    facebook_config = models.ForeignKey('FacebookConfig', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_deployed = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -74,6 +75,7 @@ class WhatsAppConfig(models.Model):
     name = models.CharField(max_length=255, default="Default WhatsApp")
     is_connected = models.BooleanField(default=False)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
+    unipile_account_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID du compte Unipile")
     qr_code = models.TextField(blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='whatsapp_configs', null=True, blank=True)
@@ -85,6 +87,7 @@ class EmailConfig(models.Model):
     name = models.CharField(max_length=255, default="Default Email")
     is_active = models.BooleanField(default=False)
     email = models.EmailField(max_length=255, blank=True, null=True)
+    unipile_account_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID du compte Unipile")
     imap_server = models.CharField(max_length=255, blank=True, null=True)
     smtp_server = models.CharField(max_length=255, blank=True, null=True)
     password = models.CharField(max_length=255, blank=True, null=True)
@@ -106,6 +109,16 @@ class LinkedInConfig(models.Model):
     last_sync_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='linkedin_configs', null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.user.email if self.user else 'No user'})"
+
+class FacebookConfig(models.Model):
+    name = models.CharField(max_length=255, default="Default Facebook")
+    is_connected = models.BooleanField(default=False)
+    unipile_account_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID du compte Unipile")
+    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='facebook_configs', null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.user.email if self.user else 'No user'})"
@@ -190,6 +203,13 @@ class ContactAssignment(models.Model):
         return f"{self.contact_info} assigned to {self.agent.name}"
 
 class Contact(models.Model):
+    PROSPECTION_STATUS_CHOICES = [
+        ('new', 'Nouveau / 1er Contact'),
+        ('contacted', 'Contacté'),
+        ('interested', 'Intéressé'),
+        ('ready', 'Prêt'),
+        ('no', 'Non intéressé'),
+    ]
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='contacts')
     source = models.CharField(max_length=50)
     contact_info = models.CharField(max_length=255) 
@@ -197,6 +217,11 @@ class Contact(models.Model):
     avatar = models.URLField(null=True, blank=True)
     last_message_at = models.DateTimeField(null=True, blank=True)
     is_blocked = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=PROSPECTION_STATUS_CHOICES, default='new')
+    followup_count = models.IntegerField(default=0)
+    replied_since_last_ai = models.BooleanField(default=True)
+    next_followup_date = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

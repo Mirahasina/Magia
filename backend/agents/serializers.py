@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, AgentFeedback, UserSurvey
+from .models import Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, AgentFeedback, UserSurvey
 
 class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,20 +15,26 @@ class TemplateSerializer(serializers.ModelSerializer):
 class WhatsAppConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = WhatsAppConfig
-        fields = '__all__'
-        read_only_fields = ['user']
+        fields = ['id', 'name', 'is_connected', 'unipile_account_id', 'phone_number', 'updated_at']
+        read_only_fields = ['user', 'is_connected', 'unipile_account_id']
+
+class FacebookConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FacebookConfig
+        fields = ['id', 'name', 'is_connected', 'unipile_account_id', 'updated_at']
+        read_only_fields = ['user', 'is_connected', 'unipile_account_id']
 
 class EmailConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailConfig
-        fields = '__all__'
-        read_only_fields = ['user']
+        fields = ['id', 'name', 'is_active', 'email', 'unipile_account_id', 'updated_at']
+        read_only_fields = ['user', 'is_active', 'unipile_account_id']
 
 class LinkedInConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = LinkedInConfig
-        fields = '__all__'
-        read_only_fields = ['user']
+        fields = ['id', 'name', 'is_connected', 'unipile_account_id', 'is_messaging_active', 'last_sync_at', 'updated_at']
+        read_only_fields = ['user', 'is_connected', 'unipile_account_id']
 
 class KnowledgeBaseSerializer(serializers.ModelSerializer):
     class Meta:

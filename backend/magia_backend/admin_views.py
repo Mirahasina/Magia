@@ -264,7 +264,7 @@ class AdminStatsViewSet(viewsets.ViewSet):
         AuditLog.objects.create(
             user=request.user,
             action="SEND_GLOBAL_NOTIFICATION",
-            details=f"Notification globale envoyée : {title}"
+            details=f"  envoyée : {title}"
         )
         
         return response.Response({'message': f'Notification envoyée à {users.count()} utilisateurs.'})

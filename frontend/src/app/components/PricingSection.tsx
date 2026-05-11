@@ -12,16 +12,16 @@ interface PricingSectionProps {
 }
 
 export function PricingSection({ openAuth, openContact, onRequestEnterprise, openPayment }: PricingSectionProps) {
-  const [numAgents, setNumAgents] = useState(2);
-  const [selectedPlan, setSelectedPlan] = useState<string>("Pro (Personnalisé)");
+  const [numAgents, setNumAgents] = useState(5);
+  const [selectedPlan, setSelectedPlan] = useState<string>("Pro (Personnel)");
   const [isAnnual, setIsAnnual] = useState(false);
 
-  const basePrice = 29;
-  const pricePerAgent = 15;
+  const basePrice = 99;
+  const pricePerAgent = 20;
   const monthlyPrice = basePrice + (numAgents - 1) * pricePerAgent;
   const totalPrice = isAnnual ? Math.floor(monthlyPrice * 12 * 0.8 / 12) : monthlyPrice;
-  const credits = numAgents * 1000;
-  const userPlaces = numAgents * 2;
+  const credits = numAgents * 2000;
+  const userPlaces = Math.max(5, numAgents * 3);
 
   const handlePlanClick = (planName: string) => {
     setSelectedPlan(planName);
@@ -51,42 +51,41 @@ export function PricingSection({ openAuth, openContact, onRequestEnterprise, ope
       popular: false
     },
     {
-      name: "Pro (Personnalisé)",
+      name: "Pro (Personnel)",
+      price: "29",
+      period: "/mois",
+      subtitle: "Pour les professionnels indépendants et freelances.",
+      features: [
+        "1 agent IA inclus",
+        "1 000 crédits / mois",
+        "1 place utilisateur",
+        "Puissance Machine : 25%",
+        "Optimisation IA : 85%",
+        "Email inclus",
+        "Support Email"
+      ],
+      cta: "Choisir Pro",
+      variant: "outline" as const,
+      popular: false
+    },
+    {
+      name: "Entreprise",
       price: totalPrice.toString(),
       period: "/mois",
-      subtitle: "Ajustez selon vos besoins et ne payez que ce que vous utilisez.",
+      subtitle: "Ajustez selon vos besoins et gérez votre équipe en toute sérénité.",
       features: [
         `${numAgents} agents IA inclus`,
         `${credits.toLocaleString()} crédits / mois`,
         `${userPlaces} places utilisateur`,
-        `Puissance Machine : ${Math.min(100, 20 + numAgents * 2)}%`,
-        `Optimisation IA : ${Math.min(100, 85 + Math.floor(numAgents/2))}%`,
-        "Whatsapp Business inclus",
-        "API & Webhooks",
-        "Support prioritaire"
+        "Invitations collaborateurs illimitées",
+        "Whatsapp Business & LinkedIn inclus",
+        "API & Webhooks avancés",
+        "Support prioritaire 24/7",
+        "Hébergement dédié possible"
       ],
-      cta: "Démarrer en Pro",
+      cta: "Démarrer en Entreprise",
       variant: "default" as const,
       popular: true
-    },
-    {
-      name: "Sur mesure",
-      price: "Entreprise",
-      period: "",
-      subtitle: "Pour les grandes organisations avec des besoins spécifiques.",
-      features: [
-        "Agents & places illimités",
-        "SSO & MMR 2.0",
-        "Audit Trail complet",
-        "Marque blanche dédiée",
-        "Analytics avancées",
-        "SLA garanti 99.9%",
-        "Hébergement dédié",
-        "Accompagnement dédié"
-      ],
-      cta: "Contacter l'équipe",
-      variant: "outline" as const,
-      popular: false
     }
   ];
 
@@ -100,7 +99,7 @@ export function PricingSection({ openAuth, openContact, onRequestEnterprise, ope
           </h2>
         </div>
 
-        {selectedPlan === "Pro (Personnalisé)" && (
+        {selectedPlan === "Entreprise" && (
           <div className="max-w-2xl mx-auto mb-16 bg-gray-50/50 p-10 sm:p-12 rounded-3xl border border-gray-100 shadow-xl shadow-blue-800/5 relative overflow-hidden animate-in fade-in zoom-in-95 duration-500">
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-100/40 to-transparent rounded-full -mr-16 -mt-16 blur-3xl"></div>
 
@@ -131,7 +130,7 @@ export function PricingSection({ openAuth, openContact, onRequestEnterprise, ope
             </div>
             <Slider
               value={[numAgents]}
-              max={50}
+              max={100}
               min={1}
               step={1}
               onValueChange={(value) => setNumAgents(value[0])}
@@ -139,8 +138,8 @@ export function PricingSection({ openAuth, openContact, onRequestEnterprise, ope
             />
             <div className="flex justify-between text-xs text-gray-400 font-medium">
               <span>1 AGENT</span>
-              <span>25 AGENTS</span>
               <span>50 AGENTS</span>
+              <span>100 AGENTS</span>
             </div>
           </div>
         )}

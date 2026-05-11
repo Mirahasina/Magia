@@ -246,7 +246,7 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard }:
             title={isBackOfficeMode ? "Console d'Administration" : undefined}
           />
 
-          <main className="p-8 flex-1 flex flex-col min-h-0 relative z-10 w-full overflow-hidden">
+          <main className="p-8 flex-1 flex flex-col min-h-0 relative z-10 w-full overflow-y-auto">
             <div
               key={isBackOfficeMode ? backOfficeTab : activeTab}
               className="flex-1 flex flex-col min-h-0 animate-page-fade w-full"

@@ -29,16 +29,6 @@ export function useAgents() {
     }
   };
 
-  const toggleWhatsAppConnection = async (configId: number): Promise<void> => {
-    try {
-      await fetch(`${API_BASE}/whatsapp-config/${configId}/toggle_connection/`, {
-        method: "POST",
-        headers: getAuthHeadersOnly(),
-      });
-      context.fetchWhatsAppConfigs();
-    } catch {
-    }
-  };
 
   const addWhatsAppConfig = async (data: Record<string, unknown>): Promise<void> => {
     try {
@@ -91,11 +81,19 @@ export function useAgents() {
     ...context,
     regenerateMasterKey,
     toggle2FA,
-    toggleWhatsAppConnection,
     addWhatsAppConfig,
     addEmailConfig,
     addLinkedInConfig,
     deleteLinkedInConfig,
     updateLinkedInConfig: context.updateLinkedInConfig,
+    refreshLinkedInConnection: context.refreshLinkedInConnection,
+    addFacebookConfig: context.addFacebookConfig,
+    deleteFacebookConfig: context.deleteFacebookConfig,
+    getFacebookConnectionUrl: context.getFacebookConnectionUrl,
+    refreshFacebookConnection: context.refreshFacebookConnection,
+    getWhatsAppConnectionUrl: context.getWhatsAppConnectionUrl,
+    refreshWhatsAppConnection: context.refreshWhatsAppConnection,
+    getEmailConnectionUrl: context.getEmailConnectionUrl,
+    refreshEmailConnection: context.refreshEmailConnection,
   };
 }
