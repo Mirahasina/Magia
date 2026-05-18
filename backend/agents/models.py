@@ -61,6 +61,7 @@ class AuditLog(models.Model):
 
 class KnowledgeBase(models.Model):
     agent = models.ForeignKey(Agent, related_name='knowledge_bases', on_delete=models.CASCADE, null=True, blank=True)
+    team = models.ForeignKey('AgentTeam', related_name='knowledge_bases', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
     source_type = models.CharField(max_length=100)
     file_binary = models.BinaryField(null=True, blank=True)
@@ -69,7 +70,11 @@ class KnowledgeBase(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.name} ({self.agent.name if self.agent else 'Unlinked'})"
+        if self.agent:
+            return f"{self.name} (Agent: {self.agent.name})"
+        if self.team:
+            return f"{self.name} (Team: {self.team.name})"
+        return f"{self.name} (Unlinked)"
 
 class WhatsAppConfig(models.Model):
     name = models.CharField(max_length=255, default="Default WhatsApp")

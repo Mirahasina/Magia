@@ -436,13 +436,13 @@ class SecurityView(APIView):
 
     def post(self, request, action=None):
         user = request.user
-        if action == 'regenerate':
+        if action in ('regenerate', 'regenerate_master_key'):
             new_key = user.generate_master_api_key()
             return Response({
                 'message': 'Clé API régénérée avec succès.',
                 'master_api_key': UserProfileSerializer(user).to_representation(user).get('master_api_key')
             })
-        elif action == 'toggle-2fa':
+        elif action in ('toggle-2fa', 'toggle_2fa'):
             user.is_2fa_enabled = not user.is_2fa_enabled
             user.save()
             return Response({

@@ -185,3 +185,50 @@ class TestEmailService:
         assert ai_msg is not None
         assert "Outgoing message" in ai_msg.content
         assert ai_msg.contact_info == "external@test.com"
+
+
+@pytest.mark.django_db
+class TestTeamKnowledgeBase:
+    def test_team_knowledge_base_creation_and_search(self, test_user):
+        from agents.models import AgentTeam, KnowledgeBase
+        from agents.rag_service import add_texts_to_knowledge_base, search_agent_and_team_knowledge_base, search_knowledge_base
+
+        # Create AgentTeam
+        team = AgentTeam.objects.create(name="Support Team", user=test_user)
+        agent = Agent.objects.create(
+            user=test_user,
+            name="Team Support Agent",
+            role="Support",
+            system_prompt="Support Prompt",
+            team=team
+        )
+
+        # 1. Test indexing on team globally
+        kb_team = KnowledgeBase.objects.create(
+            name="Global Product Manual",
+            team=team,
+            source_type="file"
+        )
+        assert kb_team.team == team
+
+        success = add_texts_to_knowledge_base(
+            team_id=team.id,
+            raw_text="The color of the product is blue and standard price is 99$.",
+            source_name=kb_team.name
+        )
+        assert success is True
+
+        # 2. Test search on team globally
+        team_search = search_knowledge_base(team_id=team.id, query="price")
+        assert "99$" in team_search
+
+        # 3. Test combined search for the agent
+        combined_search = search_agent_and_team_knowledge_base(
+            agent_id=agent.id,
+            team_id=team.id,
+            query="color"
+        )
+        assert "blue" in combined_search
+
+        # 4. Test database string representation
+        assert str(kb_team) == "Global Product Manual (Team: Support Team)"

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { API_BASE, getAuthHeaders, getAuthHeadersOnly } from "../../../lib/api";
 import { useDailyAudioCall } from "../../hooks/useDailyAudioCall";
+import { useAgents } from "../../hooks/useAgents";
 
 /* ───────────────────── Domain Types ───────────────────── */
 
@@ -145,6 +146,18 @@ interface Props {
 }
 
 export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "" }: Props) {
+  const { whatsappConfigs, emailConfigs } = useAgents();
+
+  const hasWhatsApp = whatsappConfigs && whatsappConfigs.some((c: any) => c.is_connected);
+  const hasEmail = emailConfigs && emailConfigs.some((c: any) => c.is_active);
+
+  const availableTabs = [
+    { id: "all" as const, label: "Tout" },
+    ...(hasWhatsApp ? [{ id: "whatsapp" as const, label: "WhatsApp" }] : []),
+    ...(hasEmail ? [{ id: "email" as const, label: "Email" }] : []),
+    { id: "agents" as const, label: "Agents" }
+  ];
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [emptyContacts, setEmptyContacts] = useState<EmptyContact[]>([]);
   const [agents, setAgents] = useState<AgentThread[]>([]);
@@ -323,7 +336,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "" }: 
       const endpoint = agentId
         ? `${API_BASE}/agents/${agentId}/send_manual_reply/`
         : `${API_BASE}/agents/universal_reply/`;
-      
+
       await fetch(endpoint, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -334,7 +347,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "" }: 
           email_config_id: conv.email_config_id,
         }),
       });
-      
+
     } catch (err: any) {
       setVideoCallState("error");
       setVideoCallError(err.message || "Unknown error");
@@ -373,7 +386,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "" }: 
       const endpoint = agentId
         ? `${API_BASE}/agents/${agentId}/send_manual_reply/`
         : `${API_BASE}/agents/universal_reply/`;
-      
+
       await fetch(endpoint, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -387,7 +400,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "" }: 
 
       // Join the call object locally
       await startCall(roomUrl);
-      
+
     } catch (err: any) {
       alert(err.message || "Unknown error");
     }
@@ -476,34 +489,31 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "" }: 
   return (
     <div className="flex flex-1 w-full bg-[#ffffff] rounded-2xl overflow-hidden shadow-2xl min-h-0 border border-[#d1d7db]">
 
-      {/* ═══ LEFT PANEL – Thread List ═══ */}
       <div
         className={cn(
           "flex flex-col w-full md:w-[360px] lg:w-[400px] shrink-0 border-r border-[#d1d7db] bg-[#ffffff] min-h-0 overflow-hidden",
           selectedThread ? "hidden md:flex" : "flex"
         )}
       >
-        {/* Tab bar */}
         <div className="flex items-center justify-between px-4 py-3 bg-[#f0f2f5]">
           <div className="flex gap-1">
-            {(["all", "whatsapp", "email", "agents"] as const).map((tab) => (
+            {availableTabs.map((tab) => (
               <button
-                key={tab}
-                onClick={() => { setActiveTab(tab); setSelectedThread(null); }}
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id); setSelectedThread(null); }}
                 className={cn(
                   "px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors border",
-                  activeTab === tab
+                  activeTab === tab.id
                     ? "bg-[#218158] text-white border-[#218158]"
                     : "bg-white text-[#54656f] border-[#d1d7db] hover:bg-[#f0f2f5]"
                 )}
               >
-                {tab === "all" ? "Tout" : tab === "agents" ? "Agents" : tab === "whatsapp" ? "WhatsApp" : "Email"}
+                {tab.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Search */}
         <div className="px-3 py-2 bg-[#ffffff] border-b border-[#f0f2f5]">
           <div className="flex items-center gap-2 bg-[#f0f2f5] rounded-xl px-3 py-1.5 transition-shadow focus-within:bg-white focus-within:shadow-[0_1px_3px_rgba(11,20,26,0.1)] focus-within:border focus-within:border-[#00a884]">
             <Search size={16} className="text-[#54656f] shrink-0" />

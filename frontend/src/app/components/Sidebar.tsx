@@ -13,6 +13,7 @@ const aiWorkforce = [
 
 const mainTools = [
     { label: "Boîte de réception", icon: Inbox, badge: "12" },
+    { label: "Prospection (CRM)", icon: BarChart3 },
 ];
 
 const systemItems = [

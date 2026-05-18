@@ -53,7 +53,7 @@ from django.db.models.functions import TruncDay
 from rest_framework.exceptions import PermissionDenied
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .rag_service import add_texts_to_knowledge_base, search_knowledge_base
+from .rag_service import add_texts_to_knowledge_base, search_knowledge_base, search_agent_and_team_knowledge_base
 
 
 
@@ -194,8 +194,22 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
         if wa_id and ChatMessage.objects.filter(user=user, whatsapp_message_id=wa_id).exists():
             return Response({'status': 'ignored', 'reason': 'duplicate'})
 
+        assignment = ContactAssignment.objects.filter(user=user, contact_info=wa_sender).first()
+        effective_agent = None
+        if assignment:
+            effective_agent = assignment.agent
+        else:
+            active_agents = Agent.objects.filter(user=user, is_active=True)
+            for agent in active_agents:
+                if agent.channels and any(str(c).lower() == 'whatsapp' for c in agent.channels):
+                    effective_agent = agent
+                    break
+            if not effective_agent:
+                effective_agent = active_agents.first()
+
         msg = ChatMessage.objects.create(
             user=user,
+            agent=effective_agent,
             sender='ai' if is_me else 'user',
             content=message,
             contact_info=wa_sender,
@@ -205,6 +219,8 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
             is_read=bool(is_historical),
             status='archived' if is_historical else 'new'
         )
+        return Response({'status': 'received'})
+
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
     def whatsapp_gateway_bulk(self, request):
@@ -291,12 +307,13 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
         service = UnipileService()
         
         accounts = service.fetch_accounts()
-        target_name = f"GMAIL_{request.user.id}_{config.id}"
-        found_account = next((a for a in accounts if a.get('name') == target_name), None)
+        target_name_gmail = f"GMAIL_{request.user.id}_{config.id}"
+        target_name_google = f"GOOGLE_{request.user.id}_{config.id}"
+        found_account = next((a for a in accounts if a.get('name') in (target_name_gmail, target_name_google)), None)
         
         if not found_account:
             used_ids = set(EmailConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
-            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) in ['GMAIL', 'OUTLOOK', 'IMAP']]
+            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) in ['GOOGLE', 'GMAIL', 'OUTLOOK', 'IMAP']]
             if potential_accounts:
                 found_account = potential_accounts[0]
 
@@ -348,12 +365,13 @@ class FacebookConfigViewSet(viewsets.ModelViewSet):
         service = UnipileService()
         
         accounts = service.fetch_accounts()
-        target_name = f"FACEBOOK_{request.user.id}_{config.id}"
-        found_account = next((a for a in accounts if a.get('name') == target_name), None)
+        target_name_fb = f"FACEBOOK_{request.user.id}_{config.id}"
+        target_name_messenger = f"MESSENGER_{request.user.id}_{config.id}"
+        found_account = next((a for a in accounts if a.get('name') in (target_name_fb, target_name_messenger)), None)
         
         if not found_account:
             used_ids = set(FacebookConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
-            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) == 'FACEBOOK']
+            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) in ['MESSENGER', 'FACEBOOK']]
             if potential_accounts:
                 found_account = potential_accounts[0]
 
@@ -518,7 +536,6 @@ Triggers : interest, email_requested, whatsapp_requested, manual."""
                         return Response({'error': f'Erreur AI : {str(ex)}'}, status=500)
                     continue
 
-            # Robust JSON extraction
             try:
                 json_match = re.search(r'(\{.*\})', reply_text, re.DOTALL)
                 if json_match:
@@ -529,15 +546,71 @@ Triggers : interest, email_requested, whatsapp_requested, manual."""
                         'ready': data.get('ready', False),
                         'plan': data.get('plan'),
                     })
-            except Exception:  # noqa: BLE001
+            except Exception:  
                 pass
 
-            # Fallback: AI returned raw text instead of JSON
             return Response({'reply': reply_text, 'options': [], 'ready': False, 'plan': None})
 
         except Exception as exc:
             logger.error('design_team error: %s\n%s', exc, traceback.format_exc())
             return Response({'error': f'Erreur AI : {exc}'}, status=500)
+
+    @action(detail=True, methods=['post'], url_path='upload_knowledge', parser_classes=[parsers.MultiPartParser, parsers.FormParser])
+    def upload_knowledge(self, request, pk=None):
+        team = self.get_object()
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'No file provided'}, status=400)
+            
+        name = request.data.get('name', getattr(file_obj, 'name', 'Document'))
+        
+        apply_to_all = request.data.get('apply_to_all_agents', 'false').lower() == 'true'
+        agent_ids_str = request.data.get('agent_ids', '')
+        
+        selected_agent_ids = []
+        if apply_to_all:
+            selected_agent_ids = list(team.members.values_list('id', flat=True))
+        elif agent_ids_str:
+            selected_agent_ids = [aid.strip() for aid in agent_ids_str.split(',') if aid.strip()]
+            
+        try:
+            file_binary = file_obj.read()
+            file_extension = os.path.splitext(file_obj.name)[1].lower()
+            file_obj.seek(0)
+            extracted_text = _extract_text(file_obj)
+            
+            kb_team = KnowledgeBase.objects.create(
+                name=name,
+                team=team,
+                source_type=request.data.get('source_type', 'file'),
+                file_binary=file_binary,
+                file_extension=file_extension
+            )
+            
+            if extracted_text:
+                add_texts_to_knowledge_base(team_id=team.id, raw_text=extracted_text, source_name=kb_team.name)
+                
+            kbs_created = [{'type': 'team', 'id': kb_team.id}]
+            
+            for agent_id in selected_agent_ids:
+                try:
+                    agent = team.members.get(id=agent_id)
+                    kb_agent = KnowledgeBase.objects.create(
+                        name=name,
+                        agent=agent,
+                        source_type=request.data.get('source_type', 'file'),
+                        file_binary=file_binary,
+                        file_extension=file_extension
+                    )
+                    if extracted_text:
+                        add_texts_to_knowledge_base(agent_id=agent.id, raw_text=extracted_text, source_name=kb_agent.name)
+                    kbs_created.append({'type': 'agent', 'agent_id': agent.id, 'id': kb_agent.id})
+                except Exception:
+                    pass
+                    
+            return Response({'status': 'uploaded', 'results': kbs_created})
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=400)
 
 class AgentLinkViewSet(viewsets.ModelViewSet):
     serializer_class = AgentLinkSerializer
@@ -569,17 +642,18 @@ class LinkedInConfigViewSet(viewsets.ModelViewSet):
         for acc in accounts:
             logger.info(f"Unipile Account: ID={acc.get('id')}, Name='{acc.get('name')}', Provider={acc.get('provider') or acc.get('type')}")
             
-        target_name = f"LinkedIn_{request.user.id}_{config.id}"
-        logger.info(f"Searching for account with name: '{target_name}'")
+        target_name_mixed = f"LinkedIn_{request.user.id}_{config.id}"
+        target_name_upper = f"LINKEDIN_{request.user.id}_{config.id}"
+        logger.info(f"Searching for account with names: '{target_name_mixed}' or '{target_name_upper}'")
         
-        found_account = next((a for a in accounts if a.get('name') == target_name), None)
+        found_account = next((a for a in accounts if a.get('name') in (target_name_mixed, target_name_upper)), None)
         
         # Fallback: Si pas de match exact (Unipile peut renommer avec le nom du profil LinkedIn)
         if not found_account:
             logger.info("No exact name match found. Trying fallback matching...")
             # On cherche un compte qui n'est pas encore utilisé par une autre config LinkedIn
             used_ids = set(LinkedInConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
-            potential_accounts = [a for a in accounts if a.get('id') not in used_ids]
+            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) == 'LINKEDIN']
             
             if potential_accounts:
                 # On prend le premier disponible
@@ -645,6 +719,17 @@ class ContactAssignmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return ContactAssignment.objects.filter(user=self.request.user)
 
+class ContactViewSet(viewsets.ModelViewSet):
+    from .serializers import ContactSerializer
+    serializer_class = ContactSerializer
+    
+    def get_queryset(self):
+        return Contact.objects.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
 class ChatMessageViewSet(viewsets.ModelViewSet):
     serializer_class = ChatMessageSerializer
 
@@ -663,7 +748,10 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user_agents = Agent.objects.filter(user=self.request.user).values_list('id', flat=True)
-        return KnowledgeBase.objects.filter(agent_id__in=user_agents)
+        user_teams = AgentTeam.objects.filter(user=self.request.user).values_list('id', flat=True)
+        return KnowledgeBase.objects.filter(
+            Q(agent_id__in=user_agents) | Q(team_id__in=user_teams)
+        )
 
     def perform_create(self, serializer):
         file_obj = self.request.FILES.get('file')
@@ -679,8 +767,11 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 
                 if extracted_text or instance.file_binary:
                     instance.save()
-                    if extracted_text and instance.agent:
-                        add_texts_to_knowledge_base(instance.agent.id, extracted_text, instance.name)
+                    if extracted_text:
+                        if instance.agent:
+                            add_texts_to_knowledge_base(agent_id=instance.agent.id, raw_text=extracted_text, source_name=instance.name)
+                        elif instance.team:
+                            add_texts_to_knowledge_base(team_id=instance.team.id, raw_text=extracted_text, source_name=instance.name)
             except Exception:  # noqa: BLE001
                 pass
 
@@ -891,7 +982,6 @@ class AgentViewSet(viewsets.ModelViewSet):
         agent.is_active = new_status
         agent.save()
 
-        # Cascading pause: if agent is paused, pause all agents linked downstream
         if not new_status:
             self._cascade_pause(agent)
 
@@ -912,7 +1002,8 @@ class AgentViewSet(viewsets.ModelViewSet):
         agent = self.get_object()
         user_message = request.data.get('message', '')
         
-        rag_context = search_knowledge_base(agent.id, user_message, top_k=4)
+        team_id = agent.team.id if agent.team else None
+        rag_context = search_agent_and_team_knowledge_base(agent_id=agent.id, team_id=team_id, query=user_message, top_k=4)
         context_for_llm = f"Documents sources (Extraits pertinents par recherche sémantique RAG) :\n{rag_context if rag_context.strip() else '[Aucun document fourni]'}\n\n[MODE SANDBOX : Ce message est un test isolé]"
         
         user_plan = 'gratuit'
@@ -975,10 +1066,8 @@ class AgentViewSet(viewsets.ModelViewSet):
         user_message = request.data.get('message', '')
         contact_info = request.data.get('contact_info', 'anonymous')
         
-        # Check if another agent is assigned
         effective_agent = self._get_assigned_agent(request.user, contact_info, agent)
         
-        # Check for handoff for future messages
         self._check_handoff(effective_agent, user_message, contact_info)
         
         ChatMessage.objects.create(agent=effective_agent, sender='user', content=user_message, contact_info=contact_info)

@@ -31,6 +31,7 @@ class UnipileService:
             self.dsn = os.getenv('UNIPILE_DSN', 'https://api1.unipile.com')
 
         self.headers = {
+            'Authorization': f'Bearer {self.api_key}',
             'X-API-KEY': self.api_key,
             'accept': 'application/json'
         }
@@ -67,9 +68,9 @@ class UnipileService:
         provider_map = {
             'linkedin': 'LINKEDIN',
             'whatsapp': 'WHATSAPP',
-            'facebook': 'FACEBOOK',
-            'email': 'GMAIL',
-            'gmail': 'GMAIL',
+            'facebook': 'MESSENGER',
+            'email': 'MAIL',
+            'gmail': 'GOOGLE',
             'outlook': 'OUTLOOK'
         }
         
@@ -81,8 +82,8 @@ class UnipileService:
             "api_url": self.dsn,
             "expiresOn": expires_on,
             "name": f"{target_provider}_{user_id}_{config_id}",
-            "success_redirect_url": f"http://localhost:5173/dashboard?view=settings&tab={provider.lower()}&status=success",
-            "failure_redirect_url": f"http://localhost:5173/dashboard?view=settings&tab={provider.lower()}&status=failure"
+            "success_redirect_url": f"http://localhost:5173/dashboard?view=settings&tab={provider.lower()}&status=success&id={config_id}",
+            "failure_redirect_url": f"http://localhost:5173/dashboard?view=settings&tab={provider.lower()}&status=failure&id={config_id}"
         }
         try:
             res = requests.post(url, headers=self.headers, json=payload)
@@ -146,6 +147,17 @@ class UnipileService:
             logger.error(f"Unipile LinkedIn invitation failed: {e}")
             return False
 
+    def fetch_messages(self, chat_id, limit=50):
+        url = f"{self.dsn}/api/v1/chats/{chat_id}/messages?limit={limit}"
+        try:
+            res = requests.get(url, headers=self.headers)
+            if res.status_code == 200:
+                return res.json().get('items', [])
+            return []
+        except Exception as e:
+            logger.error(f"Unipile fetch_messages failed: {e}")
+            return []
+
 def sync_unipile_inbox(config, provider='linkedin'):
     """
     Generic sync for Unipile inbox.
@@ -161,14 +173,72 @@ def sync_unipile_inbox(config, provider='linkedin'):
     chats = service.fetch_chats(config.unipile_account_id)
     
     from .models import ChatMessage, Contact
+    from django.utils.dateparse import parse_datetime
     
     for chat in chats:
-        # TODO: Implement full synchronization logic
-        # This will be handled in a later step to avoid excessive complexity now
-        pass
+        chat_id = chat.get('id')
+        if not chat_id:
+            continue
+        
+        chat_name = chat.get('name') or chat.get('id')
+        
+        # Get or create contact
+        contact, created = Contact.objects.get_or_create(
+            user=config.user,
+            source=provider,
+            contact_info=chat_id,
+            defaults={
+                'name': chat_name,
+                'status': 'new',
+            }
+        )
+        
+        # Fetch latest messages for this chat
+        messages = service.fetch_messages(chat_id)
+        for message in messages:
+            msg_id = message.get('id')
+            if not msg_id:
+                continue
+            
+            # Check if already exists
+            if ChatMessage.objects.filter(user=config.user, source=provider, whatsapp_message_id=msg_id).exists():
+                continue
+            
+            # Parse text/body
+            text = message.get('text') or message.get('body') or ""
+            
+            # Parse timestamp
+            timestamp_str = message.get('timestamp') or message.get('created_at')
+            if timestamp_str:
+                try:
+                    created_at = parse_datetime(timestamp_str) or timezone.now()
+                except Exception:
+                    created_at = timezone.now()
+            else:
+                created_at = timezone.now()
+            
+            # Create message
+            ChatMessage.objects.create(
+                user=config.user,
+                sender='ai' if message.get('from_me') else 'user',
+                contact_info=chat_id,
+                contact_name=chat_name,
+                source=provider,
+                content=text,
+                whatsapp_message_id=msg_id,
+                is_read=True,
+                created_at=created_at
+            )
+            
+        # Update last_message_at
+        latest_msg = ChatMessage.objects.filter(user=config.user, contact_info=chat_id, source=provider).order_by('-created_at').first()
+        if latest_msg:
+            contact.last_message_at = latest_msg.created_at
+            contact.save()
 
-    config.last_sync_at = timezone.now()
-    config.save()
+    if hasattr(config, 'last_sync_at'):
+        config.last_sync_at = timezone.now()
+        config.save()
 
 def sync_linkedin_inbox(config):
     return sync_unipile_inbox(config, provider='linkedin')

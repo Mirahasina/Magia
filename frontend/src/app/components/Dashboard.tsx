@@ -17,6 +17,7 @@ import { ParametresView } from "./views/ParametresView";
 import { FacturationView } from "./views/FacturationView";
 import { EquipeView } from "./views/EquipeView";
 import { BackOfficeView } from "./views/BackOfficeView";
+import { ProspectionView } from "./views/ProspectionView";
 import { useAgents } from "../hooks/useAgents";
 import { API_BASE, getAuthHeadersOnly } from "../../lib/api";
 import { StorageKeys } from "../../lib/storage";
@@ -32,7 +33,8 @@ type ActiveTab =
   | "Journaux d'audit"
   | "Paramètres"
   | "Facturation"
-  | "Équipe";
+  | "Équipe"
+  | "Prospection (CRM)";
 
 interface DashboardProps {
   onLogout?: () => void;
@@ -169,6 +171,8 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard }:
         );
       case "Membres":
         return <MembresView />;
+      case "Prospection (CRM)":
+        return <ProspectionView />;
       case "Journaux d'audit":
         return <JournauxAuditView />;
       case "Paramètres":

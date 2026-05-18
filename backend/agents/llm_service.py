@@ -74,11 +74,11 @@ def generate_video_huggingface(prompt):
         return f"\n*Erreur lors de la génération de la vidéo: {e}*\n"
 
 def process_ai_response(response_text):
+    import html
     image_pattern = r'\[GENERATE_IMAGE:\s*(.*?)\]'
     def replace_image(match):
         prompt = match.group(1).strip('"').strip("'")
         
-        # 1. Tentative avec OpenAI (DALL-E 3) si la clé est présente
         openai_key = env('OPENAI_API_KEY', default=None)
         if openai_key and openai_key.startswith('sk-'):
             try:
@@ -90,7 +90,7 @@ def process_ai_response(response_text):
                     size="1024x1024"
                 )
                 url = res.data[0].url
-                return f"![Image générée]({url})"
+                return f"\n<img class='rounded-lg max-w-full shadow-md mt-2' src='{url}' alt='Image générée' />\n"
             except Exception as oe:
                 print(f"OpenAI Image Error: {oe}")
                 pass
@@ -127,16 +127,13 @@ def process_ai_response(response_text):
                     
                     file_url = f"{settings.MEDIA_URL}generated/{fname}"
                     url_path = file_url if file_url.startswith('/') else f"/{file_url}"
-                    return f"![Image générée]({url_path})"
+                    return f"\n<img class='rounded-lg max-w-full shadow-md mt-2' src='{url_path}' alt='Image générée' />\n"
             except Exception as e:
-                # 3. Fallback avec Pollinations.ai (Service gratuit sans clé)
                 try:
                     encoded_prompt = urllib.parse.quote(prompt)
-                    # On génère une URL unique pour éviter le cache si nécessaire, mais Pollinations est déterministe par prompt
                     pollinations_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
                     
-                    # On vérifie rapidement si le service répond (optionnel)
-                    return f"![Image générée (Fallback)]({pollinations_url})"
+                    return f"\n<img class='rounded-lg max-w-full shadow-md mt-2' src='{pollinations_url}' alt='Image générée' />\n"
                 except Exception as pe:
                     if not openai_key:
                         return f"\n*Erreur: Clé OpenAI manquante et échec du fallback Gemini ({e}). Fallback Pollinations échoué ({pe}).*\n"
@@ -184,7 +181,12 @@ def process_ai_response(response_text):
         url_path = file_url if file_url.startswith('/') else f"/{file_url}"
         
         preview_content = content if len(content) < 500 else content[:500] + "..."
-        return f"\n```\n{preview_content}\n```\n[📄 Télécharger {fname}]({url_path})\n"
+        escaped_preview = html.escape(preview_content)
+        
+        return (
+            f"\n<pre class='bg-slate-100 p-2.5 rounded border border-slate-200 font-mono text-xs overflow-x-auto mt-2'>{escaped_preview}</pre>\n"
+            f"<div class='mt-2'><a class='inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#218158] text-white font-medium py-1.5 px-3 rounded-lg transition-colors shadow-sm' href='{url_path}' download='{fname}' target='_blank'>📄 Télécharger {fname}</a></div>\n"
+        )
         
     res = re.sub(file_pattern, replace_file, res, flags=re.DOTALL)
     return res
@@ -359,3 +361,48 @@ def classify_handoff(trigger_type, message):
                 continue
             break
     return False
+
+def analyze_prospection_context(history_text):
+    """
+    Analyse la conversation pour définir le statut CRM et le délai de relance en heures.
+    """
+    import json
+    env_local = environ.Env()
+    environ.Env.read_env(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
+    api_key = env_local('GEMINI_API_KEY', default=None)
+    if not api_key: return {'status': 'contacted', 'next_followup_hours': 24}
+    
+    try:
+        client = genai.Client(api_key=api_key)
+        prompt = f"""
+Analyse cet historique de conversation de prospection :
+{history_text}
+
+Tu dois déterminer :
+1. Le statut actuel du prospect parmi cette liste : 'new', 'contacted', 'interested', 'ready', 'no'.
+2. Le nombre d'heures à attendre avant de relancer automatiquement si le prospect ne répond pas (ex: 24, 48, 72). S'il n'est pas intéressé ('no'), met 0.
+
+Réponds UNIQUEMENT au format JSON strict :
+{{"status": "...", "next_followup_hours": ...}}
+"""
+        for m in DEFAULT_GEMINI_MODELS:
+            try:
+                response = client.models.generate_content(model=m, contents=[prompt])
+                res = response.text.strip()
+                if res.startswith("```json"): res = res[7:-3]
+                elif res.startswith("```"): res = res[3:-3]
+                
+                data = json.loads(res.strip())
+                return {
+                    'status': data.get('status', 'contacted'),
+                    'next_followup_hours': int(data.get('next_followup_hours', 24))
+                }
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "404" in err or "quota" in err.lower():
+                    continue
+                break
+        return {'status': 'contacted', 'next_followup_hours': 24}
+    except Exception:
+        return {'status': 'contacted', 'next_followup_hours': 24}
+

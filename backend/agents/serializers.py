@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, AgentFeedback, UserSurvey
+from .models import Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, AgentFeedback, UserSurvey, Contact
 
 class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
@@ -39,7 +39,14 @@ class LinkedInConfigSerializer(serializers.ModelSerializer):
 class KnowledgeBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = KnowledgeBase
-        fields = ['id', 'agent', 'name', 'source_type', 'file_extension', 'url', 'created_at']
+        fields = ['id', 'agent', 'team', 'name', 'source_type', 'file_extension', 'url', 'created_at']
+
+class ContactSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contact
+        fields = '__all__'
+        read_only_fields = ['user']
+
 
 class ChatMessageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -107,12 +114,13 @@ class AgentSerializer(serializers.ModelSerializer):
         read_only_fields = ['user']
 
 class AgentTeamSerializer(serializers.ModelSerializer):
-    agents = AgentSerializer(many=True, read_only=True)
+    agents = AgentSerializer(source='members', many=True, read_only=True)
     links = AgentLinkSerializer(many=True, read_only=True)
+    knowledge_bases = KnowledgeBaseSerializer(many=True, read_only=True)
     
     class Meta:
         model = AgentTeam
-        fields = ['id', 'name', 'description', 'color', 'avatar', 'agents', 'links', 'created_at']
+        fields = ['id', 'name', 'description', 'color', 'avatar', 'agents', 'links', 'knowledge_bases', 'created_at']
         read_only_fields = ['user', 'created_at']
 
 class AgentFeedbackSerializer(serializers.ModelSerializer):

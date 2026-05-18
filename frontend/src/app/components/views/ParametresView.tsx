@@ -55,31 +55,35 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
         securitySettings, fetchSecuritySettings, regenerateMasterKey, toggle2FA
     } = useAgents();
 
+    const security = securitySettings as any;
+
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const status = urlParams.get('status');
         const tab = urlParams.get('tab');
+        const idStr = urlParams.get('id');
         
         if (status === 'success' && tab) {
-            const configs = {
-                linkedin: { list: linkedinConfigs, refresh: refreshLinkedInConnection },
-                whatsapp: { list: whatsappConfigs, refresh: refreshWhatsAppConnection },
-                facebook: { list: facebookConfigs, refresh: refreshFacebookConnection },
-                email: { list: emailConfigs, refresh: refreshEmailConnection }
-            }[tab as keyof typeof configs];
+            const configsMap = {
+                linkedin: { refresh: refreshLinkedInConnection },
+                whatsapp: { refresh: refreshWhatsAppConnection },
+                facebook: { refresh: refreshFacebookConnection },
+                email: { refresh: refreshEmailConnection },
+                gmail: { refresh: refreshEmailConnection }
+            };
+            const configs = configsMap[tab as keyof typeof configsMap];
 
-            if (configs) {
-                configs.list.forEach(c => {
-                    if (!('is_connected' in c ? c.is_connected : (c as any).is_active)) {
-                        configs.refresh(c.id);
-                    }
-                });
+            if (configs && idStr) {
+                const id = parseInt(idStr, 10);
+                if (!isNaN(id)) {
+                    configs.refresh(id);
+                }
             }
             
             const newUrl = window.location.pathname + (urlParams.get('view') ? `?view=${urlParams.get('view')}` : '');
             window.history.replaceState({}, document.title, newUrl);
         }
-    }, [linkedinConfigs, whatsappConfigs, facebookConfigs, emailConfigs]);
+    }, []);
 
     const [configTarget, setConfigTarget] = useState<"whatsapp" | "email" | "linkedin" | "facebook" | null>(null);
     const [activeConfig, setActiveConfig] = useState<any>(null);
@@ -273,15 +277,14 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                     <p className="text-[11px] text-gray-400 italic mb-8">Connexions neurales avec outils tiers</p>
 
                                     {configTarget === null ? (
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            {['WhatsApp', 'Email', 'LinkedIn', 'Facebook'].map((app) => {
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {['WhatsApp', 'Email', 'LinkedIn'].map((app) => {
                                                 const configs = 
                                                     app === 'WhatsApp' ? whatsappConfigs : 
-                                                    (app === 'Email' ? emailConfigs : 
-                                                    (app === 'LinkedIn' ? linkedinConfigs : facebookConfigs));
+                                                    (app === 'Email' ? emailConfigs : linkedinConfigs);
                                                 
                                                 const isConnected = configs.some((c: any) => c.is_connected || c.is_active);
-
+ 
                                                 return (
                                                     <div
                                                         key={app}
@@ -382,12 +385,6 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                 </>
                                                                             )}
                                                                         </button>
-                                                                        <button
-                                                                            onClick={() => providerInfo.refresh(c.id)}
-                                                                            className="text-[8px] font-black uppercase tracking-widest text-blue-900 hover:underline"
-                                                                        >
-                                                                            Déjà connecté ? Synchroniser
-                                                                        </button>
                                                                     </div>
                                                                 ) : (
                                                                     <div className="flex items-center gap-3">
@@ -438,7 +435,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                             <div>
                                                 <p className="magia-label text-gray-900 mb-1">Master API Key</p>
                                                 <p className="text-[10px] font-mono text-gray-300 group-hover:text-blue-900 transition-colors uppercase">
-                                                    {securitySettings?.master_api_key || '••••••••••••••••'}
+                                                    {security?.master_api_key || '••••••••••••••••'}
                                                 </p>
                                             </div>
                                             <button
@@ -452,14 +449,14 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                             <div>
                                                 <p className="magia-label opacity-60 mb-1 text-white">Authentification 2FA</p>
                                                 <p className="text-[11px] font-medium italic opacity-80">
-                                                    {securitySettings?.is_2fa_enabled ? "Protection biométrique activée" : "Protection non activée"}
+                                                    {security?.is_2fa_enabled ? "Protection biométrique activée" : "Protection non activée"}
                                                 </p>
                                             </div>
                                             <div
-                                                onClick={() => toggle2FA(!securitySettings?.is_2fa_enabled)}
-                                                className={`w-10 h-5 rounded-full flex items-center px-1 cursor-pointer transition-colors ${securitySettings?.is_2fa_enabled ? 'bg-blue-900' : 'bg-gray-700'}`}
+                                                onClick={() => toggle2FA(!security?.is_2fa_enabled)}
+                                                className={`w-10 h-5 rounded-full flex items-center px-1 cursor-pointer transition-colors ${security?.is_2fa_enabled ? 'bg-blue-900' : 'bg-gray-700'}`}
                                             >
-                                                <div className={`w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${securitySettings?.is_2fa_enabled ? 'ml-auto' : ''}`} />
+                                                <div className={`w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${security?.is_2fa_enabled ? 'ml-auto' : ''}`} />
                                             </div>
                                         </div>
                                     </div>

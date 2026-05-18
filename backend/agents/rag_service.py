@@ -1,7 +1,10 @@
 import os
 import shutil
+# pyrefly: ignore [missing-import]
 from langchain_community.vectorstores import FAISS
+# pyrefly: ignore [missing-import]
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+# pyrefly: ignore [missing-import]
 from langchain_huggingface import HuggingFaceEmbeddings
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,10 +18,14 @@ except Exception as e:
     print(f"Error loading HuggingFaceEmbeddings: {e}")
     embeddings = None
 
-def get_agent_index_path(agent_id):
-    return os.path.join(FAISS_STORE_DIR, str(agent_id))
+def get_index_path(agent_id=None, team_id=None):
+    if agent_id:
+        return os.path.join(FAISS_STORE_DIR, str(agent_id))
+    elif team_id:
+        return os.path.join(FAISS_STORE_DIR, f"team_{team_id}")
+    return None
 
-def add_texts_to_knowledge_base(agent_id, raw_text, source_name=""):
+def add_texts_to_knowledge_base(agent_id=None, team_id=None, raw_text="", source_name=""):
     if not embeddings or not raw_text.strip():
         return False
         
@@ -28,7 +35,10 @@ def add_texts_to_knowledge_base(agent_id, raw_text, source_name=""):
         
         metadatas = [{"source": source_name} for _ in chunks]
         
-        index_path = get_agent_index_path(agent_id)
+        index_path = get_index_path(agent_id, team_id)
+        if not index_path:
+            return False
+            
         if os.path.exists(index_path):
             vector_store = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
             vector_store.add_texts(chunks, metadatas=metadatas)
@@ -41,12 +51,12 @@ def add_texts_to_knowledge_base(agent_id, raw_text, source_name=""):
         print(f"Error adding to FAISS: {e}")
         return False
 
-def search_knowledge_base(agent_id, query, top_k=4):
+def search_knowledge_base(agent_id=None, team_id=None, query="", top_k=4):
     if not embeddings:
         return ""
         
-    index_path = get_agent_index_path(agent_id)
-    if not os.path.exists(index_path):
+    index_path = get_index_path(agent_id, team_id)
+    if not index_path or not os.path.exists(index_path):
         return ""
         
     try:
@@ -65,8 +75,27 @@ def search_knowledge_base(agent_id, query, top_k=4):
     except Exception as e:
         print(f"Error searching FAISS: {e}")
         return ""
+
+def search_agent_and_team_knowledge_base(agent_id, team_id=None, query="", top_k=4):
+    agent_context = search_knowledge_base(agent_id=agent_id, query=query, top_k=top_k)
+    team_context = ""
+    if team_id:
+        team_context = search_knowledge_base(team_id=team_id, query=query, top_k=top_k)
+        
+    parts = []
+    if agent_context.strip():
+        parts.append(agent_context)
+    if team_context.strip():
+        parts.append(team_context)
+        
+    return "\n\n".join(parts)
         
 def clear_agent_index(agent_id):
-    index_path = get_agent_index_path(agent_id)
-    if os.path.exists(index_path):
+    index_path = get_index_path(agent_id=agent_id)
+    if index_path and os.path.exists(index_path):
+        shutil.rmtree(index_path)
+
+def clear_team_index(team_id):
+    index_path = get_index_path(team_id=team_id)
+    if index_path and os.path.exists(index_path):
         shutil.rmtree(index_path)
