@@ -8,9 +8,7 @@ import {
     Shield,
     ChevronLeft,
     LogOut,
-    Activity,
-    FileText,
-    Settings
+    FileText
 } from "lucide-react";
 
 interface BackOfficeSidebarProps {
@@ -79,9 +77,9 @@ export function BackOfficeSidebar({
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pl-4 pr-0 space-y-8 pb-8 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto pl-4 pr-0 space-y-4 pb-4 scrollbar-hide">
                     <div className="space-y-1">
-                        <p className={cn("px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
+                        <p className={cn("px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-1.5 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
                             {isOpen ? "ADMINISTRATION" : " "}
                         </p>
                         {adminMenu.map((item) => (
@@ -89,7 +87,7 @@ export function BackOfficeSidebar({
                                 key={item.label}
                                 onClick={() => handleItemClick(item.label)}
                                 className={cn(
-                                    "relative w-full flex items-center px-6 py-4 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group",
+                                    "relative w-full flex items-center px-6 py-3 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group",
                                     activeTab === item.label
                                         ? "bg-emerald-500/10 text-emerald-400 border-r-[3px] border-emerald-500"
                                         : "text-slate-400 hover:text-slate-100"
@@ -108,14 +106,14 @@ export function BackOfficeSidebar({
                         ))}
                     </div>
 
-                    <div className="pt-6 border-t border-slate-800 space-y-1">
-                        <p className={cn("px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
+                    <div className="pt-3 border-t border-slate-800 space-y-1">
+                        <p className={cn("px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-1.5 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
                             {isOpen ? "NAVIGATION" : " "}
                         </p>
                         <button
                             onClick={onLogout}
                             className={cn(
-                                "relative w-full flex items-center px-6 py-4 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group text-red-400 hover:text-red-300 hover:bg-red-400/5"
+                                "relative w-full flex items-center px-6 py-3 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group text-red-400 hover:text-red-300 hover:bg-red-400/5"
                             )}
                         >
                             <div className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">

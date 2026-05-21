@@ -554,7 +554,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
     );
 
     return (
-        <div className="h-full flex flex-col gap-8 max-w-7xl mx-auto pb-12">
+        <div className="w-full flex-1 flex flex-col gap-8 max-w-7xl mx-auto pb-12">
             <div className="flex items-end justify-between">
                 <div>
                     <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Magia Back-office</h2>

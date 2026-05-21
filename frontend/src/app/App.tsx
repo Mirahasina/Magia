@@ -48,9 +48,15 @@ export default function App() {
     numAgents: number;
     isAnnual: boolean;
     totalPrice: number;
+    currentPlan?: string;
   } | null>(null);
 
-  const [paymentDetails, setPaymentDetails] = useState({
+  const [paymentDetails, setPaymentDetails] = useState<{
+    numAgents: number;
+    isAnnual: boolean;
+    totalPrice: number;
+    currentPlan?: string;
+  }>({
     numAgents: 2,
     isAnnual: false,
     totalPrice: 44,

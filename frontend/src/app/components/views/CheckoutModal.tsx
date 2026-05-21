@@ -49,7 +49,7 @@ export function CheckoutModal({
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
             <div className="bg-white rounded-none shadow-xl w-full max-w-md overflow-hidden flex flex-col">
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h2 className="text-sm font-black uppercase tracking-widest text-gray-900">Finaliser la commande</h2>
+                    <h2 className="text-sm font-black uppercase tracking-wider text-gray-900">Finaliser la commande</h2>
                     <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><X className="w-4 h-4 text-gray-500" /></button>
                 </div>
 
@@ -63,12 +63,12 @@ export function CheckoutModal({
                     </div>
 
                     <div className="space-y-3">
-                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Mode de paiement</p>
+                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Mode de paiement</p>
 
                         <div className="grid grid-cols-1 gap-3">
                             <div className="p-4 border rounded-xl flex flex-col items-center gap-2 transition-all shadow-sm border-blue-900 bg-blue-50/30 ring-1 ring-blue-900">
                                 <CreditCard className="w-6 h-6 text-blue-900" />
-                                <span className="text-[10px] font-black tracking-widest uppercase text-blue-900">Carte Bancaire (Stripe)</span>
+                                <span className="text-[10px] font-black tracking-wider uppercase text-blue-900">Carte Bancaire (Stripe)</span>
                             </div>
                         </div>
                     </div>
@@ -80,7 +80,7 @@ export function CheckoutModal({
                     <Button
                         onClick={handleCheckout}
                         disabled={loading}
-                        className="w-full h-12 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all bg-blue-900 hover:bg-blue-800 shadow-blue-100"
+                        className="w-full h-12 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all bg-blue-900 hover:bg-blue-800 shadow-blue-100"
                     >
                         {loading ? 'Redirection sécurisée...' : `Payer ${(details.totalPrice * 5000).toLocaleString('fr-FR')} Ar`}
                         {!loading && <ExternalLink className="w-3.5 h-3.5 ml-2 opacity-70" />}

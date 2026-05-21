@@ -526,7 +526,7 @@ class InviteMemberView(APIView):
         max_members = limits['max_members']
 
         if max_members == 0:
-            return Response({'error': "Votre plan Gratuit ne permet pas d'inviter des membres."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': f"Votre plan {plan.capitalize()} ne permet pas d'inviter des membres."}, status=status.HTTP_403_FORBIDDEN)
 
         current_members = WorkspaceMember.objects.filter(workspace_owner=user).count()
         if max_members is not None and current_members >= max_members:
@@ -542,7 +542,6 @@ class InviteMemberView(APIView):
         if email == user.email:
             return Response({'error': "Vous ne pouvez pas vous inviter vous-même."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Cancel previous pending invitations for this email
         WorkspaceInvitation.objects.filter(workspace_owner=user, invited_email=email, is_used=False).delete()
 
         expiry = timezone.now() + datetime.timedelta(days=7)

@@ -138,12 +138,12 @@ export function MembresView() {
                     </div>
                 </div>
 
-                {plan === 'gratuit' && (
+                {(plan === 'gratuit' || plan === 'pro') && (
                     <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-100 rounded-2xl flex-shrink-0">
                         <Crown className="w-5 h-5 text-orange-400 shrink-0" />
                         <div>
-                            <p className="text-xs font-bold text-orange-700 uppercase tracking-widest">Plan Standard</p>
-                            <p className="text-[11px] text-orange-500 font-medium">Passez au plan Pro pour inviter jusqu'à 3 membres dans votre workspace.</p>
+                            <p className="text-xs font-bold text-orange-700 uppercase tracking-widest">Fonctionnalité Entreprise</p>
+                            <p className="text-[11px] text-orange-500 font-medium">L'invitation de collaborateurs est réservée au plan Entreprise. Passez à l'Entreprise pour gérer votre équipe.</p>
                         </div>
                     </div>
                 )}

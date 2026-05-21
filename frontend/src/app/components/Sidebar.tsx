@@ -43,7 +43,7 @@ const SidebarLink = ({ item, isActive, isOpen, onClick }: {
         <button
             onClick={onClick}
             className={cn(
-                "relative w-full flex items-center px-6 py-4 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group sidebar-tab-item",
+                "relative w-full flex items-center px-6 py-3 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group sidebar-tab-item",
                 isActive ? "sidebar-tab-active" : "text-white/50"
             )}
         >
@@ -111,79 +111,78 @@ export function Sidebar({ activeTab, onNavigate, isOpen, onToggle, onClose, inbo
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pl-4 pr-0 space-y-8 pb-8 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto pl-4 pr-0 space-y-4 pb-4 scrollbar-hide">
                     <div className="space-y-1">
                         {menuItems.map((item) => (
                             <SidebarLink key={item.label} item={item} isActive={activeTab === item.label} isOpen={isOpen} onClick={() => handleItemClick(item.label)} />
                         ))}
                     </div>
 
-                <div className="space-y-1">
-                    <p className={cn("px-4 magia-label text-white/30 mb-3 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
-                        {isOpen ? "ÉQUIPE IA" : " "}
-                    </p>
-                    {aiWorkforce.map((item) => (
-                        <SidebarLink key={item.label} item={item} isActive={activeTab === item.label} isOpen={isOpen} onClick={() => handleItemClick(item.label)} />
-                    ))}
-                </div>
+                    <div className="space-y-1">
+                        <p className={cn("px-4 magia-label text-white/30 mb-1 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
+                            {isOpen ? "ÉQUIPE IA" : " "}
+                        </p>
+                        {aiWorkforce.map((item) => (
+                            <SidebarLink key={item.label} item={item} isActive={activeTab === item.label} isOpen={isOpen} onClick={() => handleItemClick(item.label)} />
+                        ))}
+                    </div>
 
-                <div className="space-y-1">
-                    <p className={cn("px-4 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-3 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
-                        {isOpen ? "OUTILS" : " "}
-                    </p>
-                    {mainTools.map((item) => {
-                        const badge = item.label === "Boîte de réception" && inboxBadge !== undefined ? inboxBadge.toString() : item.badge;
-                        return (
-                            <SidebarLink key={item.label} item={{ ...item, badge }} isActive={activeTab === item.label} isOpen={isOpen} onClick={() => handleItemClick(item.label)} />
-                        );
-                    })}
-                </div>
+                    <div className="space-y-1">
+                        <p className={cn("px-4 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
+                            {isOpen ? "OUTILS" : " "}
+                        </p>
+                        {mainTools.map((item) => {
+                            const badge = item.label === "Boîte de réception" && inboxBadge !== undefined ? inboxBadge.toString() : item.badge;
+                            return (
+                                <SidebarLink key={item.label} item={{ ...item, badge }} isActive={activeTab === item.label} isOpen={isOpen} onClick={() => handleItemClick(item.label)} />
+                            );
+                        })}
+                    </div>
 
-                {/* System Section */}
-                <div className="pt-6 border-white/10 space-y-1">
-                    <p className={cn("px-4 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-3 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
-                        {isOpen ? "MON ESPACE" : " "}
-                    </p>
-                    {systemItems.map((item) => (
-                        <SidebarLink key={item.label} item={item} isActive={activeTab === item.label} isOpen={isOpen} onClick={() => handleItemClick(item.label)} />
-                    ))}
-                    {user?.is_staff && (
-                        <div className="mt-4 pt-4 border-t border-white/5 border-none">
-                            <SidebarLink
-                                item={{ label: "Back-office", icon: Shield }}
-                                isActive={activeTab === "Back-office"}
-                                isOpen={isOpen}
-                                onClick={() => handleItemClick("Back-office")}
-                            />
-                        </div>
-                    )}
-                </div>
-
-                <div className="pt-6 border-t border-white/10 space-y-1">
-                    <p className={cn("px-4 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-3 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
-                        {isOpen ? "NAVIGATION" : " "}
-                    </p>
-                    <button
-                        onClick={onLogout}
-                        className={cn(
-                            "relative w-full flex items-center px-6 py-4 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group text-red-100/60 hover:text-red-100 hover:bg-red-500/10"
+                    <div className="pt-3 border-white/10 space-y-1">
+                        <p className={cn("px-4 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
+                            {isOpen ? "MON ESPACE" : " "}
+                        </p>
+                        {systemItems.map((item) => (
+                            <SidebarLink key={item.label} item={item} isActive={activeTab === item.label} isOpen={isOpen} onClick={() => handleItemClick(item.label)} />
+                        ))}
+                        {user?.is_staff && (
+                            <div className="mt-2 pt-2 border-t border-white/5 border-none">
+                                <SidebarLink
+                                    item={{ label: "Back-office", icon: Shield }}
+                                    isActive={activeTab === "Back-office"}
+                                    isOpen={isOpen}
+                                    onClick={() => handleItemClick("Back-office")}
+                                />
+                            </div>
                         )}
-                    >
-                        <div className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
-                            <LogOut className="w-full h-full" />
-                        </div>
-                        <span className={cn(
-                            "transition-all duration-300 overflow-hidden whitespace-nowrap text-left",
-                            isOpen ? "ml-3 opacity-100 max-w-[200px]" : "ml-0 opacity-0 max-w-0"
-                        )}>
-                            Se déconnecter
-                        </span>
-                    </button>
-                </div>
-            </div>
+                    </div>
 
-            <div className="absolute top-0 right-0 w-px h-full bg-gradient-to-b from-blue-800/20 via-transparent to-blue-800/20" />
-        </div >
+                    <div className="pt-3 border-t border-white/10 space-y-1">
+                        <p className={cn("px-4 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1 transition-opacity duration-300", !isOpen && "lg:opacity-0")}>
+                            {isOpen ? "NAVIGATION" : " "}
+                        </p>
+                        <button
+                            onClick={onLogout}
+                            className={cn(
+                                "relative w-full flex items-center px-6 py-3 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group text-red-100/60 hover:text-red-100 hover:bg-red-500/10"
+                            )}
+                        >
+                            <div className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
+                                <LogOut className="w-full h-full" />
+                            </div>
+                            <span className={cn(
+                                "transition-all duration-300 overflow-hidden whitespace-nowrap text-left",
+                                isOpen ? "ml-3 opacity-100 max-w-[200px]" : "ml-0 opacity-0 max-w-0"
+                            )}>
+                                Se déconnecter
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="absolute top-0 right-0 w-px h-full bg-gradient-to-b from-blue-800/20 via-transparent to-blue-800/20" />
+            </div >
         </>
     );
 }

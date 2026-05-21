@@ -13,7 +13,8 @@ from .views import (
 from .payment_views import (
     CreateCheckoutIntentView, StripeWebhookView,
     SendPaymentOTPView, ConfirmSavedCardPaymentView, TransactionListView,
-    DownloadInvoiceView, DownloadFullHistoryView
+    DownloadInvoiceView, DownloadFullHistoryView,
+    CreatePaymentIntentView, ConfirmCardPaymentView,
 )
 
 urlpatterns = [
@@ -46,4 +47,6 @@ urlpatterns = [
     path('payments/transactions/', TransactionListView.as_view(), name='payment_transactions_list'),
     path('payments/transactions/<uuid:transaction_id>/download/', DownloadInvoiceView.as_view(), name='payment_invoice_download'),
     path('payments/transactions/download-history/', DownloadFullHistoryView.as_view(), name='payment_history_download'),
+    path('payments/create-payment-intent/', CreatePaymentIntentView.as_view(), name='payment_create_intent'),
+    path('payments/confirm-card-payment/', ConfirmCardPaymentView.as_view(), name='payment_confirm_card'),
 ]

@@ -134,8 +134,9 @@ export function FacturationView({
 
     if (loading) return <div className="p-8 text-center font-bold text-gray-400">Chargement...</div>;
 
-    const planDisplay = sub?.plan_name === 'pro' ? 'Business Pro' : sub?.plan_name === 'entreprise' ? 'Entreprise' : 'Gratuit';
+    const planDisplay = sub?.plan_name === 'pro' ? 'Pro (Personnel)' : sub?.plan_name === 'entreprise' ? 'Entreprise' : 'Gratuit';
     const isGratuit = sub?.plan_name === 'gratuit';
+    const isPro = sub?.plan_name === 'pro';
     const isEnterprise = sub?.plan_name === 'entreprise';
     const pricePerAgent = 15;
     const monthlyTotal = isGratuit ? 0 : (sub?.num_agents || 0) * pricePerAgent;
@@ -180,10 +181,46 @@ export function FacturationView({
                     </div>
                 </div>
 
-                {!isEnterprise && (
+                {isGratuit && (
                     <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm space-y-4">
                         <div className="flex items-center justify-between">
-                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ajuster mon offre</h4>
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Passer au plan Pro</h4>
+                            <Zap className="w-3.5 h-3.5 text-blue-800" />
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-end justify-between">
+                                <div className="space-y-0.5">
+                                    <span className="text-3xl font-serif font-black text-gray-900">145 000</span>
+                                    <span className="text-[10px] font-bold text-gray-400 ml-2 uppercase tracking-widest">Ar / mois</span>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[9px] font-black text-gray-400 tracking-tighter">Prix fixe</p>
+                                    <p className="text-[8px] text-gray-300 font-medium">1 agent IA inclus</p>
+                                </div>
+                            </div>
+
+                            <div className="text-[9px] text-gray-400 font-medium space-y-1 py-2 border-t border-gray-50">
+                                <p>✓ 1 000 crédits / mois</p>
+                                <p>✓ WhatsApp Business inclus</p>
+                                <p>✓ Boîte de réception unifiée</p>
+                            </div>
+
+                            <Button
+                                onClick={() => onUpgrade?.({ numAgents: 1, isAnnual: sub?.is_annual || false, totalPrice: 29, currentPlan: 'gratuit' })}
+                                className="w-full h-10 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-blue-100 border-none"
+                            >
+                                Passer au Plan Pro
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pro → Entreprise : slider pour choisir le nombre d'agents */}
+                {isPro && (
+                    <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Passer au plan Entreprise</h4>
                             <Zap className="w-3.5 h-3.5 text-blue-800" />
                         </div>
 
@@ -202,7 +239,7 @@ export function FacturationView({
                                 <input
                                     type="range"
                                     min="2"
-                                    max="50"
+                                    max="100"
                                     value={agentsToBuy}
                                     onChange={(e) => setAgentsToBuy(parseInt(e.target.value))}
                                     className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-900"
@@ -210,10 +247,10 @@ export function FacturationView({
                             </div>
 
                             <Button
-                                onClick={() => onUpgrade?.({ numAgents: agentsToBuy, isAnnual: sub?.is_annual || false, totalPrice: agentsToBuy * 15 })}
-                                className="w-full h-10 bg-blue-900 hover:bg-blue-900 text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-blue-100 border-none mt-2"
+                                onClick={() => onUpgrade?.({ numAgents: agentsToBuy, isAnnual: sub?.is_annual || false, totalPrice: agentsToBuy * 15, currentPlan: 'pro' })}
+                                className="w-full h-10 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-blue-100 border-none mt-2"
                             >
-                                {isGratuit ? 'Passer au Plan Pro' : 'Mettre à jour'}
+                                Passer au Plan Entreprise
                             </Button>
                         </div>
                     </div>
@@ -249,7 +286,7 @@ export function FacturationView({
                     </div>
                 </div>
 
-                <div 
+                <div
                     onClick={handleDownloadFull}
                     className={cn(
                         "p-6 bg-gray-50/50 border border-gray-100 rounded-none flex flex-col justify-center items-center text-center space-y-2 transition-all duration-300",
@@ -308,7 +345,7 @@ export function FacturationView({
                                     <td className="px-6 py-4 text-[10px] text-gray-900 font-black text-right">
                                         <div className="flex items-center justify-end gap-3">
                                             <span>{parseFloat(tx.amount).toLocaleString('fr-FR')} {tx.currency === 'EUR' ? '€' : tx.currency}</span>
-                                            <button 
+                                            <button
                                                 onClick={() => handleDownload(tx.id)}
                                                 className="p-1.5 bg-gray-50 hover:bg-white hover:shadow-md rounded-lg text-blue-800 transition-all active:scale-95 group-hover:bg-white"
                                             >

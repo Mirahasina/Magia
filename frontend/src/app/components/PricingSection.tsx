@@ -42,7 +42,7 @@ export function PricingSection({ openAuth, openContact, onRequestEnterprise, ope
       features: [
         "2 agents IA inclus",
         "500 crédits / mois",
-        "2 places utilisateur",
+        "1 place utilisateur",
         "1 inbox unifiée",
         "Support Email"
       ],

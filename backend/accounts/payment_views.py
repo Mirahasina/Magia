@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 import json
+import stripe
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -36,7 +37,6 @@ class CreateCheckoutIntentView(APIView):
         )
 
         if gateway == 'card' or gateway == 'stripe':
-            import stripe
             stripe.api_key = settings.STRIPE_SECRET_KEY
             
             try:
@@ -109,7 +109,105 @@ class StripeWebhookView(APIView):
             return Response({'error': str(e)}, status=400)
 
 
+class CreatePaymentIntentView(APIView):
+    """Creates a Stripe PaymentIntent for in-modal card capture."""
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+
+        plan_name = request.data.get('plan_name', 'pro')
+        num_agents = int(request.data.get('num_agents', 1))
+        amount_eur = 99 if plan_name == 'entreprise' else max(num_agents, 1) * 15
+        amount_cents = int(amount_eur * 100)
+
+        try:
+            sub = getattr(request.user, 'subscription', None)
+            customer_id = sub.gateway_customer_id if sub else None
+
+            if not customer_id:
+                customer = stripe.Customer.create(
+                    email=request.user.email,
+                    name=request.user.full_name,
+                    metadata={'user_id': str(request.user.id)}
+                )
+                customer_id = customer.id
+                if sub:
+                    sub.gateway_customer_id = customer_id
+                    sub.save(update_fields=['gateway_customer_id'])
+
+            intent = stripe.PaymentIntent.create(
+                amount=amount_cents,
+                currency='eur',
+                customer=customer_id,
+                setup_future_usage='off_session',
+                metadata={
+                    'plan_name': plan_name,
+                    'num_agents': str(num_agents),
+                    'user_id': str(request.user.id),
+                }
+            )
+
+            transaction = PaymentTransaction.objects.create(
+                user=request.user,
+                subscription=sub,
+                amount=amount_eur,
+                gateway='stripe',
+                status='pending',
+                gateway_transaction_id=intent.id
+            )
+
+            return Response({
+                'client_secret': intent.client_secret,
+                'transaction_id': str(transaction.id),
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
+
+
+class ConfirmCardPaymentView(APIView):
+    """Called after Stripe confirms payment on frontend — saves card & updates subscription."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+
+        payment_intent_id = request.data.get('payment_intent_id')
+        if not payment_intent_id:
+            return Response({'error': 'payment_intent_id requis.'}, status=400)
+
+        try:
+            intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+            if intent.status != 'succeeded':
+                return Response({'error': f'Paiement non confirmé (statut: {intent.status}).'}, status=400)
+
+            transaction = PaymentTransaction.objects.filter(
+                gateway_transaction_id=payment_intent_id,
+                user=request.user
+            ).first()
+
+            if transaction and transaction.status != 'completed':
+                transaction.status = 'completed'
+                transaction.save()
+
+            # Save card details to subscription
+            try:
+                sub = request.user.subscription
+                pm_id = intent.payment_method
+                if pm_id:
+                    pm = stripe.PaymentMethod.retrieve(pm_id)
+                    card = pm.get('card', {})
+                    sub.card_last4 = card.get('last4', '')
+                    sub.card_brand = card.get('brand', '').capitalize()
+                    sub.card_exp_month = str(card.get('exp_month', '')).zfill(2)
+                    sub.card_exp_year = str(card.get('exp_year', ''))[-2:]
+                    sub.save(update_fields=['card_last4', 'card_brand', 'card_exp_month', 'card_exp_year'])
+            except Exception as e:
+                print(f"[WARN] Card save error: {e}")
+
+            return Response({'message': 'Paiement confirmé avec succès.'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
 
 
 class SendPaymentOTPView(APIView):

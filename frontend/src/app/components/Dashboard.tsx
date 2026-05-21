@@ -39,7 +39,7 @@ type ActiveTab =
 interface DashboardProps {
   onLogout?: () => void;
   refreshKey?: number;
-  onUpgrade?: (details: { numAgents: number; isAnnual: boolean; totalPrice: number }) => void;
+  onUpgrade?: (details: { numAgents: number; isAnnual: boolean; totalPrice: number; currentPlan?: string }) => void;
   onUpdateCard?: () => void;
 }
 
