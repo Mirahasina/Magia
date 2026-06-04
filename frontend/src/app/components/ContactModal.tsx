@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 "use client";
 
 import { useState } from "react";
@@ -30,7 +31,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
         e.preventDefault();
         setLoading(true);
         try {
-            const response = await fetch("http://localhost:8000/api/auth/contact/", {
+            const response = await fetch(`${API_BASE}/auth/contact/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData)

@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useState } from "react";
 import { X, CreditCard, ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -40,7 +41,7 @@ export function UpdateCardModal({ isOpen, onClose, onSuccess }: UpdateCardModalP
         const brand = cleanNumber.startsWith('4') ? 'Visa' : cleanNumber.startsWith('5') ? 'Mastercard' : 'Card';
 
         try {
-            const response = await fetch("http://localhost:8000/api/auth/subscription/", {
+            const response = await fetch(`${API_BASE}/auth/subscription/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

@@ -1,3 +1,4 @@
+import { API_BASE } from "../../../lib/api";
 import { useState, useEffect } from "react";
 import { Loader2, Shield, Calendar, User, Activity } from "lucide-react";
 
@@ -14,7 +15,7 @@ export function JournauxAuditView() {
 
     const fetchLogs = async () => {
         try {
-            const res = await fetch("http://localhost:8000/api/audit-logs/", {
+            const res = await fetch(`${API_BASE}/audit-logs/`, {
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("access_token")}`
                 }

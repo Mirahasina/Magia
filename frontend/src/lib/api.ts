@@ -3,7 +3,7 @@
  * All fetch calls must reference these helpers — never hardcode the base URL.
  */
 
-export const API_BASE = "http://localhost:8000/api";
+export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 /** Returns Authorization + Content-Type headers for authenticated JSON requests. */
 export function getAuthHeaders(): HeadersInit {

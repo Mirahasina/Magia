@@ -71,7 +71,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'company', 'avatar', 'avatar_url', 'is_staff', 'created_at',
             'recovery_email', 'workspace_label', 'timezone',
             'master_api_key', 'is_2fa_enabled', 'is_email_verified', 'has_password',
-            'subscription'
+            'has_completed_onboarding', 'subscription'
         ]
         read_only_fields = ['id', 'email', 'is_staff', 'created_at', 'master_api_key']
 

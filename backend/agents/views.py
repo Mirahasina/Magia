@@ -729,6 +729,104 @@ class ContactViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    @action(detail=True, methods=['post'], url_path='contact_via_agent')
+    def contact_via_agent(self, request, pk=None):
+        """
+        Confie ce prospect à un Agent IA qui génère et envoie un premier message
+        via WhatsApp ou Email selon le canal du contact.
+        """
+        contact = self.get_object()
+        agent_id = request.data.get('agent_id')
+
+        if not agent_id:
+            return Response({'error': 'agent_id requis.'}, status=400)
+
+        try:
+            agent = Agent.objects.get(id=agent_id, user=request.user)
+        except Agent.DoesNotExist:
+            return Response({'error': 'Agent introuvable.'}, status=404)
+
+        source = contact.source
+        contact_info = contact.contact_info
+        contact_name = contact.name or contact_info
+        notes = contact.notes or ''
+
+        intro_prompt = (
+            f"Tu dois écrire un premier message de prise de contact à destination de {contact_name}. "
+            f"Tes notes sur ce prospect : {notes if notes else 'Aucune note spécifique.'}. "
+            f"Ce message doit être court, chaleureux, professionnel et adapté à ton rôle. "
+            f"N'utilise pas de gras ni de formatage spécial. Écris uniquement le message."
+        )
+
+        try:
+            response_text = get_llm_response(
+                agent_name=agent.name,
+                agent_role=agent.role,
+                system_prompt=agent.system_prompt,
+                knowledge_context='',
+                user_message=intro_prompt,
+                model_name=agent.llm_model,
+            )
+        except Exception as exc:
+            logger.error('contact_via_agent LLM error: %s', exc)
+            response_text = f"Bonjour {contact_name}, je suis {agent.name}. Je serais ravi d'échanger avec vous."
+
+        sent = False
+        if source == 'whatsapp':
+            config = WhatsAppConfig.objects.filter(user=request.user).first()
+            if not config or not config.unipile_account_id:
+                return Response({'error': 'Reliez votre WhatsApp avec MAGIA pour effectuer cette opération'}, status=400)
+            service = UnipileService()
+            sent = service.send_message(contact_info, response_text)
+        elif source == 'facebook':
+            config = FacebookConfig.objects.filter(user=request.user).first()
+            if not config or not config.unipile_account_id:
+                return Response({'error': 'Reliez votre Facebook avec MAGIA pour effectuer cette opération'}, status=400)
+            service = UnipileService()
+            sent = service.send_message(contact_info, response_text)
+        elif source == 'linkedin':
+            config = LinkedInConfig.objects.filter(user=request.user).first()
+            if not config or not config.unipile_account_id:
+                return Response({'error': 'Reliez votre LinkedIn avec MAGIA pour effectuer cette opération'}, status=400)
+            service = UnipileService()
+            sent = service.send_message(contact_info, response_text)
+        elif source == 'email':
+            email_config = agent.email_config or EmailConfig.objects.filter(user=request.user).first()
+            if not email_config:
+                return Response({'error': 'Reliez votre email avec MAGIA pour effectuer cette opération'}, status=400)
+            sent = send_email_reply(email_config, contact_info, f"Message de {agent.name}", response_text)
+
+        if not sent:
+            return Response({'error': f'Échec de l\'envoi via {source}'}, status=500)
+
+        ChatMessage.objects.create(
+            user=request.user,
+            agent=agent,
+            sender='ai',
+            content=response_text,
+            contact_info=contact_info,
+            contact_name=contact_name,
+            source=source,
+            status='new',
+        )
+
+        ContactAssignment.objects.update_or_create(
+            user=request.user,
+            contact_info=contact_info,
+            defaults={'agent': agent},
+        )
+
+        if contact.status == 'new':
+            contact.status = 'contacted'
+            contact.save()
+
+        return Response({
+            'status': 'sent' if sent else 'logged_only',
+            'message': response_text,
+            'agent': agent.name,
+            'source': source,
+        })
+
 
 class ChatMessageViewSet(viewsets.ModelViewSet):
     serializer_class = ChatMessageSerializer
@@ -1244,21 +1342,42 @@ class AgentViewSet(viewsets.ModelViewSet):
                 config = agent.email_config
 
             if not config:
-                return Response({'error': 'No email config available for reply'}, status=400)
+                return Response({'error': 'Reliez votre email avec MAGIA pour effectuer cette opération'}, status=400)
                 
             success = send_email_reply(config, contact_info, "Re: Contact", content)
             if not success:
                 return Response({'error': 'Failed to send email'}, status=500)
             ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
+            
         elif source == 'whatsapp':
-            try:
-                port = get_whatsapp_port(request.user.id)
-                resp = requests.post(f"http://localhost:{port}/send_message", json={"to": contact_info, "text": content})
-                if not resp.json().get("success"):
-                    return Response({'error': 'WhatsApp service error'}, status=500)
-                ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
-            except Exception as e:
-                return Response({'error': str(e)}, status=500)
+            config = WhatsAppConfig.objects.filter(user=request.user).first()
+            if not config or not config.unipile_account_id:
+                return Response({'error': 'Reliez votre WhatsApp avec MAGIA pour effectuer cette opération'}, status=400)
+            service = UnipileService()
+            success = service.send_message(contact_info, content)
+            if not success:
+                return Response({'error': 'WhatsApp service error'}, status=500)
+            ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
+            
+        elif source == 'facebook':
+            config = FacebookConfig.objects.filter(user=request.user).first()
+            if not config or not config.unipile_account_id:
+                return Response({'error': 'Reliez votre Facebook avec MAGIA pour effectuer cette opération'}, status=400)
+            service = UnipileService()
+            success = service.send_message(contact_info, content)
+            if not success:
+                return Response({'error': 'Facebook service error'}, status=500)
+            ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
+            
+        elif source == 'linkedin':
+            config = LinkedInConfig.objects.filter(user=request.user).first()
+            if not config or not config.unipile_account_id:
+                return Response({'error': 'Reliez votre LinkedIn avec MAGIA pour effectuer cette opération'}, status=400)
+            service = UnipileService()
+            success = service.send_message(contact_info, content)
+            if not success:
+                return Response({'error': 'LinkedIn service error'}, status=500)
+            ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
                 
         return Response({'status': 'sent'})
         
@@ -1280,7 +1399,7 @@ class AgentViewSet(viewsets.ModelViewSet):
                 config = EmailConfig.objects.filter(user=request.user).first()
                 
             if not config:
-                return Response({'error': 'No email config available'}, status=400)
+                return Response({'error': 'Reliez votre email avec MAGIA pour effectuer cette opération'}, status=400)
                 
             success = send_email_reply(config, contact_info, "Re: Contact", content)
             if not success:
@@ -1296,15 +1415,39 @@ class AgentViewSet(viewsets.ModelViewSet):
                 email_config=config
             )
             return Response({'status': 'sent'})
+            
         elif source == 'whatsapp':
-             # Fallback simple pour WhatsApp direct
-             try:
-                port = get_whatsapp_port(request.user.id)
-                res = requests.post(f"http://localhost:{port}/send_message", json={"to": contact_info, "text": content})
-                if res.status_code == 200:
-                    ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
-                    return Response({'status': 'sent'})
-             except Exception: pass
+             config = WhatsAppConfig.objects.filter(user=request.user).first()
+             if not config or not config.unipile_account_id:
+                 return Response({'error': 'Reliez votre WhatsApp avec MAGIA pour effectuer cette opération'}, status=400)
+             service = UnipileService()
+             success = service.send_message(contact_info, content)
+             if success:
+                 ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
+                 return Response({'status': 'sent'})
+             return Response({'error': 'Failed to send WhatsApp message via Unipile'}, status=500)
+
+        elif source == 'facebook':
+            config = FacebookConfig.objects.filter(user=request.user).first()
+            if not config or not config.unipile_account_id:
+                return Response({'error': 'Reliez votre Facebook avec MAGIA pour effectuer cette opération'}, status=400)
+            service = UnipileService()
+            success = service.send_message(contact_info, content)
+            if success:
+                ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
+                return Response({'status': 'sent'})
+            return Response({'error': 'Failed to send Facebook message via Unipile'}, status=500)
+                
+        elif source == 'linkedin':
+            config = LinkedInConfig.objects.filter(user=request.user).first()
+            if not config or not config.unipile_account_id:
+                return Response({'error': 'Reliez votre LinkedIn avec MAGIA pour effectuer cette opération'}, status=400)
+            service = UnipileService()
+            success = service.send_message(contact_info, content)
+            if success:
+                ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
+                return Response({'status': 'sent'})
+            return Response({'error': 'Failed to send LinkedIn message via Unipile'}, status=500)
 
         return Response({'error': 'Source not supported for direct reply'}, status=400)
 

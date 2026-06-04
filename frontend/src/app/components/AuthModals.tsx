@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
@@ -73,7 +74,7 @@ export function AuthModals({ isOpen, onClose, defaultView = "signup", onSuccess,
             try {
                 setLoading(true);
                 setErrorMsg("");
-                const res = await fetch("http://localhost:8000/api/auth/google/", {
+                const res = await fetch(`${API_BASE}/auth/google/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ access_token: tokenResponse.access_token }),
@@ -127,7 +128,7 @@ export function AuthModals({ isOpen, onClose, defaultView = "signup", onSuccess,
                     setLoading(false);
                     return;
                 }
-                const res = await fetch("http://localhost:8000/api/auth/register/", {
+                const res = await fetch(`${API_BASE}/auth/register/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -145,7 +146,7 @@ export function AuthModals({ isOpen, onClose, defaultView = "signup", onSuccess,
                 setSuccessMsg("Compte créé ! Veuillez vérifier votre email pour l'activer.");
                 setView("login");
             } else if (view === "login") {
-                const res = await fetch("http://localhost:8000/api/auth/login/", {
+                const res = await fetch(`${API_BASE}/auth/login/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -167,7 +168,7 @@ export function AuthModals({ isOpen, onClose, defaultView = "signup", onSuccess,
 
                 await handleAuthSuccess(data.tokens.access);
             } else if (view === "forgot_password") {
-                const res = await fetch("http://localhost:8000/api/auth/forgot-password/", {
+                const res = await fetch(`${API_BASE}/auth/forgot-password/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email: formData.email }),
@@ -189,7 +190,7 @@ export function AuthModals({ isOpen, onClose, defaultView = "signup", onSuccess,
         if (!token) return;
 
         try {
-            const res = await fetch("http://localhost:8000/api/auth/invite/accept/", {
+            const res = await fetch(`${API_BASE}/auth/invite/accept/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

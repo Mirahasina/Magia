@@ -1,3 +1,4 @@
+import { API_BASE } from "../../../lib/api";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "../ui/utils";
 import { useAgents } from "../../hooks/useAgents";
@@ -18,7 +19,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
 
     const handleDeleteAccount = async () => {
         try {
-            const res = await fetch('http://localhost:8000/api/auth/me/', {
+            const res = await fetch(`${API_BASE}/auth/me/`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -100,7 +101,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
 
     const fetchProfile = async () => {
         try {
-            const res = await fetch("http://localhost:8000/api/auth/me/", {
+            const res = await fetch(`${API_BASE}/auth/me/`, {
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("access_token")}`
                 }
@@ -137,7 +138,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                 data.append("avatar", selectedFile);
             }
 
-            const res = await fetch("http://localhost:8000/api/auth/me/", {
+            const res = await fetch(`${API_BASE}/auth/me/`, {
                 method: "PUT",
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("access_token")}`

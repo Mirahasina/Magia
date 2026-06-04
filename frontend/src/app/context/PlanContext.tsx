@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { getToken } from "../../lib/storage";
 
@@ -56,7 +57,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     const token = getToken();
     if (!token) return;
     try {
-      const res = await fetch("http://localhost:8000/api/auth/plan-limits/", {
+      const res = await fetch(`${API_BASE}/auth/plan-limits/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {

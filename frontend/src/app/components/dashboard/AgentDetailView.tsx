@@ -1,3 +1,4 @@
+import { API_BASE } from "../../../lib/api";
 import { useState, useEffect, useRef } from "react";
 import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown, Linkedin, AlertTriangle } from "lucide-react";
 import { cn } from "../ui/utils";
@@ -95,7 +96,6 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
         onRefresh?.();
     };
 
-    // Note: status from backend is currently in is_active and is_deployed
     const displayStatus = agent.is_active ? (agent.is_deployed ? "active" : "draft") : "paused";
 
     const displayStats = agent.stats || {
@@ -323,7 +323,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                         const model = agent.llm_model;
                                         const isProModel = model === 'gemini-1.5-pro' || model === 'gpt-4o' || model === 'claude-3-5-sonnet-20240620';
                                         const isEnterpriseModel = model === 'o1-preview';
-                                        
+
                                         if (plan === 'gratuit' && (isProModel || isEnterpriseModel)) {
                                             return <p className="text-[9px] text-orange-500 font-bold mt-1 animate-pulse flex items-center gap-1">
                                                 <Zap className="w-2.5 h-2.5" /> Modèle dégradé (Plan Gratuit)
@@ -443,7 +443,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                     const token = localStorage.getItem('access_token');
                     if (!token) return;
                     try {
-                        await fetch(`http://localhost:8000/api/agents/${agent.id}/feedback/`, {
+                        await fetch(`${API_BASE}/agents/${agent.id}/feedback/`, {
                             method: 'POST',
                             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ message_id: msgId, rating })

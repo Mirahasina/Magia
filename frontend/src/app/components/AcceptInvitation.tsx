@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 
@@ -23,7 +24,7 @@ export function AcceptInvitation({ onAuthSuccess, openAuth }: AcceptInvitationPr
             }
 
             try {
-                const res = await fetch(`http://localhost:8000/api/auth/invite/check/?token=${token}`);
+                const res = await fetch(`${API_BASE}/auth/invite/check/?token=${token}`);
                 const data = await res.json();
 
                 if (res.ok) {

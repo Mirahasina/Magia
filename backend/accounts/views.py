@@ -212,6 +212,16 @@ class MeView(APIView):
         return Response({'message': 'Compte supprimé avec succès.'}, status=status.HTTP_204_NO_CONTENT)
 
 
+class CompleteOnboardingView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        user.has_completed_onboarding = True
+        user.save(update_fields=['has_completed_onboarding'])
+        return Response({'message': 'Onboarding complété.'}, status=status.HTTP_200_OK)
+
+
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 

@@ -1,3 +1,4 @@
+import { API_BASE } from "../lib/api";
 import { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { HeroSection } from "./components/HeroSection";
@@ -12,6 +13,7 @@ import { FAQSection } from "./components/FAQSection";
 import { useScrollReveal } from "./hooks/useScrollReveal";
 import { ResetPasswordPage } from "./components/ResetPasswordPage";
 import { AuthModals } from "./components/AuthModals";
+import { AuthPage } from "./components/AuthPage";
 import { VerifyEmail } from "./components/VerifyEmail";
 import { AcceptInvitation } from "./components/AcceptInvitation";
 import { ContactModal } from "./components/ContactModal";
@@ -21,7 +23,7 @@ import { EnterpriseModal } from "./components/EnterpriseModal";
 import { AgentsProvider } from "./context/AgentsContext";
 import { StorageKeys, clearSession } from "../lib/storage";
 
-const noop = () => {};
+const noop = () => { };
 
 export default function App() {
   useScrollReveal();
@@ -31,7 +33,7 @@ export default function App() {
   );
   const [currentView, setCurrentView] = useState<"landing" | "dashboard">(
     (localStorage.getItem(StorageKeys.CURRENT_VIEW) as "landing" | "dashboard") ||
-      (!!localStorage.getItem(StorageKeys.ACCESS_TOKEN) ? "dashboard" : "landing")
+    (!!localStorage.getItem(StorageKeys.ACCESS_TOKEN) ? "dashboard" : "landing")
   );
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -49,6 +51,7 @@ export default function App() {
     isAnnual: boolean;
     totalPrice: number;
     currentPlan?: string;
+    targetPlan?: string;
   } | null>(null);
 
   const [paymentDetails, setPaymentDetails] = useState<{
@@ -56,6 +59,7 @@ export default function App() {
     isAnnual: boolean;
     totalPrice: number;
     currentPlan?: string;
+    targetPlan?: string;
   }>({
     numAgents: 2,
     isAnnual: false,
@@ -72,7 +76,7 @@ export default function App() {
       setIsEnterpriseOpen(true);
     } else {
       setPendingEnterpriseRequest(true);
-      openAuth("login");
+      window.location.href = "/?view=login";
     }
   };
 
@@ -126,7 +130,7 @@ export default function App() {
     const refreshToken = localStorage.getItem(StorageKeys.REFRESH_TOKEN);
     if (refreshToken) {
       try {
-        await fetch("http://localhost:8000/api/auth/logout/", {
+        await fetch(`${API_BASE}/auth/logout/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -143,59 +147,81 @@ export default function App() {
     setCurrentView("landing");
   };
 
+  // Determine view layout based on pathname
+  const queryParams = new URLSearchParams(window.location.search);
+  const authViewParam = (queryParams.get("view") || queryParams.get("autoOpen") || "login") as "login" | "signup";
+  const initialEmailParam = queryParams.get("email") || "";
+
+  let mainContent;
+  if (window.location.pathname === "/landing") {
+    mainContent = (
+      <div className="flex flex-col">
+        <Header
+          isAuthenticated={isAuthenticated}
+          onGoToDashboard={() => {
+            window.location.href = "/";
+          }}
+          onLogin={() => {
+            window.location.href = "/?view=login";
+          }}
+          openAuth={(view) => {
+            window.location.href = `/?view=${view}`;
+          }}
+        />
+        <main>
+          <HeroSection onStart={() => { window.location.href = "/?view=signup"; }} />
+          <ComparisonSection />
+          <AgentsSection />
+          <HowItWorksSection />
+          <PricingSection
+            openAuth={(view) => { window.location.href = `/?view=${view}`; }}
+            openContact={() => setIsContactOpen(true)}
+            onRequestEnterprise={handleRequestEnterprise}
+            openPayment={(details) => {
+              if (isAuthenticated) {
+                setPaymentDetails(details);
+                setIsPaymentOpen(true);
+              } else {
+                setPendingOrder(details);
+                window.location.href = "/?view=signup";
+              }
+            }}
+          />
+          <FAQSection />
+          <CTASection onAction={() => { window.location.href = "/?view=signup"; }} onContact={() => setIsContactOpen(true)} />
+        </main>
+        <Footer />
+      </div>
+    );
+  } else {
+    if (isAuthenticated) {
+      mainContent = (
+        <Dashboard
+          onLogout={handleLogout}
+          refreshKey={refreshKey}
+          onUpgrade={(details) => {
+            setPaymentDetails(details);
+            setIsPaymentOpen(true);
+          }}
+          onUpdateCard={() => setIsUpdateCardOpen(true)}
+          onRequestEnterprise={handleRequestEnterprise}
+        />
+      );
+    } else {
+      mainContent = (
+        <AuthPage
+          defaultView={authViewParam}
+          onSuccess={handleAuthSuccess}
+          initialEmail={initialEmailParam}
+        />
+      );
+    }
+  }
+
   return (
     <AgentsProvider>
       <div className="min-h-screen bg-white bg-mesh relative">
-        {isAuthenticated && currentView === "dashboard" ? (
-          <Dashboard
-            onLogout={handleLogout}
-            refreshKey={refreshKey}
-            onUpgrade={(details) => {
-              setPaymentDetails(details);
-              setIsPaymentOpen(true);
-            }}
-            onUpdateCard={() => setIsUpdateCardOpen(true)}
-          />
-        ) : (
-          <div className="flex flex-col">
-            <Header
-              isAuthenticated={isAuthenticated}
-              onGoToDashboard={() => {
-                setCurrentView("dashboard");
-                localStorage.setItem(StorageKeys.CURRENT_VIEW, "dashboard");
-              }}
-              onLogin={() => {
-                const token = localStorage.getItem(StorageKeys.ACCESS_TOKEN);
-                if (token) {
-                  setIsAuthenticated(true);
-                  setCurrentView("dashboard");
-                  localStorage.setItem(StorageKeys.CURRENT_VIEW, "dashboard");
-                } else {
-                  openAuth("login");
-                }
-              }}
-              openAuth={openAuth}
-            />
-            <main>
-              <HeroSection onStart={() => openAuth("signup")} />
-              <ComparisonSection />
-              <AgentsSection />
-              <HowItWorksSection />
-              <PricingSection
-                openAuth={openAuth}
-                openContact={() => setIsContactOpen(true)}
-                onRequestEnterprise={handleRequestEnterprise}
-                openPayment={(details) => {
-                  setPaymentDetails(details);
-                  setIsPaymentOpen(true);
-                }}
-              />
-              <FAQSection />
-              <CTASection onAction={() => openAuth("signup")} onContact={() => setIsContactOpen(true)} />
-            </main>
-            <Footer />
-          </div>
-        )}
+        {mainContent}
 
         {/* Global Modals */}
         <AuthModals
@@ -223,19 +249,18 @@ export default function App() {
           planDetails={paymentDetails}
           onSuccess={(isAlreadyAuth) => {
             if (!isAlreadyAuth) {
-              setIsAuthOpen(true);
+              window.location.href = "/?view=login";
             } else {
               window.dispatchEvent(new CustomEvent("auth-success"));
               setRefreshKey((prev) => prev + 1);
               setIsPaymentOpen(false);
-              setCurrentView("dashboard");
-              localStorage.setItem(StorageKeys.CURRENT_VIEW, "dashboard");
+              window.location.href = "/";
             }
           }}
           onAuthRequired={() => {
             setPendingOrder(paymentDetails);
             setIsPaymentOpen(false);
-            openAuth("login");
+            window.location.href = "/?view=login";
           }}
         />
 

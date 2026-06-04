@@ -1,3 +1,4 @@
+import { API_BASE } from "../../../lib/api";
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, ArrowRight, Send, Loader2, X, CheckCircle2, Bot } from "lucide-react";
 import { Button } from "../ui/button";
@@ -34,7 +35,7 @@ const TRIGGER_LABELS: Record<string, string> = {
 
 async function callDesignTeam(history: Message[], message: string): Promise<{ reply: string; options: string[]; ready: boolean; plan: TeamPlan | null }> {
     const token = localStorage.getItem("access_token");
-    const res = await fetch("http://localhost:8000/api/agent-teams/design_team/", {
+    const res = await fetch(`${API_BASE}/agent-teams/design_team/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ history, message }),
@@ -48,7 +49,7 @@ async function callDesignTeam(history: Message[], message: string): Promise<{ re
 
 async function deployTeamPlan(plan: TeamPlan): Promise<any> {
     const token = localStorage.getItem("access_token");
-    const res = await fetch("http://localhost:8000/api/agent-teams/deploy_plan/", {
+    const res = await fetch(`${API_BASE}/agent-teams/deploy_plan/`, {
         method: "POST",
         headers: { 
             "Content-Type": "application/json", 

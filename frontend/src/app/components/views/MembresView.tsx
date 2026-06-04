@@ -1,3 +1,4 @@
+import { API_BASE } from "../../../lib/api";
 import { useState, useEffect } from "react";
 import { usePlan } from "../../context/PlanContext";
 import { UserPlus, Trash2, Crown, Eye, Edit3, AlertCircle } from "lucide-react";
@@ -52,7 +53,7 @@ export function MembresView() {
     const fetchMembers = async () => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:8000/api/auth/members/', {
+            const res = await fetch(`${API_BASE}/auth/members/`, {
                 headers: { 'Authorization': `Bearer ${token()}` }
             });
             if (res.ok) {
@@ -73,7 +74,7 @@ export function MembresView() {
         setInviting(true);
         setFeedback(null);
         try {
-            const res = await fetch('http://localhost:8000/api/auth/invite/', {
+            const res = await fetch(`${API_BASE}/auth/invite/`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole })
@@ -95,7 +96,7 @@ export function MembresView() {
     const handleRemove = async (id: string) => {
         if (!confirm('Retirer ce membre du workspace ?')) return;
         try {
-            const res = await fetch('http://localhost:8000/api/auth/members/', {
+            const res = await fetch(`${API_BASE}/auth/members/`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id })

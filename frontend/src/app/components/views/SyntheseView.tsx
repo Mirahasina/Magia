@@ -1,3 +1,4 @@
+import { API_BASE } from "../../../lib/api";
 import { cn } from "../ui/utils";
 import { useState, useEffect } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -28,7 +29,7 @@ export function SyntheseView({ setIsCreatingAgent }: SyntheseViewProps) {
 
     const fetchStats = async () => {
         try {
-            const res = await fetch("http://localhost:8000/api/agents/dashboard_stats/", {
+            const res = await fetch(`${API_BASE}/agents/dashboard_stats/`, {
                 headers: {
                     "Authorization": "Bearer " + localStorage.getItem("access_token")
                 }

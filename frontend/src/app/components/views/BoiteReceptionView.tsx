@@ -143,9 +143,11 @@ function SourceBadge({ source }: { source: string }) {
 interface Props {
   setViewingAgent: (agent: any) => void;
   globalSearchQuery?: string;
+  initialContact?: { contact_info: string; name: string; source: string } | null;
+  onInitialContactConsumed?: () => void;
 }
 
-export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "" }: Props) {
+export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", initialContact, onInitialContactConsumed }: Props) {
   const { whatsappConfigs, emailConfigs } = useAgents();
 
   const hasWhatsApp = whatsappConfigs && whatsappConfigs.some((c: any) => c.is_connected);
@@ -179,6 +181,25 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "" }: 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const initialLoadRef = useRef(false);
+
+  // Ouvrir automatiquement un contact envoyé depuis le CRM
+  useEffect(() => {
+    if (initialContact) {
+      setSelectedThread({
+        contact: initialContact.contact_info,
+        contact_name: initialContact.name,
+        source: initialContact.source,
+        type: "contact",
+        unread: 0,
+      });
+      // Basculer sur l'onglet correspondant
+      if (initialContact.source === "whatsapp") setActiveTab("whatsapp");
+      else if (initialContact.source === "email") setActiveTab("email");
+      else setActiveTab("all");
+      onInitialContactConsumed?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialContact]);
 
   useEffect(() => { setSearchQuery(globalSearchQuery); }, [globalSearchQuery]);
 

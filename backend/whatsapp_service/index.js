@@ -12,7 +12,7 @@ const path = require('path');
 const { Boom } = require('@hapi/boom');
 const express = require('express');
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = process.env.API_BASE || 'http://localhost:8000/api';
 const logger = pino({ level: 'info' });
 
 const args = process.argv.slice(2);

@@ -1,3 +1,4 @@
+import { API_BASE } from "../../../lib/api";
 import { useState, useEffect } from "react";
 import { cn } from "../ui/utils";
 import {
@@ -59,7 +60,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
     const fetchStats = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("http://localhost:8000/api/admin/stats/", {
+            const res = await fetch(`${API_BASE}/admin/stats/`, {
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("access_token")}`
                 }
@@ -89,7 +90,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
         }
 
         try {
-            const res = await fetch(`http://localhost:8000/api/admin/stats/${endpoint}/`, {
+            const res = await fetch(`${API_BASE}/admin/stats/${endpoint}/`, {
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("access_token")}`
                 }
@@ -107,7 +108,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
 
     const handleAction = async (action: 'approve_enterprise' | 'reject_enterprise', reqId: string) => {
         try {
-            const res = await fetch(`http://localhost:8000/api/admin/stats/${action}/`, {
+            const res = await fetch(`${API_BASE}/admin/stats/${action}/`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
@@ -150,7 +151,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
     const handleRefund = async (txId: string) => {
         if (!confirm("Voulez-vous vraiment rembourser cette transaction ?")) return;
         try {
-            const res = await fetch(`http://localhost:8000/api/admin/stats/refund_transaction/`, {
+            const res = await fetch(`${API_BASE}/admin/stats/refund_transaction/`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
@@ -170,7 +171,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
 
     const handleSendGlobalNotification = async (title: string, message: string, type: string) => {
         try {
-            const res = await fetch(`http://localhost:8000/api/admin/stats/send_global_notification/`, {
+            const res = await fetch(`${API_BASE}/admin/stats/send_global_notification/`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("access_token")}`,

@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -24,7 +25,7 @@ export function VerifyEmail() {
 
     const verify = async (uid: string, token: string) => {
         try {
-            const res = await fetch("http://localhost:8000/api/auth/verify-email/", {
+            const res = await fetch(`${API_BASE}/auth/verify-email/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ uid, token }),

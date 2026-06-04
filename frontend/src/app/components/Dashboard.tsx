@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "./Sidebar";
 import { BackOfficeSidebar } from "./BackOfficeSidebar";
 import { Topbar } from "./Topbar";
@@ -22,6 +22,7 @@ import { useAgents } from "../hooks/useAgents";
 import { API_BASE, getAuthHeadersOnly } from "../../lib/api";
 import { StorageKeys } from "../../lib/storage";
 import type { Agent } from "../context/AgentsContext";
+import { OnboardingTour } from "./OnboardingTour";
 
 const noop = () => {};
 
@@ -41,6 +42,7 @@ interface DashboardProps {
   refreshKey?: number;
   onUpgrade?: (details: { numAgents: number; isAnnual: boolean; totalPrice: number; currentPlan?: string }) => void;
   onUpdateCard?: () => void;
+  onRequestEnterprise?: () => void;
 }
 
 interface UserProfile {
@@ -59,7 +61,7 @@ interface UserProfile {
   [key: string]: unknown;
 }
 
-export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard }: DashboardProps) {
+export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard, onRequestEnterprise }: DashboardProps) {
   const { agents, fetchAgents } = useAgents();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>(
@@ -77,6 +79,11 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard }:
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [viewingAgent, setViewingAgent] = useState<Agent | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const [initialInboxContact, setInitialInboxContact] = useState<{
+    contact_info: string;
+    name: string;
+    source: string;
+  } | null>(null);
 
   useEffect(() => {
     if (window.innerWidth >= 1024) setIsSidebarOpen(true);
@@ -114,7 +121,7 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard }:
     }
   };
 
-  useEffect(() => { fetchProfile(); }, []);
+  useEffect(() => { fetchProfile(); }, [refreshKey]);
 
   const renderContent = () => {
     if (isBackOfficeMode) {
@@ -167,18 +174,27 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard }:
           <BoiteReceptionView
             setViewingAgent={setViewingAgent}
             globalSearchQuery={globalSearchQuery}
+            initialContact={initialInboxContact}
+            onInitialContactConsumed={() => setInitialInboxContact(null)}
           />
         );
       case "Membres":
         return <MembresView />;
       case "Prospection (CRM)":
-        return <ProspectionView />;
+        return (
+          <ProspectionView
+            onOpenInboxWithContact={(contact) => {
+              setInitialInboxContact(contact);
+              setActiveTab("Boîte de réception");
+            }}
+          />
+        );
       case "Journaux d'audit":
         return <JournauxAuditView />;
       case "Paramètres":
         return <ParametresView onProfileUpdate={fetchProfile} onLogout={onLogout || noop} />;
       case "Facturation":
-        return <FacturationView refreshKey={refreshKey} onUpgrade={onUpgrade} onUpdateCard={onUpdateCard} />;
+        return <FacturationView refreshKey={refreshKey} onUpgrade={onUpgrade} onUpdateCard={onUpdateCard} onRequestEnterprise={onRequestEnterprise} />;
       case "Équipe":
         return <EquipeView />;
       default:
@@ -205,6 +221,12 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard }:
       </div>
 
       <div className="flex-1 flex w-full bg-white rounded-3xl shadow-2xl relative z-10 overflow-hidden border border-gray-100">
+        {user && !isBackOfficeMode && (
+          <OnboardingTour
+            hasCompletedOnboarding={user.has_completed_onboarding as boolean || false}
+            onComplete={() => setUser(prev => prev ? { ...prev, has_completed_onboarding: true } : null)}
+          />
+        )}
         {isBackOfficeMode ? (
           <BackOfficeSidebar
             activeTab={backOfficeTab}

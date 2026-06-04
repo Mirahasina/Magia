@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { cn } from "./ui/utils";
@@ -20,7 +21,7 @@ export function Topbar({ user, onLogout, onToggleSidebar, isSidebarOpen, searchQ
     useEffect(() => {
         const fetchNotifications = async () => {
             try {
-                const res = await fetch("http://localhost:8000/api/auth/notifications/", {
+                const res = await fetch(`${API_BASE}/auth/notifications/`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
                 });
                 if (res.ok) {
@@ -54,7 +55,7 @@ export function Topbar({ user, onLogout, onToggleSidebar, isSidebarOpen, searchQ
 
     const markAsRead = async (id?: number) => {
         try {
-            await fetch("http://localhost:8000/api/auth/notifications/", {
+            await fetch(`${API_BASE}/auth/notifications/`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('access_token')}`,

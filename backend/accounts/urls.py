@@ -5,7 +5,7 @@ from .views import (
     RegisterView, LoginView, GoogleLoginView, LogoutView, MeView,
     ChangePasswordView, ForgotPasswordView, ResetPasswordView,
     ContactRequestCreateView, SubscriptionView, SecurityView,
-    VerifyEmailView, NotificationListView,
+    VerifyEmailView, NotificationListView, CompleteOnboardingView,
     PlanLimitsView, InviteMemberView, CheckInvitationView, AcceptInvitationView, WorkspaceMembersView,
     UserSurveyView,
 )
@@ -24,6 +24,7 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='auth_logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('me/', MeView.as_view(), name='auth_me'),
+    path('complete_onboarding/', CompleteOnboardingView.as_view(), name='auth_complete_onboarding'),
     path('change-password/', ChangePasswordView.as_view(), name='auth_change_password'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='auth_forgot_password'),
     path('reset-password/', ResetPasswordView.as_view(), name='auth_reset_password'),

@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Logo } from "./Logo";
@@ -32,7 +33,7 @@ export function ResetPasswordPage() {
 
         setLoading(true);
         try {
-            const res = await fetch("http://localhost:8000/api/auth/reset-password/", {
+            const res = await fetch(`${API_BASE}/auth/reset-password/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

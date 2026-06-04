@@ -1,3 +1,4 @@
+import { API_BASE } from "../../../lib/api";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Zap, CreditCard, Receipt, FileText, ArrowUpRight } from "lucide-react";
@@ -28,22 +29,24 @@ interface TransactionData {
 export function FacturationView({
     refreshKey = 0,
     onUpgrade,
-    onUpdateCard
+    onUpdateCard,
+    onRequestEnterprise,
 }: {
     refreshKey?: number,
     onUpgrade?: (details: any) => void,
-    onUpdateCard?: () => void
+    onUpdateCard?: () => void,
+    onRequestEnterprise?: () => void,
 }) {
     const [sub, setSub] = useState<SubscriptionData | null>(null);
     const [transactions, setTransactions] = useState<TransactionData[]>([]);
     const [loading, setLoading] = useState(true);
-    const [agentsToBuy, setAgentsToBuy] = useState(2);
+    const [agentsToBuy, setAgentsToBuy] = useState(5);
 
     useEffect(() => {
         const fetchSub = async () => {
             try {
                 const token = localStorage.getItem("access_token");
-                const response = await fetch("http://localhost:8000/api/auth/subscription/", {
+                const response = await fetch(`${API_BASE}/auth/subscription/`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
                 if (response.ok) {
@@ -61,7 +64,7 @@ export function FacturationView({
         const fetchTransactions = async () => {
             try {
                 const token = localStorage.getItem("access_token");
-                const res = await fetch("http://localhost:8000/api/auth/payments/transactions/", {
+                const res = await fetch(`${API_BASE}/auth/payments/transactions/`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
                 if (res.ok) {
@@ -75,7 +78,7 @@ export function FacturationView({
         const handleDownloadInvoice = async (transactionId: string) => {
             try {
                 const token = localStorage.getItem("access_token");
-                const response = await fetch(`http://localhost:8000/api/auth/payments/transactions/${transactionId}/download/`, {
+                const response = await fetch(`${API_BASE}/auth/payments/transactions/${transactionId}/download/`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
                 if (response.ok) {
@@ -93,7 +96,7 @@ export function FacturationView({
     const handleDownload = async (id: string) => {
         try {
             const token = localStorage.getItem("access_token");
-            const response = await fetch(`http://localhost:8000/api/auth/payments/transactions/${id}/download/`, {
+            const response = await fetch(`${API_BASE}/auth/payments/transactions/${id}/download/`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             if (response.ok) {
@@ -114,7 +117,7 @@ export function FacturationView({
     const handleDownloadFull = async () => {
         try {
             const token = localStorage.getItem("access_token");
-            const response = await fetch(`http://localhost:8000/api/auth/payments/transactions/download-history/`, {
+            const response = await fetch(`${API_BASE}/auth/payments/transactions/download-history/`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             if (response.ok) {
@@ -146,174 +149,261 @@ export function FacturationView({
         : "Sans engagement";
 
     return (
-        <div className="space-y-4 animate-in fade-in duration-500 overflow-hidden max-h-[calc(100vh-120px)] flex flex-col">
+        <div className="space-y-6 animate-in fade-in duration-500 overflow-y-auto max-h-[calc(100vh-120px)] pr-2">
             <div className="flex items-center justify-between shrink-0">
                 <div className="space-y-0.5">
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">Facturation</h2>
-                    <p className="text-gray-500 text-xs font-medium">Gérez votre abonnement et vos paiements.</p>
+                    <p className="text-gray-500 text-xs font-medium">Gérez votre abonnement, vos moyens de paiement et vos factures.</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
-                <div className={cn(
-                    "p-6 rounded-none text-white shadow-xl relative overflow-hidden group transition-all duration-500",
-                    isGratuit ? "bg-slate-900" : "bg-blue-900 shadow-blue-100"
-                )}>
-                    <div className="relative z-10 flex flex-col justify-between h-full min-h-[140px]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 shrink-0">
+                {/* Card 1: Mon Abonnement */}
+                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[180px] hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-indigo-600" />
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-400">PLAN ACTUEL</h3>
+                            </div>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-black text-[9px] uppercase tracking-wider">
+                                {sub?.status === 'active' ? 'ACTIF' : sub?.status || 'ACTIF'}
+                            </span>
+                        </div>
+
                         <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] opacity-70">PLAN ACTUEL</h3>
+                            <div className="text-2xl font-black text-gray-900 tracking-tight uppercase font-serif">
+                                {planDisplay}
                             </div>
-                            <div className="text-3xl font-serif font-bold mb-1 tracking-tighter uppercase">{planDisplay}</div>
-                            <p className="text-base opacity-90 font-bold">{(monthlyTotal * 5000).toLocaleString('fr-FR')} Ar <span className="text-xs opacity-60 font-medium">/ mois</span></p>
+                            <p className="text-base font-bold text-blue-900 mt-1">
+                                {(monthlyTotal * 5000).toLocaleString('fr-FR')} Ar <span className="text-xs text-gray-500 font-medium">/ mois</span>
+                            </p>
                         </div>
-                        <div className="mt-4 space-y-2">
-                            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest items-center">
-                                <span className="opacity-70">{sub?.plan_name === 'entreprise' ? 'Agents Illimités' : `${sub?.num_agents} Agents configurés`}</span>
-                                <div className="px-2 py-0.5 bg-white/10 rounded-full backdrop-blur-md italic font-black text-[8px]">ACTIF</div>
-                            </div>
-                            <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                                <div className="h-full bg-white w-full rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
-                            </div>
-                            <p className="text-[9px] opacity-40 italic uppercase tracking-widest">{isGratuit ? "Passez Pro pour débloquer les fonctions" : `Prélèvement le ${nextBillDate}`}</p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-gray-50 space-y-2">
+                        <div className="flex justify-between items-center text-[10px] font-medium text-gray-600">
+                            <span>{sub?.plan_name === 'entreprise' ? 'Agents Illimités' : `${sub?.num_agents} Agents configurés`}</span>
+                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                                {isGratuit ? "Gratuit" : `Renouvellement`}
+                            </span>
                         </div>
+                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 w-full rounded-full" />
+                        </div>
+                        <p className="text-[9px] text-gray-400 italic">
+                            {isGratuit ? "Débloquez plus de fonctions en passant Pro" : `Prochain prélèvement : ${nextBillDate}`}
+                        </p>
                     </div>
                 </div>
 
-                {isGratuit && (
-                    <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm space-y-4">
+                {/* Card 2: Moyen de Paiement */}
+                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[180px] hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
+
+                    <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Passer au plan Pro</h4>
-                            <Zap className="w-3.5 h-3.5 text-blue-800" />
+                            <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-400">MOYEN DE PAIEMENT</h3>
+                            <CreditCard className="w-3.5 h-3.5 text-gray-400" />
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="flex items-end justify-between">
-                                <div className="space-y-0.5">
-                                    <span className="text-3xl font-serif font-black text-gray-900">145 000</span>
-                                    <span className="text-[10px] font-bold text-gray-400 ml-2 uppercase tracking-widest">Ar / mois</span>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[9px] font-black text-gray-400 tracking-tighter">Prix fixe</p>
-                                    <p className="text-[8px] text-gray-300 font-medium">1 agent IA inclus</p>
-                                </div>
-                            </div>
-
-                            <div className="text-[9px] text-gray-400 font-medium space-y-1 py-2 border-t border-gray-50">
-                                <p>✓ 1 000 crédits / mois</p>
-                                <p>✓ WhatsApp Business inclus</p>
-                                <p>✓ Boîte de réception unifiée</p>
-                            </div>
-
-                            <Button
-                                onClick={() => onUpgrade?.({ numAgents: 1, isAnnual: sub?.is_annual || false, totalPrice: 29, currentPlan: 'gratuit' })}
-                                className="w-full h-10 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-blue-100 border-none"
-                            >
-                                Passer au Plan Pro
-                            </Button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Pro → Entreprise : slider pour choisir le nombre d'agents */}
-                {isPro && (
-                    <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Passer au plan Entreprise</h4>
-                            <Zap className="w-3.5 h-3.5 text-blue-800" />
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="flex items-end justify-between">
-                                <div className="space-y-0.5">
-                                    <span className="text-3xl font-serif font-black text-gray-900">{agentsToBuy}</span>
-                                    <span className="text-[10px] font-bold text-gray-400 ml-2 uppercase tracking-widest">Agents</span>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[9px] font-black text-blue-900 tracking-tighter">{(agentsToBuy * 15 * 5000).toLocaleString('fr-FR')} Ar<span className="text-[8px]">/m</span></p>
-                                </div>
-                            </div>
-
-                            <div className="relative pt-2 pb-1">
-                                <input
-                                    type="range"
-                                    min="2"
-                                    max="100"
-                                    value={agentsToBuy}
-                                    onChange={(e) => setAgentsToBuy(parseInt(e.target.value))}
-                                    className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-900"
-                                />
-                            </div>
-
-                            <Button
-                                onClick={() => onUpgrade?.({ numAgents: agentsToBuy, isAnnual: sub?.is_annual || false, totalPrice: agentsToBuy * 15, currentPlan: 'pro' })}
-                                className="w-full h-10 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-blue-100 border-none mt-2"
-                            >
-                                Passer au Plan Entreprise
-                            </Button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
-                <div className="p-6 bg-white border border-gray-100 rounded-none shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paiement</h4>
-                        <CreditCard className="w-3.5 h-3.5 text-gray-400" />
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-none border border-gray-100">
-                            <div className="w-10 h-6 bg-gray-900 rounded-md flex items-center justify-center text-[8px] font-black italic text-white shadow-md">
+                        <div className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-xl border border-gray-100/50">
+                            <div className="w-10 h-6 bg-slate-900 rounded flex items-center justify-center text-[8px] font-black italic text-white shadow-sm tracking-wider">
                                 {sub?.card_brand?.toUpperCase() || "VISA"}
                             </div>
                             <div className="flex-1">
-                                <p className="text-sm font-black text-gray-900 italic tracking-tighter">•••• •••• •••• {sub?.card_last4 || "4242"}</p>
-                                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
-                                    Expire le {sub?.card_exp_month || "12"}/{sub?.card_exp_year || "26"} • Auto-débit
+                                <p className="text-xs font-black text-gray-800 tracking-tighter">•••• •••• •••• {sub?.card_last4 || "4242"}</p>
+                                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                                    Expire le {sub?.card_exp_month || "12"}/{sub?.card_exp_year || "26"}
                                 </p>
                             </div>
                         </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
+                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Auto-débit</span>
                         <Button
                             onClick={onUpdateCard}
                             variant="outline"
-                            className="h-9 px-4 border border-gray-100 hover:bg-gray-50 text-gray-900 font-black text-[9px] uppercase tracking-widest rounded-xl transition-all"
+                            className="h-7 px-3 border border-gray-200 hover:bg-gray-50 text-gray-800 font-black text-[9px] uppercase tracking-wider rounded-xl transition-all"
                         >
-                            MODIFIER LA CARTE
+                            Modifier
                         </Button>
                     </div>
                 </div>
 
+                {/* Card 3: Export & Documents */}
                 <div
-                    onClick={handleDownloadFull}
+                    onClick={transactions.length > 0 ? handleDownloadFull : undefined}
                     className={cn(
-                        "p-6 bg-gray-50/50 border border-gray-100 rounded-none flex flex-col justify-center items-center text-center space-y-2 transition-all duration-300",
-                        transactions.length > 0 ? "cursor-pointer hover:bg-white hover:shadow-md hover:border-blue-200 group" : "opacity-50"
+                        "bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[180px] hover:shadow-md transition-all duration-300 relative overflow-hidden group",
+                        transactions.length > 0 ? "cursor-pointer hover:border-blue-200" : "opacity-90"
                     )}
                 >
-                    <div className="p-2 bg-white rounded-none shadow-sm group-hover:scale-110 transition-transform">
-                        <FileText className="w-5 h-5 text-blue-800" />
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-400">FACTURES & EXPORTS</h3>
+                            <FileText className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                        </div>
+
+                        <div className="space-y-1">
+                            <p className="text-xs font-bold text-gray-800">Facturation Simplifiée</p>
+                            <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
+                                {transactions.length > 0
+                                    ? "Téléchargez l'historique complet de vos transactions au format PDF."
+                                    : "Aucune facture ou transaction disponible pour le moment."}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Facturation Simplifiée</p>
-                        <p className="text-[9px] text-gray-500 font-medium max-w-[180px]">
-                            {transactions.length > 0 ? "Cliquez ici pour télécharger votre historique complet." : "Aucune facture disponible pour le moment."}
-                        </p>
+
+                    <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
+                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider">
+                            {transactions.length} TRANSACTION{transactions.length > 1 ? 'S' : ''}
+                        </span>
+                        {transactions.length > 0 && (
+                            <span className="text-[9px] text-blue-600 font-black uppercase tracking-wider group-hover:underline flex items-center gap-0.5">
+                                Télécharger <ArrowUpRight className="w-2.5 h-2.5" />
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white border border-gray-100 rounded-none overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
-                <div className="px-6 py-3 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Transactions</h3>
+            {/* Upgrade / Renewal Options Section */}
+            {(isGratuit || isPro) && (
+                <div className="space-y-3 shrink-0">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                            Faire évoluer votre offre
+                        </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Pro Plan Card */}
+                        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[220px]">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-800 text-[9px] font-black uppercase tracking-wider rounded-md">
+                                        PLAN PRO
+                                    </span>
+                                    <Zap className="w-3.5 h-3.5 text-blue-600" />
+                                </div>
+
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-2xl font-serif font-black text-gray-900">145 000</span>
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Ar / mois</span>
+                                </div>
+
+                                <div className="text-[10px] text-gray-500 font-medium space-y-1.5 border-t border-gray-50 pt-3">
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                        1 000 crédits / mois inclus
+                                    </p>
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                        WhatsApp Business inclus
+                                    </p>
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                        Boîte de réception unifiée
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-4">
+                                <Button
+                                    onClick={() => onUpgrade?.({ numAgents: 1, isAnnual: sub?.is_annual || false, totalPrice: 29, currentPlan: sub?.plan_name || 'gratuit', targetPlan: 'pro' })}
+                                    className="w-full h-9 bg-blue-900 hover:bg-blue-950 text-white font-black text-[9px] uppercase tracking-[0.2em] rounded-xl shadow-md border-none transition-all duration-300"
+                                >
+                                    {isPro ? "Renouveler mon Plan Pro" : "Passer au Plan Pro"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Enterprise Plan Card */}
+                        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[220px]">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="px-2 py-0.5 bg-purple-50 text-purple-800 text-[9px] font-black uppercase tracking-wider rounded-md">
+                                        PLAN ENTREPRISE
+                                    </span>
+                                    <Zap className="w-3.5 h-3.5 text-purple-600 animate-pulse" />
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className="text-2xl font-serif font-black text-gray-900">{agentsToBuy}</span>
+                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Agent{agentsToBuy > 1 ? 's' : ''}</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-black text-blue-900 tracking-tight">
+                                            {((99 + (agentsToBuy - 1) * 20) * 5000).toLocaleString('fr-FR')} Ar <span className="text-[8px] text-gray-400 font-normal">/m</span>
+                                        </p>
+                                        <p className="text-[8px] text-gray-400 font-medium">
+                                            {99 + (agentsToBuy - 1) * 20}€ / mois
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="relative pt-1 pb-1">
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="100"
+                                        value={agentsToBuy}
+                                        onChange={(e) => setAgentsToBuy(parseInt(e.target.value))}
+                                        className="w-full h-1.5 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-900"
+                                    />
+                                    <div className="flex justify-between text-[8px] text-gray-400 font-medium mt-1">
+                                        <span>1 agent</span>
+                                        <span>50</span>
+                                        <span>100</span>
+                                    </div>
+                                </div>
+
+                                <div className="text-[10px] text-gray-500 font-medium space-y-1.5 border-t border-gray-50 pt-3">
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                                        Agents IA Illimités
+                                    </p>
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                                        WhatsApp, LinkedIn, Facebook, Email
+                                    </p>
+                                    <p className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                                        API & Webhooks avancés • Support 24/7
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-4">
+                                <Button
+                                    onClick={() => onUpgrade?.({ numAgents: agentsToBuy, isAnnual: sub?.is_annual || false, totalPrice: 99 + (agentsToBuy - 1) * 20, currentPlan: sub?.plan_name || 'gratuit', targetPlan: 'entreprise' })}
+                                    className="w-full h-9 bg-white border border-blue-900 text-blue-900 hover:bg-blue-50 font-black text-[9px] uppercase tracking-[0.2em] rounded-xl shadow-sm transition-all duration-300"
+                                >
+                                    Passer au Plan Entreprise
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Transactions Section */}
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm flex flex-col shrink-0">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Transactions Effectuées</h3>
                     <Receipt className="w-3.5 h-3.5 text-gray-300" />
                 </div>
-                <div className="overflow-y-auto flex-1 scrollbar-hide">
-                    <table className="w-full text-left">
-                        <thead className="sticky top-0 bg-white z-10">
-                            <tr className="border-b border-gray-100">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/30">
                                 <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Date</th>
                                 <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">N° Facture</th>
                                 <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Description</th>

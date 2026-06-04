@@ -226,6 +226,7 @@ class Contact(models.Model):
     followup_count = models.IntegerField(default=0)
     replied_since_last_ai = models.BooleanField(default=True)
     next_followup_date = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True, help_text="Besoins ou informations sur le prospect")
 
     created_at = models.DateTimeField(auto_now_add=True)
 

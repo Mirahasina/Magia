@@ -41,6 +41,7 @@ const SidebarLink = ({ item, isActive, isOpen, onClick }: {
 }) => {
     return (
         <button
+            id={`tour-${item.label.toLowerCase().replace(/[\s()éêè]/g, '-').replace(/-+/g, '-')}`}
             onClick={onClick}
             className={cn(
                 "relative w-full flex items-center px-6 py-3 rounded-l-[30px] rounded-r-none text-[13px] font-bold transition-all duration-300 group sidebar-tab-item",

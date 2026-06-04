@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
@@ -43,10 +44,10 @@ interface PaymentModalProps {
         isAnnual: boolean;
         totalPrice: number;
         currentPlan?: string;
+        targetPlan?: string;
     };
 }
 
-// ─── Inner form (needs Stripe context) ───────────────────────────────────────
 function CardSetupForm({
     planDetails, onClose, onSuccess, onAuthRequired, storedCard, hasPassword,
 }: {
@@ -71,7 +72,15 @@ function CardSetupForm({
         number?: string; expiry?: string; cvc?: string;
     }>({});
 
-    const targetPlan = planDetails.currentPlan === "pro" ? "entreprise" : "pro";
+    // Auto-send OTP if user has no password (Google/social account)
+    useEffect(() => {
+        if (storedCard && hasPassword === false && !otpSent) {
+            sendOtp();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [storedCard, hasPassword]);
+
+    const targetPlan = planDetails.targetPlan || (planDetails.currentPlan === "pro" ? "entreprise" : "pro");
     const targetPlanLabel = targetPlan === "entreprise" ? "Entreprise" : "Pro";
     const priceAriary = (planDetails.totalPrice * 5000).toLocaleString("fr-FR");
 
@@ -80,7 +89,7 @@ function CardSetupForm({
         setError(null);
         try {
             const token = localStorage.getItem("access_token");
-            const res = await fetch("http://localhost:8000/api/auth/payments/send-otp/", {
+            const res = await fetch(`${API_BASE}/auth/payments/send-otp/`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -93,7 +102,6 @@ function CardSetupForm({
         }
     };
 
-    // ── Saved card: password / OTP confirmation ──
     const handleSavedCardPayment = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -101,7 +109,7 @@ function CardSetupForm({
         const token = localStorage.getItem("access_token");
         if (!token) { onAuthRequired?.(); return; }
         try {
-            const res = await fetch("http://localhost:8000/api/auth/payments/confirm-saved/", {
+            const res = await fetch(`${API_BASE}/auth/payments/confirm-saved/`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -125,7 +133,6 @@ function CardSetupForm({
         }
     };
 
-    // ── New card: Stripe Elements flow ──
     const handleNewCardPayment = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!stripe || !elements) return;
@@ -135,8 +142,7 @@ function CardSetupForm({
         if (!token) { onAuthRequired?.(); setLoading(false); return; }
 
         try {
-            // 1. Create PaymentIntent on backend
-            const intentRes = await fetch("http://localhost:8000/api/auth/payments/create-payment-intent/", {
+            const intentRes = await fetch(`${API_BASE}/auth/payments/create-payment-intent/`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
                 body: JSON.stringify({ plan_name: targetPlan, num_agents: planDetails.numAgents }),
@@ -152,7 +158,6 @@ function CardSetupForm({
             const cardElement = elements.getElement(CardNumberElement);
             if (!cardElement) { setLoading(false); return; }
 
-            // 2. Confirm payment with Stripe (PCI-compliant)
             const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(client_secret, {
                 payment_method: { card: cardElement },
             });
@@ -164,8 +169,7 @@ function CardSetupForm({
             }
 
             if (paymentIntent?.status === "succeeded") {
-                // 3. Confirm on backend → save card + update subscription
-                await fetch("http://localhost:8000/api/auth/payments/confirm-card-payment/", {
+                await fetch(`${API_BASE}/auth/payments/confirm-card-payment/`, {
                     method: "POST",
                     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -175,7 +179,7 @@ function CardSetupForm({
                     }),
                 });
                 setSuccess(true);
-                setTimeout(() => { onClose(); onSuccess(false); }, 2000);
+                setTimeout(() => { onClose(); onSuccess(true); }, 2000);
             }
         } catch {
             setError("Erreur réseau lors du paiement.");
@@ -184,7 +188,6 @@ function CardSetupForm({
         }
     };
 
-    // ── Success screen ──
     if (success) {
         return (
             <div className="flex flex-col items-center justify-center py-14 px-6 space-y-4 text-center">
@@ -204,7 +207,6 @@ function CardSetupForm({
         <form onSubmit={storedCard ? handleSavedCardPayment : handleNewCardPayment}>
             <div className="p-6 space-y-5">
 
-                {/* Plan summary */}
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex justify-between items-center">
                     <span className="text-xs font-black text-blue-950 uppercase tracking-wider flex items-center gap-2">
                         <Zap className="w-4 h-4 text-blue-900" />
@@ -222,11 +224,7 @@ function CardSetupForm({
                 </div>
 
                 {storedCard ? (
-                    /* ═══════════════════════════════════════
-                       FLOW A : Carte déjà enregistrée
-                       ═══════════════════════════════════════ */
                     <div className="space-y-4">
-                        {/* Saved card display */}
                         <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-gray-100">
@@ -266,27 +264,46 @@ function CardSetupForm({
                         ) : (
                             <div className="space-y-2">
                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                                    <MailCheck className="w-3.5 h-3.5" /> Code de sécurité (OTP)
+                                    <MailCheck className="w-3.5 h-3.5" /> Code de sécurité par email
                                 </label>
                                 {!otpSent ? (
-                                    <Button
-                                        type="button"
-                                        onClick={sendOtp}
-                                        disabled={loading}
-                                        variant="outline"
-                                        className="w-full h-11 border-dashed border-gray-300 text-gray-600 font-bold text-xs"
-                                    >
-                                        Envoyer le code par email
-                                    </Button>
+                                    loading ? (
+                                        <div className="w-full h-11 flex items-center justify-center gap-2 bg-blue-50 rounded-xl border border-blue-100 text-[11px] text-blue-700 font-bold">
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            Envoi du code en cours...
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            type="button"
+                                            onClick={sendOtp}
+                                            disabled={loading}
+                                            variant="outline"
+                                            className="w-full h-11 border-dashed border-gray-300 text-gray-600 font-bold text-xs"
+                                        >
+                                            Envoyer le code par email
+                                        </Button>
+                                    )
                                 ) : (
-                                    <input
-                                        type="text"
-                                        maxLength={6}
-                                        value={otp}
-                                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                                        placeholder="• • • • • •"
-                                        className="w-full h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 outline-none text-lg font-black tracking-[0.5em] text-center"
-                                    />
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] text-green-700 bg-green-50 rounded-lg px-3 py-2 font-medium border border-green-100">
+                                            ✓ Code envoyé à votre adresse email. Vérifiez votre boîte de réception.
+                                        </p>
+                                        <input
+                                            type="text"
+                                            maxLength={6}
+                                            value={otp}
+                                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                                            placeholder="• • • • • •"
+                                            className="w-full h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 outline-none text-lg font-black tracking-[0.5em] text-center"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={sendOtp}
+                                            className="text-[10px] text-blue-600 hover:underline font-bold block"
+                                        >
+                                            Renvoyer le code
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         )}
@@ -334,6 +351,7 @@ function CardSetupForm({
                                 )}>
                                     <CardExpiryElement
                                         options={ELEMENT_OPTIONS}
+                                        className="w-full"
                                         onChange={(e) => setCardFieldErrors(p => ({ ...p, expiry: e.error?.message }))}
                                     />
                                 </div>
@@ -353,6 +371,7 @@ function CardSetupForm({
                                 )}>
                                     <CardCvcElement
                                         options={ELEMENT_OPTIONS}
+                                        className="w-full"
                                         onChange={(e) => setCardFieldErrors(p => ({ ...p, cvc: e.error?.message }))}
                                     />
                                 </div>
@@ -422,10 +441,10 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onAuthRequired, planD
         setDataLoading(true);
         const token = localStorage.getItem("access_token");
         Promise.all([
-            fetch("http://localhost:8000/api/auth/subscription/", {
+            fetch(`${API_BASE}/auth/subscription/`, {
                 headers: { Authorization: `Bearer ${token}` },
             }).then((r) => r.json()),
-            fetch("http://localhost:8000/api/auth/me/", {
+            fetch(`${API_BASE}/auth/me/`, {
                 headers: { Authorization: `Bearer ${token}` },
             }).then((r) => r.json()),
         ])
@@ -441,11 +460,16 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onAuthRequired, planD
             .finally(() => setDataLoading(false));
     }, [isOpen, isAuth]);
 
-    const targetPlan = planDetails.currentPlan === "pro" ? "entreprise" : "pro";
+    const targetPlan = planDetails.targetPlan || (planDetails.currentPlan === "pro" ? "entreprise" : "pro");
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[440px] p-0 rounded-2xl overflow-hidden bg-white border-none shadow-2xl">
+        <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+            <DialogContent
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                onCloseAutoFocus={(e) => e.preventDefault()}
+                onInteractOutside={(e) => e.preventDefault()}
+                className="sm:max-w-[440px] p-0 rounded-2xl overflow-hidden bg-white border-none shadow-2xl"
+            >
                 <DialogTitle className="sr-only">Paiement</DialogTitle>
 
                 <div className="flex flex-col">
