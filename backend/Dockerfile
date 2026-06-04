@@ -37,8 +37,8 @@ COPY . .
 # Collect static files
 RUN python manage.py collectstatic --noinput || true
 
-# Expose the application port
+# Expose default port (Railway injects $PORT at runtime)
 EXPOSE 8000
 
-# Run database migrations and start the server
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn magia_backend.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120"]
+# Run database migrations then start Gunicorn on Railway's dynamic $PORT
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn magia_backend.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120"]

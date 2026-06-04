@@ -1,0 +1,15 @@
+# Configuration Railway pour déploiement du backend Django
+# Ce fichier dit à Railway d'utiliser le dossier backend/ et son Dockerfile
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "backend/Dockerfile"
+buildContext = "backend"
+
+[deploy]
+# Railway injecte automatiquement $PORT — ne pas hardcoder 8000
+startCommand = "sh -c 'python manage.py migrate --noinput && gunicorn magia_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120'"
+healthcheckPath = "/api/auth/me/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
