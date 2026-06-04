@@ -12,19 +12,19 @@ DJANGO_ENV = env('DJANGO_ENV', default='development')
 SECRET_KEY = env('SECRET_KEY', default='django-dev-secret-key')
 DEBUG = env.bool('DEBUG', default=(DJANGO_ENV == 'development'))
 
-# Stripe
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 
 if DJANGO_ENV == 'production':
     ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['magia.ai'])
-    if 'healthcheck.railway.app' not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append('healthcheck.railway.app')
     SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
     SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=True)
     CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=True)
 else:
     ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+
+if 'healthcheck.railway.app' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('healthcheck.railway.app')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
