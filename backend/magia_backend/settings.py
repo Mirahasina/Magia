@@ -17,12 +17,11 @@ STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 
 
 # ALLOWED_HOSTS — Railway domains are included by default so no env var is needed
-# If ALLOWED_HOSTS is set in the environment, it overrides this list entirely.
 _default_hosts = [
     'localhost',
     '127.0.0.1',
-    '.up.railway.app',       # Wildcard: covers magia-production.up.railway.app etc.
-    '.railway.app',          # Covers other Railway subdomains
+    '.up.railway.app', 
+    '.railway.app', 
     'healthcheck.railway.app',
 ]
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=_default_hosts)
@@ -134,6 +133,10 @@ else:
         'http://localhost:3000',
         'http://127.0.0.1:5173',
     ]
+
+# Strip trailing slashes from origins (common misconfiguration)
+CORS_ALLOWED_ORIGINS = [o.rstrip('/') for o in CORS_ALLOWED_ORIGINS]
+CSRF_TRUSTED_ORIGINS = [o.rstrip('/') for o in CSRF_TRUSTED_ORIGINS]
 
 CORS_ALLOW_CREDENTIALS = True
 
