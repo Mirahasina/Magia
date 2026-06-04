@@ -12,11 +12,23 @@ FAISS_STORE_DIR = os.path.join(BASE_DIR, 'faiss_indexes')
 if not os.path.exists(FAISS_STORE_DIR):
     os.makedirs(FAISS_STORE_DIR)
 
-try:
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-except Exception as e:
-    print(f"Error loading HuggingFaceEmbeddings: {e}")
-    embeddings = None
+_embeddings = None
+
+def get_embeddings():
+    """
+    Lazy load HuggingFaceEmbeddings to avoid loading the model during Django initialization 
+    (such as during migrations) which saves memory and prevents OOM crashes on free hosting tiers.
+    """
+    global _embeddings
+    if _embeddings is None:
+        try:
+            print("Loading HuggingFaceEmbeddings...")
+            _embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            print("HuggingFaceEmbeddings loaded successfully.")
+        except Exception as e:
+            print(f"Error loading HuggingFaceEmbeddings: {e}")
+            _embeddings = None
+    return _embeddings
 
 def get_index_path(agent_id=None, team_id=None):
     if agent_id:
@@ -26,6 +38,7 @@ def get_index_path(agent_id=None, team_id=None):
     return None
 
 def add_texts_to_knowledge_base(agent_id=None, team_id=None, raw_text="", source_name=""):
+    embeddings = get_embeddings()
     if not embeddings or not raw_text.strip():
         return False
         
@@ -52,6 +65,7 @@ def add_texts_to_knowledge_base(agent_id=None, team_id=None, raw_text="", source
         return False
 
 def search_knowledge_base(agent_id=None, team_id=None, query="", top_k=4):
+    embeddings = get_embeddings()
     if not embeddings:
         return ""
         
