@@ -4,7 +4,6 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
-buildContext = "backend"
 
 [deploy]
 # Railway injecte automatiquement $PORT — ne pas hardcoder 8000

@@ -2,8 +2,8 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Copy requirements file first for caching
-COPY requirements.txt .
+# Copy requirements file (relative to repo root context)
+COPY backend/requirements.txt .
 
 # Install dependencies (using psycopg2-binary, so libpq-dev is not strictly needed,
 # but we keep build-essential just in case)
@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get purge -y --auto-remove build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project source code
-COPY . .
+# Copy backend source code (relative to repo root context)
+COPY backend/ .
 
 # Collect static files
 RUN python manage.py collectstatic --noinput || true
