@@ -18,6 +18,8 @@ STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 
 if DJANGO_ENV == 'production':
     ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['magia.ai'])
+    if 'healthcheck.railway.app' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('healthcheck.railway.app')
     SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
     SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=True)
     CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=True)
