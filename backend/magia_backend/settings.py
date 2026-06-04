@@ -23,8 +23,11 @@ if DJANGO_ENV == 'production':
 else:
     ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
-if 'healthcheck.railway.app' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('healthcheck.railway.app')
+# Always allow Railway domains (healthcheck + deployed service)
+RAILWAY_DOMAINS = ['.up.railway.app', 'healthcheck.railway.app']
+for domain in RAILWAY_DOMAINS:
+    if domain not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(domain)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
