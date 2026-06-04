@@ -15,19 +15,22 @@ DEBUG = env.bool('DEBUG', default=(DJANGO_ENV == 'development'))
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 
+
+# ALLOWED_HOSTS — Railway domains are included by default so no env var is needed
+# If ALLOWED_HOSTS is set in the environment, it overrides this list entirely.
+_default_hosts = [
+    'localhost',
+    '127.0.0.1',
+    '.up.railway.app',       # Wildcard: covers magia-production.up.railway.app etc.
+    '.railway.app',          # Covers other Railway subdomains
+    'healthcheck.railway.app',
+]
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=_default_hosts)
+
 if DJANGO_ENV == 'production':
-    ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['magia.ai'])
-    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
+    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
     SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=True)
     CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=True)
-else:
-    ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
-
-# Always allow Railway domains (healthcheck + deployed service)
-RAILWAY_DOMAINS = ['.up.railway.app', 'healthcheck.railway.app']
-for domain in RAILWAY_DOMAINS:
-    if domain not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append(domain)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
