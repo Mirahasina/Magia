@@ -7,7 +7,7 @@ dockerfilePath = "backend/Dockerfile"
 
 [deploy]
 # Railway injecte automatiquement $PORT — ne pas hardcoder 8000
-startCommand = "sh -c 'python manage.py migrate --noinput && gunicorn magia_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120'"
+startCommand = "sh -c 'python manage.py migrate --noinput && gunicorn magia_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 180'"
 healthcheckPath = "/healthcheck/"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
