@@ -5,7 +5,9 @@ from datetime import timedelta
 
 env = environ.Env()
 BASE_DIR = Path(__file__).resolve().parent.parent
-environ.Env.read_env(env_file=os.path.join(BASE_DIR, '.env'))
+env_file = os.path.join(BASE_DIR, '.env')
+if os.path.exists(env_file):
+    environ.Env.read_env(env_file)
 
 DJANGO_ENV = env('DJANGO_ENV', default='development')
 
