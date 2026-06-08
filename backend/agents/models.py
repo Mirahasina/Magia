@@ -122,6 +122,9 @@ class FacebookConfig(models.Model):
     name = models.CharField(max_length=255, default="Default Facebook")
     is_connected = models.BooleanField(default=False)
     unipile_account_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID du compte Unipile")
+    page_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID de la Page Facebook")
+    page_access_token = models.TextField(blank=True, null=True, help_text="Token d'accès de la Page Facebook")
+    page_name = models.CharField(max_length=255, blank=True, null=True, help_text="Nom de la Page Facebook")
     updated_at = models.DateTimeField(auto_now=True)
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='facebook_configs', null=True, blank=True)
 

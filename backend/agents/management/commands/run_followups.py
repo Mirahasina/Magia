@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from agents.models import Contact, Agent, ChatMessage
 from agents.llm_service import get_llm_response
-from agents.unipile_service import UnipileService
+from agents.messaging_service import MessagingService
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,6 @@ class Command(BaseCommand):
         if not contacts_to_followup.exists():
             self.stdout.write("Aucune relance à effectuer pour le moment.")
             return
-
-        unipile_service = UnipileService()
 
         for contact in contacts_to_followup:
             agent = Agent.objects.filter(user=contact.user, is_active=True).first()
@@ -52,7 +50,7 @@ class Command(BaseCommand):
                 user_plan='gratuit' # Par défaut
             )
             
-            success = unipile_service.send_message(contact.contact_info, response_text)
+            success = MessagingService.send_message(contact.user, contact.contact_info, response_text, contact.source)
             
             if success:
                 self.stdout.write(f"Relance {contact.followup_count} envoyée à {contact.contact_info}")

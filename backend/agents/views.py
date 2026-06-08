@@ -1,4 +1,4 @@
-from .unipile_service import UnipileService, sync_linkedin_inbox, sync_unipile_inbox
+from .messaging_service import MessagingService
 import logging
 import os
 import re
@@ -127,46 +127,106 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
         config = self.get_object()
-        service = UnipileService()
-        
-        if not service.api_key:
-            return Response({"error": "La clé UNIPILE_API_KEY est manquante dans la configuration serveur (.env)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-        url = service.get_connection_url('whatsapp', request.user.id, config.id)
-        if url:
-            return Response({"url": url})
-        return Response({"error": "Impossible de générer l'URL de connexion WhatsApp. Veuillez vérifier vos accès Unipile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if config.is_connected:
+            return Response({"status": "connected", "phone_number": config.phone_number})
+        if config.qr_code:
+            return Response({"qr_code": config.qr_code})
+        return Response({"status": "generating_qr", "message": "Le code QR est en cours de génération par le service WhatsApp local. Veuillez rafraîchir dans quelques secondes."})
 
     @action(detail=True, methods=['get'])
     def refresh_connection(self, request, pk=None):
         config = self.get_object()
-        service = UnipileService()
-        
-        accounts = service.fetch_accounts()
-        target_name = f"WHATSAPP_{request.user.id}_{config.id}"
-        found_account = next((a for a in accounts if a.get('name') == target_name), None)
-        
-        if not found_account:
-            used_ids = set(WhatsAppConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
-            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) == 'WHATSAPP']
-            if potential_accounts:
-                found_account = potential_accounts[0]
-
-        if found_account:
-            config.unipile_account_id = found_account.get('id')
-            config.is_connected = True
-            config.save()
-            return Response({"status": "connected", "unipile_account_id": config.unipile_account_id})
-            
-        return Response({"status": "not_found", "message": "Aucun compte WhatsApp correspondant trouvé sur Unipile."}, status=200)
+        return Response({
+            "status": "connected" if config.is_connected else "not_connected",
+            "is_connected": config.is_connected,
+            "phone_number": config.phone_number,
+            "qr_code": config.qr_code
+        })
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
-        config = self.get_object()
-        thread = threading.Thread(target=sync_unipile_inbox, args=(config, 'whatsapp'))
-        thread.daemon = True
-        thread.start()
-        return Response({"status": "Synchronisation WhatsApp démarrée"})
+        return Response({"status": "Synchronisation en temps réel via le service local active."})
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
+    def update_qr(self, request):
+        user_id = request.data.get('user_id')
+        qr_code = request.data.get('qr_code')
+        if not user_id or user_id == 'global':
+            return Response({'error': 'User ID required'}, status=400)
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        config, created = WhatsAppConfig.objects.get_or_create(user=user)
+        config.qr_code = qr_code
+        config.is_connected = False
+        config.save()
+        return Response({'status': 'updated'})
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
+    def set_connected(self, request):
+        user_id = request.data.get('user_id')
+        phone_number = request.data.get('phone_number')
+        if not user_id or user_id == 'global':
+            return Response({'error': 'User ID required'}, status=400)
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        config, created = WhatsAppConfig.objects.get_or_create(user=user)
+        config.is_connected = True
+        config.phone_number = phone_number
+        config.qr_code = None
+        config.save()
+        return Response({'status': 'connected'})
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
+    def set_disconnected(self, request):
+        user_id = request.data.get('user_id')
+        if not user_id or user_id == 'global':
+            return Response({'error': 'User ID required'}, status=400)
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        config, created = WhatsAppConfig.objects.get_or_create(user=user)
+        config.is_connected = False
+        config.qr_code = None
+        config.save()
+        return Response({'status': 'disconnected'})
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
+    def sync_whatsapp_contacts(self, request):
+        user_id = request.data.get('user_id')
+        contacts = request.data.get('contacts', [])
+        if not user_id or user_id == 'global':
+            return Response({'error': 'User ID required'}, status=400)
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        synced_count = 0
+        for c in contacts:
+            contact_info = c.get('id')
+            if not contact_info:
+                continue
+            name = c.get('name') or c.get('notify') or c.get('verifiedName') or contact_info.split('@')[0]
+            contact, created = Contact.objects.get_or_create(
+                user=user,
+                source='whatsapp',
+                contact_info=contact_info,
+                defaults={'name': name, 'status': 'new'}
+            )
+            if not created and name and contact.name != name:
+                contact.name = name
+                contact.save()
+            synced_count += 1
+            
+        return Response({'status': 'success', 'synced': synced_count})
 
     def perform_destroy(self, instance):
         ChatMessage.objects.filter(user=instance.user, source='whatsapp').delete()
@@ -290,45 +350,12 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
-        config = self.get_object()
-        service = UnipileService()
-        
-        if not service.api_key:
-            return Response({"error": "La clé UNIPILE_API_KEY est manquante dans la configuration serveur (.env)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-        url = service.get_connection_url('gmail', request.user.id, config.id)
-        if url:
-            return Response({"url": url})
-        return Response({"error": "Impossible de générer l'URL de connexion Email. Veuillez vérifier vos accès Unipile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    @action(detail=True, methods=['get'])
-    def refresh_connection(self, request, pk=None):
-        config = self.get_object()
-        service = UnipileService()
-        
-        accounts = service.fetch_accounts()
-        target_name_gmail = f"GMAIL_{request.user.id}_{config.id}"
-        target_name_google = f"GOOGLE_{request.user.id}_{config.id}"
-        found_account = next((a for a in accounts if a.get('name') in (target_name_gmail, target_name_google)), None)
-        
-        if not found_account:
-            used_ids = set(EmailConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
-            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) in ['GOOGLE', 'GMAIL', 'OUTLOOK', 'IMAP']]
-            if potential_accounts:
-                found_account = potential_accounts[0]
-
-        if found_account:
-            config.unipile_account_id = found_account.get('id')
-            config.is_active = True
-            config.save()
-            return Response({"status": "connected", "unipile_account_id": config.unipile_account_id})
-            
-        return Response({"status": "not_found", "message": "Aucun compte Email correspondant trouvé sur Unipile."}, status=200)
+        return Response({"error": "Veuillez configurer directement votre serveur SMTP/IMAP dans les champs de saisie (pas d'URL de connexion nécessaire)."}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
         config = self.get_object()
-        thread = threading.Thread(target=sync_unipile_inbox, args=(config, 'email'))
+        thread = threading.Thread(target=sync_email_history, args=(config,))
         thread.daemon = True
         thread.start()
         return Response({"status": "Synchronisation Email démarrée"})
@@ -348,48 +375,15 @@ class FacebookConfigViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
-        config = self.get_object()
-        service = UnipileService()
-        
-        if not service.api_key:
-            return Response({"error": "La clé UNIPILE_API_KEY est manquante dans la configuration serveur (.env)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-        url = service.get_connection_url('facebook', request.user.id, config.id)
-        if url:
-            return Response({"url": url})
-        return Response({"error": "Impossible de générer l'URL de connexion Facebook. Veuillez vérifier vos accès Unipile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": "La connexion Facebook automatique n'est plus supportée suite au décommissionnement d'Unipile."}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'])
     def refresh_connection(self, request, pk=None):
-        config = self.get_object()
-        service = UnipileService()
-        
-        accounts = service.fetch_accounts()
-        target_name_fb = f"FACEBOOK_{request.user.id}_{config.id}"
-        target_name_messenger = f"MESSENGER_{request.user.id}_{config.id}"
-        found_account = next((a for a in accounts if a.get('name') in (target_name_fb, target_name_messenger)), None)
-        
-        if not found_account:
-            used_ids = set(FacebookConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
-            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) in ['MESSENGER', 'FACEBOOK']]
-            if potential_accounts:
-                found_account = potential_accounts[0]
-
-        if found_account:
-            config.unipile_account_id = found_account.get('id')
-            config.is_connected = True
-            config.save()
-            return Response({"status": "connected", "unipile_account_id": config.unipile_account_id})
-            
-        return Response({"status": "not_found", "message": "Aucun compte Facebook correspondant trouvé sur Unipile."}, status=200)
+        return Response({"status": "disconnected", "message": "Canal Facebook inactif."})
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
-        config = self.get_object()
-        thread = threading.Thread(target=sync_unipile_inbox, args=(config, 'facebook'))
-        thread.daemon = True
-        thread.start()
-        return Response({"status": "Synchronisation Facebook démarrée"})
+        return Response({"status": "Facebook inactif"})
 
     def perform_destroy(self, instance):
         ChatMessage.objects.filter(user=instance.user, source='facebook').delete()
@@ -631,88 +625,19 @@ class LinkedInConfigViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def refresh_connection(self, request, pk=None):
-        config = self.get_object()
-        service = UnipileService()
-        
-        accounts = service.fetch_accounts()
-        logger.info(f"Fetched {len(accounts)} accounts from Unipile for user {request.user.id}")
-        if accounts:
-            logger.info(f"Sample account structure: {accounts[0]}")
-            
-        for acc in accounts:
-            logger.info(f"Unipile Account: ID={acc.get('id')}, Name='{acc.get('name')}', Provider={acc.get('provider') or acc.get('type')}")
-            
-        target_name_mixed = f"LinkedIn_{request.user.id}_{config.id}"
-        target_name_upper = f"LINKEDIN_{request.user.id}_{config.id}"
-        logger.info(f"Searching for account with names: '{target_name_mixed}' or '{target_name_upper}'")
-        
-        found_account = next((a for a in accounts if a.get('name') in (target_name_mixed, target_name_upper)), None)
-        
-        # Fallback: Si pas de match exact (Unipile peut renommer avec le nom du profil LinkedIn)
-        if not found_account:
-            logger.info("No exact name match found. Trying fallback matching...")
-            # On cherche un compte qui n'est pas encore utilisé par une autre config LinkedIn
-            used_ids = set(LinkedInConfig.objects.filter(unipile_account_id__isnull=False).values_list('unipile_account_id', flat=True))
-            potential_accounts = [a for a in accounts if a.get('id') not in used_ids and (a.get('provider') or a.get('type')) == 'LINKEDIN']
-            
-            if potential_accounts:
-                # On prend le premier disponible
-                found_account = potential_accounts[0]
-                logger.info(f"Fallback found account: {found_account.get('id')} ({found_account.get('name')})")
-
-        if found_account:
-            config.unipile_account_id = found_account.get('id')
-            config.is_connected = True
-            config.save()
-            return Response({
-                "status": "connected", 
-                "unipile_account_id": config.unipile_account_id,
-                "name": found_account.get('name')
-            })
-            
-        return Response({"status": "not_found", "message": "Aucun compte correspondant trouvé sur Unipile."}, status=200)
+        return Response({"status": "disconnected", "message": "Canal LinkedIn inactif."})
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
-        config = self.get_object()
-        thread = threading.Thread(target=sync_linkedin_inbox, args=(config,))
-        thread.daemon = True
-        thread.start()
-        return Response({"status": "Synchronisation LinkedIn démarrée"})
+        return Response({"status": "LinkedIn inactif"})
 
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
-        config = self.get_object()
-        service = UnipileService()
-        
-        if not service.api_key:
-            return Response({"error": "La clé UNIPILE_API_KEY est manquante dans la configuration serveur (.env)"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-        url = service.get_connection_url('linkedin', request.user.id, config.id)
-        if url:
-            return Response({"url": url})
-        return Response({"error": "Impossible de générer l'URL de connexion LinkedIn. Veuillez vérifier vos accès Unipile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": "La connexion LinkedIn automatique n'est plus supportée suite au décommissionnement d'Unipile."}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def prospect(self, request, pk=None):
-        config = self.get_object()
-        query = request.data.get('query')
-        message = request.data.get('message')
-        
-        if not config.unipile_account_id:
-            return Response({"error": "Un compte LinkedIn connecté est requis pour prospecter."}, status=400)
-        
-        service = UnipileService()
-        leads = service.search_people(config.unipile_account_id, query)
-        
-        results = []
-        for lead in leads[:5]:
-            profile_id = lead.get('provider_id')
-            if profile_id:
-                success = service.send_invitation(config.unipile_account_id, profile_id, message)
-                results.append({"name": lead.get('name'), "success": success})
-        
-        return Response({"status": "Séquence de prospection lancée", "results": results})
+        return Response({"error": "La prospection automatique LinkedIn n'est plus supportée suite au décommissionnement d'Unipile."}, status=status.HTTP_400_BAD_REQUEST)
 
 class ContactAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = ContactAssignmentSerializer
@@ -771,30 +696,10 @@ class ContactViewSet(viewsets.ModelViewSet):
             logger.error('contact_via_agent LLM error: %s', exc)
             response_text = f"Bonjour {contact_name}, je suis {agent.name}. Je serais ravi d'échanger avec vous."
 
-        sent = False
-        if source == 'whatsapp':
-            config = WhatsAppConfig.objects.filter(user=request.user).first()
-            if not config or not config.unipile_account_id:
-                return Response({'error': 'Reliez votre WhatsApp avec MAGIA pour effectuer cette opération'}, status=400)
-            service = UnipileService()
-            sent = service.send_message(contact_info, response_text)
-        elif source == 'facebook':
-            config = FacebookConfig.objects.filter(user=request.user).first()
-            if not config or not config.unipile_account_id:
-                return Response({'error': 'Reliez votre Facebook avec MAGIA pour effectuer cette opération'}, status=400)
-            service = UnipileService()
-            sent = service.send_message(contact_info, response_text)
-        elif source == 'linkedin':
-            config = LinkedInConfig.objects.filter(user=request.user).first()
-            if not config or not config.unipile_account_id:
-                return Response({'error': 'Reliez votre LinkedIn avec MAGIA pour effectuer cette opération'}, status=400)
-            service = UnipileService()
-            sent = service.send_message(contact_info, response_text)
-        elif source == 'email':
-            email_config = agent.email_config or EmailConfig.objects.filter(user=request.user).first()
-            if not email_config:
-                return Response({'error': 'Reliez votre email avec MAGIA pour effectuer cette opération'}, status=400)
-            sent = send_email_reply(email_config, contact_info, f"Message de {agent.name}", response_text)
+        if source in ['facebook', 'linkedin']:
+            return Response({'error': f"Le canal {source} n'est plus supporté suite au décommissionnement d'Unipile."}, status=400)
+
+        sent = MessagingService.send_message(request.user, contact_info, response_text, source)
 
         if not sent:
             return Response({'error': f'Échec de l\'envoi via {source}'}, status=500)
@@ -1350,34 +1255,13 @@ class AgentViewSet(viewsets.ModelViewSet):
             ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
             
         elif source == 'whatsapp':
-            config = WhatsAppConfig.objects.filter(user=request.user).first()
-            if not config or not config.unipile_account_id:
-                return Response({'error': 'Reliez votre WhatsApp avec MAGIA pour effectuer cette opération'}, status=400)
-            service = UnipileService()
-            success = service.send_message(contact_info, content)
+            success = MessagingService.send_message(request.user, contact_info, content, 'whatsapp')
             if not success:
                 return Response({'error': 'WhatsApp service error'}, status=500)
             ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
             
-        elif source == 'facebook':
-            config = FacebookConfig.objects.filter(user=request.user).first()
-            if not config or not config.unipile_account_id:
-                return Response({'error': 'Reliez votre Facebook avec MAGIA pour effectuer cette opération'}, status=400)
-            service = UnipileService()
-            success = service.send_message(contact_info, content)
-            if not success:
-                return Response({'error': 'Facebook service error'}, status=500)
-            ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
-            
-        elif source == 'linkedin':
-            config = LinkedInConfig.objects.filter(user=request.user).first()
-            if not config or not config.unipile_account_id:
-                return Response({'error': 'Reliez votre LinkedIn avec MAGIA pour effectuer cette opération'}, status=400)
-            service = UnipileService()
-            success = service.send_message(contact_info, content)
-            if not success:
-                return Response({'error': 'LinkedIn service error'}, status=500)
-            ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
+        elif source in ['facebook', 'linkedin']:
+            return Response({'error': f"Le canal {source} n'est plus supporté suite au décommissionnement d'Unipile."}, status=400)
                 
         return Response({'status': 'sent'})
         
@@ -1417,37 +1301,14 @@ class AgentViewSet(viewsets.ModelViewSet):
             return Response({'status': 'sent'})
             
         elif source == 'whatsapp':
-             config = WhatsAppConfig.objects.filter(user=request.user).first()
-             if not config or not config.unipile_account_id:
-                 return Response({'error': 'Reliez votre WhatsApp avec MAGIA pour effectuer cette opération'}, status=400)
-             service = UnipileService()
-             success = service.send_message(contact_info, content)
+             success = MessagingService.send_message(request.user, contact_info, content, 'whatsapp')
              if success:
                  ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
                  return Response({'status': 'sent'})
-             return Response({'error': 'Failed to send WhatsApp message via Unipile'}, status=500)
+             return Response({'error': 'Failed to send WhatsApp message'}, status=500)
 
-        elif source == 'facebook':
-            config = FacebookConfig.objects.filter(user=request.user).first()
-            if not config or not config.unipile_account_id:
-                return Response({'error': 'Reliez votre Facebook avec MAGIA pour effectuer cette opération'}, status=400)
-            service = UnipileService()
-            success = service.send_message(contact_info, content)
-            if success:
-                ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
-                return Response({'status': 'sent'})
-            return Response({'error': 'Failed to send Facebook message via Unipile'}, status=500)
-                
-        elif source == 'linkedin':
-            config = LinkedInConfig.objects.filter(user=request.user).first()
-            if not config or not config.unipile_account_id:
-                return Response({'error': 'Reliez votre LinkedIn avec MAGIA pour effectuer cette opération'}, status=400)
-            service = UnipileService()
-            success = service.send_message(contact_info, content)
-            if success:
-                ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
-                return Response({'status': 'sent'})
-            return Response({'error': 'Failed to send LinkedIn message via Unipile'}, status=500)
+        elif source in ['facebook', 'linkedin']:
+            return Response({'error': f"Le canal {source} n'est plus supporté suite au décommissionnement d'Unipile."}, status=400)
 
         return Response({'error': 'Source not supported for direct reply'}, status=400)
 

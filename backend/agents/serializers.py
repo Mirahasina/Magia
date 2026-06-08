@@ -15,7 +15,7 @@ class TemplateSerializer(serializers.ModelSerializer):
 class WhatsAppConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = WhatsAppConfig
-        fields = ['id', 'name', 'is_connected', 'unipile_account_id', 'phone_number', 'updated_at']
+        fields = ['id', 'name', 'is_connected', 'unipile_account_id', 'phone_number', 'qr_code', 'updated_at']
         read_only_fields = ['user', 'is_connected', 'unipile_account_id']
 
 class FacebookConfigSerializer(serializers.ModelSerializer):
