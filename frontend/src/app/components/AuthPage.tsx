@@ -55,6 +55,7 @@ export function AuthPage({ defaultView = "login", onSuccess, initialEmail }: Aut
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const [successMsg, setSuccessMsg] = useState("");
+    const [resendLoading, setResendLoading] = useState(false);
     const [captchaKey, setCaptchaKey] = useState("");
     const [isVerifyingCaptcha, setIsVerifyingCaptcha] = useState(false);
     const [showTerms, setShowTerms] = useState(false);
@@ -201,6 +202,31 @@ export function AuthPage({ defaultView = "login", onSuccess, initialEmail }: Aut
         onSuccess?.();
     };
 
+    const handleResendVerificationEmail = async () => {
+        setErrorMsg("");
+        setSuccessMsg("");
+        setResendLoading(true);
+
+        try {
+            const res = await fetch(`${API_BASE}/auth/resend-verification/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Impossible de renvoyer l'email de vérification.");
+            setSuccessMsg(data.message || "Email de vérification renvoyé.");
+        } catch (err: any) {
+            setErrorMsg(err.message);
+        } finally {
+            setResendLoading(false);
+        }
+    };
+
+    const shouldShowResendVerificationButton = [errorMsg, successMsg]
+        .filter(Boolean)
+        .some((msg) => msg.toLowerCase().includes("vérifier votre email") || msg.toLowerCase().includes("verify your email"));
+
     return (
         <div className="min-h-screen w-full flex items-center justify-center bg-white bg-mesh p-4 md:p-8 relative">
             <div className="absolute top-4 left-4 z-50">
@@ -258,6 +284,18 @@ export function AuthPage({ defaultView = "login", onSuccess, initialEmail }: Aut
                         {successMsg && (
                             <div className="p-3 bg-emerald-50/30 border border-emerald-100 text-emerald-600 text-[11px] rounded-xl font-bold animate-in fade-in slide-in-from-top-1">
                                 {successMsg}
+                            </div>
+                        )}
+                        {shouldShowResendVerificationButton && (
+                            <div className="mt-3 text-center">
+                                <button
+                                    type="button"
+                                    onClick={handleResendVerificationEmail}
+                                    className="text-xs font-bold text-blue-900 hover:text-blue-700 transition-colors"
+                                    disabled={resendLoading || !formData.email}
+                                >
+                                    {resendLoading ? "Rappel en cours..." : "Renvoyer l'email de vérification"}
+                                </button>
                             </div>
                         )}
 

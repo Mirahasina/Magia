@@ -26,6 +26,7 @@ from .models import (
     User, ContactRequest, Subscription, WorkspaceMember, 
     WorkspaceInvitation, Notification, PLAN_LIMITS, EnterpriseRequest
 )
+from .utils import send_verification_email
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
@@ -41,6 +42,24 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
+
+def send_verification_email(user):
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    verify_link = f"{FRONTEND_URL}/verify-email?uid={uid}&token={token}"
+
+    subject = "Vérifiez votre compte MAGIA"
+    html_content = render_to_string('emails/verification_email.html', {
+        'first_name': user.first_name,
+        'verify_link': verify_link
+    })
+    text_content = f"Bonjour {user.first_name},Veuillez vérifier votre compte : {verify_link}"
+
+    msg = EmailMultiAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, [user.email])
+    msg.attach_alternative(html_content, "text/html")
+    msg.send()
+
+    return verify_link
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -66,21 +85,8 @@ class RegisterView(APIView):
 
         user = serializer.save()
         
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        verify_link = f"{FRONTEND_URL}/verify-email?uid={uid}&token={token}"
-        
-        subject = "Vérifiez votre compte MAGIA"
-        html_content = render_to_string('emails/verification_email.html', {
-            'first_name': user.first_name,
-            'verify_link': verify_link
-        })
-        text_content = f"Bonjour {user.first_name},\n\nVeuillez vérifier votre compte : {verify_link}"
-        
         try:
-            msg = EmailMultiAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, [user.email])
-            msg.attach_alternative(html_content, "text/html")
-            msg.send()
+            send_verification_email(user)
         except Exception as exc:
             logger.error('Error sending verification email: %s', exc)
 
@@ -410,6 +416,30 @@ class SubscriptionView(APIView):
 
             return Response(serializer.data, status=status.HTTP_200_OK if not created else status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResendVerificationEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'L\'email est requis.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'message': 'Si cet email existe, un lien de vérification a été envoyé.'}, status=status.HTTP_200_OK)
+
+        if user.is_email_verified or user.is_staff:
+            return Response({'message': 'Cet email est déjà vérifié.'}, status=status.HTTP_200_OK)
+
+        try:
+            send_verification_email(user)
+            return Response({'message': 'Un nouveau mail de vérification a été envoyé.'}, status=status.HTTP_200_OK)
+        except Exception as exc:
+            logger.error('Error resending verification email: %s', exc)
+            return Response({'error': 'Impossible de renvoyer l\'email de vérification pour le moment.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class VerifyEmailView(APIView):

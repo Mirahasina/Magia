@@ -33,6 +33,7 @@ urlpatterns = [
     path('security/', SecurityView.as_view(), name='security_status'),
     path('security/<str:action>/', SecurityView.as_view(), name='security_action'),
     path('verify-email/', VerifyEmailView.as_view(), name='verify_email'),
+    path('resend-verification/', ResendVerificationEmailView.as_view(), name='resend_verification'),
     path('notifications/', NotificationListView.as_view(), name='notifications'),
     path('plan-limits/', PlanLimitsView.as_view(), name='plan_limits'),
     path('invite/', InviteMemberView.as_view(), name='invite_member'),
