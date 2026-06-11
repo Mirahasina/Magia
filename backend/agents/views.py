@@ -348,9 +348,53 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def perform_update(self, serializer):
+        """Allow updating imap_server, smtp_server, email, password."""
+        instance = serializer.save()
+        # Save password separately (not in serializer for security, sent via PATCH)
+        password = self.request.data.get('password')
+        if password:
+            instance.password = password
+            instance.save(update_fields=['password'])
+
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
         return Response({"error": "Veuillez configurer directement votre serveur SMTP/IMAP dans les champs de saisie (pas d'URL de connexion nécessaire)."}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def test_connection(self, request, pk=None):
+        """Test IMAP + SMTP connectivity with current config."""
+        config = self.get_object()
+        # Allow overriding password inline (not persisted)
+        password_override = request.data.get('password')
+        if password_override:
+            config.password = password_override
+        results = test_email_connection(config)
+        imap_ok = results.get('imap', {}).get('status') == 'success'
+        smtp_ok = results.get('smtp', {}).get('status') == 'success'
+        return Response({
+            'imap': results.get('imap', {}),
+            'smtp': results.get('smtp', {}),
+            'success': imap_ok and smtp_ok
+        })
+
+    @action(detail=True, methods=['post'])
+    def configure(self, request, pk=None):
+        """Save IMAP/SMTP config and activate the account."""
+        config = self.get_object()
+        config.email = request.data.get('email', config.email)
+        config.imap_server = request.data.get('imap_server', config.imap_server)
+        config.smtp_server = request.data.get('smtp_server', config.smtp_server)
+        password = request.data.get('password')
+        if password:
+            config.password = password
+        config.is_active = True
+        config.save()
+        # Kick off history sync in background
+        thread = threading.Thread(target=sync_email_history, args=(config,))
+        thread.daemon = True
+        thread.start()
+        return Response({'status': 'configured', 'email': config.email, 'is_active': True})
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
@@ -375,15 +419,285 @@ class FacebookConfigViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
-        return Response({"error": "La connexion Facebook automatique n'est plus supportée suite au décommissionnement d'Unipile."}, status=status.HTTP_400_BAD_REQUEST)
+        fb_app_id = env('FACEBOOK_APP_ID', default='')
+        if not fb_app_id:
+            return Response({"error": "FACEBOOK_APP_ID n'est pas configuré dans le fichier .env du backend."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        redirect_uri = request.query_params.get('redirect_uri')
+        if not redirect_uri:
+            return Response({"error": "redirect_uri est requis."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        params = {
+            'client_id': fb_app_id,
+            'redirect_uri': redirect_uri,
+            'scope': 'pages_messaging,pages_show_list,pages_read_engagement',
+            'state': str(pk)
+        }
+        url = f"https://www.facebook.com/v18.0/dialog/oauth?{urllib.parse.urlencode(params)}"
+        return Response({"url": url})
+
+    @action(detail=True, methods=['post'])
+    def exchange_code(self, request, pk=None):
+        """Exchange auth code for long-lived user access token and list available Pages."""
+        code = request.data.get('code')
+        redirect_uri = request.data.get('redirect_uri')
+        if not code or not redirect_uri:
+            return Response({"error": "code et redirect_uri sont requis."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        fb_app_id = env('FACEBOOK_APP_ID', default='')
+        fb_app_secret = env('FACEBOOK_APP_SECRET', default='')
+        if not fb_app_id or not fb_app_secret:
+            return Response({"error": "FACEBOOK_APP_ID ou FACEBOOK_APP_SECRET non configuré."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 1. Exchange code for short-lived user access token
+        try:
+            resp = requests.get(
+                "https://graph.facebook.com/v18.0/oauth/access_token",
+                params={
+                    'client_id': fb_app_id,
+                    'redirect_uri': redirect_uri,
+                    'client_secret': fb_app_secret,
+                    'code': code
+                },
+                timeout=10
+            )
+            if resp.status_code != 200:
+                err = resp.json().get('error', {}).get('message', 'Impossible d\'échanger le code.')
+                return Response({"error": f"Erreur Facebook : {err}"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            user_token = resp.json().get('access_token')
+        except Exception as e:
+            return Response({"error": f"Impossible de contacter Facebook : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # 2. Exchange short-lived user access token for a long-lived user access token
+        try:
+            resp = requests.get(
+                "https://graph.facebook.com/v18.0/oauth/access_token",
+                params={
+                    'grant_type': 'fb_exchange_token',
+                    'client_id': fb_app_id,
+                    'client_secret': fb_app_secret,
+                    'fb_exchange_token': user_token
+                },
+                timeout=10
+            )
+            if resp.status_code == 200:
+                user_token = resp.json().get('access_token', user_token)
+        except Exception:
+            pass
+        
+        # 3. Retrieve list of pages managed by this user
+        try:
+            resp = requests.get(
+                "https://graph.facebook.com/v18.0/me/accounts",
+                params={
+                    'access_token': user_token,
+                    'fields': 'id,name,access_token'
+                },
+                timeout=10
+            )
+            if resp.status_code != 200:
+                err = resp.json().get('error', {}).get('message', 'Impossible de récupérer la liste des pages.')
+                return Response({"error": f"Erreur Facebook Pages : {err}"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            pages_data = resp.json().get('data', [])
+            pages = []
+            for p in pages_data:
+                pages.append({
+                    'id': p.get('id'),
+                    'name': p.get('name'),
+                    'access_token': p.get('access_token')
+                })
+            
+            return Response({"pages": pages})
+        except Exception as e:
+            return Response({"error": f"Erreur de communication Pages : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['get'])
     def refresh_connection(self, request, pk=None):
-        return Response({"status": "disconnected", "message": "Canal Facebook inactif."})
+        config = self.get_object()
+        if config.is_connected and config.page_access_token:
+            # Verify token is still valid via Graph API
+            try:
+                resp = requests.get(
+                    f"https://graph.facebook.com/v18.0/{config.page_id}",
+                    params={'access_token': config.page_access_token, 'fields': 'id,name'},
+                    timeout=5
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    config.page_name = data.get('name', config.page_name)
+                    config.save(update_fields=['page_name'])
+                    return Response({'status': 'connected', 'page_name': config.page_name})
+            except Exception:
+                pass
+            config.is_connected = False
+            config.save(update_fields=['is_connected'])
+        return Response({'status': 'disconnected', 'message': 'Token invalide ou expiré.'})
+
+    @action(detail=True, methods=['post'])
+    def configure(self, request, pk=None):
+        """Save Page ID + Page Access Token and verify via Graph API."""
+        config = self.get_object()
+        page_id = request.data.get('page_id', '').strip()
+        page_access_token = request.data.get('page_access_token', '').strip()
+
+        if not page_id or not page_access_token:
+            return Response({'error': 'page_id et page_access_token sont requis.'}, status=400)
+
+        # Verify token against Graph API
+        try:
+            resp = requests.get(
+                f"https://graph.facebook.com/v18.0/{page_id}",
+                params={'access_token': page_access_token, 'fields': 'id,name'},
+                timeout=10
+            )
+            if resp.status_code != 200:
+                err = resp.json().get('error', {}).get('message', 'Token invalide.')
+                return Response({'error': f'Échec vérification Graph API : {err}'}, status=400)
+            page_data = resp.json()
+        except Exception as e:
+            return Response({'error': f'Impossible de joindre Facebook : {str(e)}'}, status=500)
+
+        config.page_id = page_id
+        config.page_access_token = page_access_token
+        config.page_name = page_data.get('name', '')
+        config.is_connected = True
+        config.save()
+        return Response({
+            'status': 'connected',
+            'page_name': config.page_name,
+            'page_id': config.page_id
+        })
+
+    @action(detail=True, methods=['post'])
+    def send_facebook_message(self, request, pk=None):
+        """Send a message to a Facebook user via Graph API (Page Messaging)."""
+        config = self.get_object()
+        if not config.is_connected:
+            return Response({'error': 'Page Facebook non connectée.'}, status=400)
+        recipient_id = request.data.get('recipient_psid')
+        text = request.data.get('text', '')
+        if not recipient_id or not text:
+            return Response({'error': 'recipient_psid et text requis.'}, status=400)
+        try:
+            resp = requests.post(
+                f"https://graph.facebook.com/v18.0/{config.page_id}/messages",
+                params={'access_token': config.page_access_token},
+                json={'recipient': {'id': recipient_id}, 'message': {'text': text}},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                return Response({'status': 'sent'})
+            return Response({'error': resp.json().get('error', {}).get('message', 'Erreur envoi.')}, status=400)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=False, methods=['get', 'post'], permission_classes=[AllowAny], authentication_classes=[])
+    def webhook(self, request):
+        """Facebook Messenger webhook: GET for verification, POST for incoming messages."""
+        VERIFY_TOKEN = env('FACEBOOK_VERIFY_TOKEN', default='magia_fb_webhook_2024')
+
+        if request.method == 'GET':
+            mode = request.query_params.get('hub.mode')
+            token = request.query_params.get('hub.verify_token')
+            challenge = request.query_params.get('hub.challenge')
+            if mode == 'subscribe' and token == VERIFY_TOKEN:
+                from django.http import HttpResponse
+                return HttpResponse(challenge, content_type='text/plain')
+            return Response({'error': 'Forbidden'}, status=403)
+
+        # POST: incoming message event
+        body = request.data
+        if body.get('object') != 'page':
+            return Response({'status': 'ignored'})
+
+        for entry in body.get('entry', []):
+            page_id = entry.get('id', '')
+            config = FacebookConfig.objects.filter(page_id=page_id, is_connected=True).first()
+            if not config:
+                continue
+            user = config.user
+            for messaging in entry.get('messaging', []):
+                sender_id = messaging.get('sender', {}).get('id', '')
+                msg = messaging.get('message', {})
+                text = msg.get('text', '').strip()
+                if not text or sender_id == page_id:
+                    continue  # skip echoes
+                # Dedup
+                msg_id = msg.get('mid', '')
+                if msg_id and ChatMessage.objects.filter(user=user, whatsapp_message_id=msg_id).exists():
+                    continue
+                # Find active agent with facebook channel
+                active_agents = Agent.objects.filter(user=user, is_active=True)
+                agent = None
+                for a in active_agents:
+                    if a.channels and any(str(c).lower() == 'facebook' for c in a.channels):
+                        agent = a
+                        break
+                if not agent:
+                    agent = active_agents.first()
+
+                ChatMessage.objects.create(
+                    user=user,
+                    agent=agent,
+                    sender='user',
+                    content=text,
+                    contact_info=sender_id,
+                    source='facebook',
+                    whatsapp_message_id=msg_id,
+                    status='new'
+                )
+                # Update/create contact
+                Contact.objects.get_or_create(
+                    user=user, source='facebook', contact_info=sender_id,
+                    defaults={'name': sender_id, 'status': 'new'}
+                )
+
+        return Response({'status': 'EVENT_RECEIVED'})
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
-        return Response({"status": "Facebook inactif"})
+        config = self.get_object()
+        if not config.is_connected or not config.page_access_token:
+            return Response({'status': 'Facebook non connecté'})
+        # Poll recent conversations via Graph API
+        try:
+            resp = requests.get(
+                f"https://graph.facebook.com/v18.0/{config.page_id}/conversations",
+                params={'access_token': config.page_access_token, 'fields': 'participants,messages{message,from,created_time,id}'},
+                timeout=15
+            )
+            if resp.status_code != 200:
+                return Response({'error': 'Erreur Graph API'}, status=400)
+            data = resp.json()
+            synced = 0
+            user = request.user
+            for conv in data.get('data', []):
+                for msg_data in conv.get('messages', {}).get('data', []):
+                    mid = msg_data.get('id', '')
+                    text = msg_data.get('message', '').strip()
+                    sender_info = msg_data.get('from', {})
+                    sender_id = sender_info.get('id', '')
+                    is_me = sender_id == config.page_id
+                    if not text:
+                        continue
+                    if ChatMessage.objects.filter(user=user, whatsapp_message_id=mid).exists():
+                        continue
+                    ChatMessage.objects.create(
+                        user=user,
+                        sender='ai' if is_me else 'user',
+                        content=text,
+                        contact_info=sender_id,
+                        source='facebook',
+                        whatsapp_message_id=mid,
+                        is_read=True,
+                        status='archived'
+                    )
+                    synced += 1
+            return Response({'status': 'synced', 'count': synced})
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
     def perform_destroy(self, instance):
         ChatMessage.objects.filter(user=instance.user, source='facebook').delete()
@@ -647,12 +961,98 @@ class ContactAssignmentViewSet(viewsets.ModelViewSet):
 class ContactViewSet(viewsets.ModelViewSet):
     from .serializers import ContactSerializer
     serializer_class = ContactSerializer
-    
+
     def get_queryset(self):
         return Contact.objects.filter(user=self.request.user)
-    
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['post'], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
+    def import_contacts(self, request):
+        """
+        Import contacts from a CSV or Excel file.
+        Expected columns: name, contact_info, source (whatsapp/email), notes (optional), status (optional)
+        """
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'Aucun fichier fourni.'}, status=400)
+
+        filename = file_obj.name.lower()
+        try:
+            if filename.endswith('.csv'):
+                df = pd.read_csv(file_obj, dtype=str)
+            elif filename.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(file_obj, dtype=str)
+            else:
+                return Response({'error': 'Format non supporté. Utilisez .csv, .xlsx ou .xls'}, status=400)
+        except Exception as exc:
+            return Response({'error': f'Erreur de lecture du fichier : {str(exc)}'}, status=400)
+
+        # Normalize column names
+        df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
+
+        # Check required columns
+        if 'contact_info' not in df.columns:
+            return Response({
+                'error': 'Colonne "contact_info" manquante.',
+                'columns_found': list(df.columns),
+                'hint': 'Colonnes attendues : name, contact_info, source, notes'
+            }, status=400)
+
+        created_count = 0
+        skipped_count = 0
+        errors = []
+        valid_statuses = {'new', 'contacted', 'interested', 'ready', 'no'}
+        valid_sources = {'whatsapp', 'email', 'facebook', 'linkedin', 'chat'}
+
+        for idx, row in df.iterrows():
+            contact_info = str(row.get('contact_info', '')).strip()
+            if not contact_info or contact_info == 'nan':
+                skipped_count += 1
+                continue
+
+            name = str(row.get('name', contact_info)).strip()
+            if name == 'nan':
+                name = contact_info
+
+            source = str(row.get('source', 'whatsapp')).strip().lower()
+            if source not in valid_sources:
+                source = 'whatsapp'
+
+            notes = str(row.get('notes', '')).strip()
+            if notes == 'nan':
+                notes = ''
+
+            row_status = str(row.get('status', 'new')).strip().lower()
+            if row_status not in valid_statuses:
+                row_status = 'new'
+
+            try:
+                contact, created = Contact.objects.get_or_create(
+                    user=request.user,
+                    source=source,
+                    contact_info=contact_info,
+                    defaults={
+                        'name': name,
+                        'notes': notes,
+                        'status': row_status,
+                    }
+                )
+                if created:
+                    created_count += 1
+                else:
+                    skipped_count += 1
+            except Exception as exc:
+                errors.append({'row': idx + 2, 'contact_info': contact_info, 'error': str(exc)})
+
+        return Response({
+            'status': 'done',
+            'created': created_count,
+            'skipped': skipped_count,
+            'errors': errors,
+            'total_rows': len(df)
+        })
 
     @action(detail=True, methods=['post'], url_path='contact_via_agent')
     def contact_via_agent(self, request, pk=None):

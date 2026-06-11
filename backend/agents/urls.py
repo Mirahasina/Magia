@@ -27,4 +27,5 @@ router.register(r'video-rooms', DailyCallViewSet, basename='video-rooms')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('webhooks/facebook/', FacebookConfigViewSet.as_view({'get': 'webhook', 'post': 'webhook'}), name='facebook-webhook'),
 ]

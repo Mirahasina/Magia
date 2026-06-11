@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { API_BASE, getAuthHeaders, getAuthHeadersOnly } from "../../../lib/api";
 import {
   Calendar, UserCircle, MessageCircle, Clock, Plus, X, Send, Bot, ChevronDown,
-  Mail, Smartphone, FileText, User, AlertCircle, CheckCircle2,
+  Mail, Smartphone, FileText, User, AlertCircle, CheckCircle2, Upload, Download,
+  Table, ArrowRight, Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+
 
 /* ─── Types ─── */
 
@@ -166,7 +168,286 @@ const KanbanColumn = ({
   );
 };
 
-/* ─── Modal Ajout Prospect ─── */
+/* ─── Modal Import CSV/Excel ─── */
+
+type ImportStep = 'upload' | 'preview' | 'done';
+
+interface ImportResult {
+  created: number;
+  skipped: number;
+  errors: Array<{ row: number; contact_info: string; error: string }>;
+  total_rows: number;
+}
+
+function ImportContactsModal({
+  onClose,
+  onImported,
+}: {
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const [step, setStep] = useState<ImportStep>('upload');
+  const [isDragging, setIsDragging] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  }, []);
+
+  const handleFile = (f: File) => {
+    const name = f.name.toLowerCase();
+    if (!name.endsWith('.csv') && !name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+      setError('Format non supporté. Utilisez .csv, .xlsx ou .xls');
+      return;
+    }
+    setError('');
+    setFile(f);
+    setStep('preview');
+  };
+
+  const handleImport = async () => {
+    if (!file) return;
+    setImporting(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${API_BASE}/contacts/import_contacts/`, {
+        method: 'POST',
+        headers: getAuthHeadersOnly(),
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Erreur lors de l\'import.');
+        return;
+      }
+      setResult(data);
+      setStep('done');
+      onImported();
+    } catch (err: any) {
+      setError(err.message || 'Erreur réseau.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-indigo-50">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center">
+              <Upload className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-800">Importer des contacts</h2>
+              <p className="text-xs text-gray-400">Format CSV ou Excel (.xlsx)</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          {/* Step: Upload */}
+          {step === 'upload' && (
+            <div className="space-y-4">
+              {/* Drag & Drop Zone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? 'border-violet-400 bg-violet-50 scale-[1.01]'
+                    : 'border-gray-200 hover:border-violet-300 hover:bg-violet-50/50'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+                <div className="w-14 h-14 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-4">
+                  <Table className="w-7 h-7 text-violet-500" />
+                </div>
+                <p className="font-semibold text-gray-700 mb-1">
+                  Glissez votre fichier ici
+                </p>
+                <p className="text-sm text-gray-400">ou cliquez pour sélectionner</p>
+                <p className="text-xs text-gray-300 mt-3">.csv · .xlsx · .xls</p>
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2.5 rounded-xl">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Format hint */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <p className="text-xs font-semibold text-blue-800 mb-2">📋 Format attendu des colonnes</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { col: 'name', desc: 'Nom du contact', required: false },
+                    { col: 'contact_info', desc: 'Numéro ou email', required: true },
+                    { col: 'source', desc: 'whatsapp / email', required: false },
+                    { col: 'notes', desc: 'Notes optionnelles', required: false },
+                  ].map((c) => (
+                    <div key={c.col} className="flex items-center gap-1.5">
+                      <code className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${c.required ? 'bg-blue-200 text-blue-800' : 'bg-white text-gray-600 border border-gray-200'}`}>
+                        {c.col}
+                      </code>
+                      <span className="text-[10px] text-gray-500">{c.desc}</span>
+                      {c.required && <span className="text-[8px] text-red-500 font-bold">REQUIS</span>}
+                    </div>
+                  ))}
+                </div>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const csv = 'name,contact_info,source,notes\n"Jean Dupont","+261340000001","whatsapp","Intéressé plan Pro"\n"Marie Martin","marie@email.com","email","Demande de démo"';
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'modele_contacts.csv';
+                    a.click();
+                  }}
+                  className="mt-3 flex items-center gap-1.5 text-[11px] text-blue-600 hover:text-blue-800 font-semibold"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Télécharger le modèle CSV
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Step: Preview */}
+          {step === 'preview' && file && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 bg-violet-50 border border-violet-200 rounded-xl">
+                <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+                  <Table className="w-5 h-5 text-violet-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 text-sm truncate">{file.name}</p>
+                  <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} Ko</p>
+                </div>
+                <button
+                  onClick={() => { setFile(null); setStep('upload'); }}
+                  className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                <p className="font-semibold mb-1">✅ Prêt à importer</p>
+                <p className="text-xs text-amber-600">
+                  Les doublons (même contact_info + source) seront ignorés automatiquement.
+                  Colonnes requises : <code className="font-mono bg-amber-100 px-1 rounded">contact_info</code>
+                </p>
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2.5 rounded-xl">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => { setFile(null); setStep('upload'); setError(''); }}
+                  className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition"
+                >
+                  Changer de fichier
+                </button>
+                <button
+                  onClick={handleImport}
+                  disabled={importing}
+                  className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {importing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="w-4 h-4" />
+                  )}
+                  {importing ? 'Import en cours...' : 'Lancer l\'import'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step: Done */}
+          {step === 'done' && result && (
+            <div className="space-y-4">
+              <div className="text-center mb-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                </div>
+                <h3 className="font-bold text-gray-800 text-lg">Import terminé !</h3>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <p className="text-2xl font-bold text-emerald-600">{result.created}</p>
+                  <p className="text-xs text-emerald-700 font-medium mt-1">Créés</p>
+                </div>
+                <div className="text-center p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-2xl font-bold text-amber-600">{result.skipped}</p>
+                  <p className="text-xs text-amber-700 font-medium mt-1">Ignorés</p>
+                </div>
+                <div className="text-center p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                  <p className="text-2xl font-bold text-gray-600">{result.total_rows}</p>
+                  <p className="text-xs text-gray-500 font-medium mt-1">Total lignes</p>
+                </div>
+              </div>
+
+              {result.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-red-700 mb-2">{result.errors.length} erreur(s) :</p>
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {result.errors.map((e, i) => (
+                      <p key={i} className="text-xs text-red-600">
+                        Ligne {e.row} ({e.contact_info}) : {e.error}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={onClose}
+                className="w-full py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold transition"
+              >
+                Fermer
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 
 interface AddProspectModalProps {
   onClose: () => void;
@@ -488,6 +769,7 @@ export const ProspectionView = ({ onOpenInboxWithContact }: ProspectionViewProps
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     fetchContacts();
@@ -556,13 +838,22 @@ export const ProspectionView = ({ onOpenInboxWithContact }: ProspectionViewProps
               Suivez vos prospects · Glissez les cartes pour changer de statut · Cliquez sur une carte pour contacter.
             </p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Nouveau prospect
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-sm font-semibold shadow-sm transition-all"
+            >
+              <Upload className="w-4 h-4 text-gray-500" />
+              Importer CSV/Excel
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Nouveau prospect
+            </button>
+          </div>
         </div>
 
         {/* Kanban board */}
@@ -590,6 +881,14 @@ export const ProspectionView = ({ onOpenInboxWithContact }: ProspectionViewProps
           onCreated={handleContactCreated}
           onOpenInbox={(contact) => { handleOpenInbox(contact); setShowAddModal(false); }}
           agents={agents}
+        />
+      )}
+
+      {/* Modal Import CSV/Excel */}
+      {showImportModal && (
+        <ImportContactsModal
+          onClose={() => setShowImportModal(false)}
+          onImported={fetchContacts}
         />
       )}
     </DndProvider>

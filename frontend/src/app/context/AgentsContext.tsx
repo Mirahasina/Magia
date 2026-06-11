@@ -121,7 +121,8 @@ interface AgentsContextType {
   refreshLinkedInConnection: (id: number) => Promise<void>;
   addFacebookConfig: (data: Record<string, unknown>) => Promise<void>;
   deleteFacebookConfig: (id: number) => Promise<void>;
-  getFacebookConnectionUrl: (id: number) => Promise<string | null>;
+  getFacebookConnectionUrl: (id: number, redirectUri?: string) => Promise<string | null>;
+  exchangeFacebookCode: (id: number, code: string, redirectUri: string) => Promise<any>;
   refreshFacebookConnection: (id: number) => Promise<void>;
   fetchSecuritySettings: () => Promise<void>;
   fetchTeams: () => Promise<void>;
@@ -547,9 +548,10 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const getFacebookConnectionUrl = async (id: number): Promise<string | null> => {
+  const getFacebookConnectionUrl = async (id: number, redirectUri?: string): Promise<string | null> => {
     try {
-      const res = await fetch(`${API_BASE}/facebook-config/${id}/get_connection_url/`, {
+      const url = `${API_BASE}/facebook-config/${id}/get_connection_url/${redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : ''}`;
+      const res = await fetch(url, {
         headers: getAuthHeadersOnly(),
       });
       if (res.ok) {
@@ -559,6 +561,28 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     } catch {
     }
     return null;
+  };
+
+  const exchangeFacebookCode = async (id: number, code: string, redirectUri: string): Promise<any> => {
+    try {
+      const res = await fetch(`${API_BASE}/facebook-config/${id}/exchange_code/`, {
+        method: "POST",
+        headers: {
+          ...getAuthHeadersOnly(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code, redirect_uri: redirectUri }),
+      });
+      if (res.ok) {
+        return await res.json();
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || "Échec échange du code Facebook.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Erreur de communication avec le serveur.");
+      return null;
+    }
   };
 
   const refreshFacebookConnection = async (id: number): Promise<void> => {
@@ -794,6 +818,7 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         addFacebookConfig,
         deleteFacebookConfig,
         getFacebookConnectionUrl,
+        exchangeFacebookCode,
         refreshFacebookConnection,
         fetchSecuritySettings,
         teams,

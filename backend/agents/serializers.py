@@ -21,14 +21,23 @@ class WhatsAppConfigSerializer(serializers.ModelSerializer):
 class FacebookConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = FacebookConfig
-        fields = ['id', 'name', 'is_connected', 'unipile_account_id', 'updated_at']
-        read_only_fields = ['user', 'is_connected', 'unipile_account_id']
+        fields = [
+            'id', 'name', 'is_connected', 'page_id', 'page_access_token',
+            'page_name', 'updated_at'
+        ]
+        read_only_fields = ['user', 'is_connected']
+        extra_kwargs = {
+            'page_access_token': {'write_only': False},  # readable for edit forms
+        }
 
 class EmailConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailConfig
-        fields = ['id', 'name', 'is_active', 'email', 'unipile_account_id', 'updated_at']
-        read_only_fields = ['user', 'is_active', 'unipile_account_id']
+        fields = [
+            'id', 'name', 'is_active', 'email', 'imap_server', 'smtp_server',
+            'updated_at'
+        ]
+        read_only_fields = ['user', 'is_active']
 
 class LinkedInConfigSerializer(serializers.ModelSerializer):
     class Meta:
