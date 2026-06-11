@@ -47,6 +47,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
 
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [redirectingIds, setRedirectingIds] = useState<number[]>([]);
+    const [qrModalConfig, setQrModalConfig] = useState<{ id: number; qr_code: string | null; loading: boolean } | null>(null);
 
     const {
         whatsappConfigs, addWhatsAppConfig, deleteWhatsAppConfig, getWhatsAppConnectionUrl, refreshWhatsAppConnection,
@@ -828,35 +829,71 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                     <>
                                                                                         {!isConnected ? (
                                                                                             <div className="flex flex-col gap-2 items-end">
-                                                                                                <button
-                                                                                                    disabled={redirectingIds.includes(c.id)}
-                                                                                                    onClick={async () => {
-                                                                                                        setRedirectingIds(prev => [...prev, c.id]);
-                                                                                                        try {
-                                                                                                            const url = await providerInfo.getUrl(c.id);
-                                                                                                            if (url) window.location.assign(url);
-                                                                                                            else throw new Error("No URL");
-                                                                                                        } catch (err) {
-                                                                                                            setRedirectingIds(prev => prev.filter(id => id !== c.id));
-                                                                                                            alert("Erreur lors de la génération de l'URL.");
-                                                                                                        }
-                                                                                                    }}
-                                                                                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all group min-w-[180px] justify-center disabled:opacity-50"
-                                                                                                >
-                                                                                                    {redirectingIds.includes(c.id) ? (
-                                                                                                        <div className="flex items-center gap-2 text-blue-900">
-                                                                                                            <div className="w-3 h-3 border-2 border-blue-900 border-t-transparent animate-spin rounded-full"></div>
-                                                                                                            <span className="text-[10px] font-bold">Redirection...</span>
-                                                                                                        </div>
-                                                                                                    ) : (
-                                                                                                        <>
-                                                                                                            <div className="w-4 h-4 flex items-center justify-center rounded-sm font-black text-[10px] text-white" style={{ backgroundColor: providerInfo.color }}>
-                                                                                                                {providerInfo.icon}
+                                                                                                {configTarget === 'whatsapp' ? (
+                                                                                                    <button
+                                                                                                        disabled={qrModalConfig?.loading}
+                                                                                                        onClick={async () => {
+                                                                                                            setQrModalConfig({ id: c.id, qr_code: null, loading: true });
+                                                                                                            try {
+                                                                                                                const res = await fetch(`${(await import('../../../lib/api')).API_BASE}/whatsapp-config/${c.id}/get_connection_url/`, { headers: (await import('../../../lib/api')).getAuthHeadersOnly() });
+                                                                                                                const data = await res.json();
+                                                                                                                setQrModalConfig({ id: c.id, qr_code: data.qr_code || null, loading: false });
+                                                                                                            } catch {
+                                                                                                                setQrModalConfig(null);
+                                                                                                                alert("Impossible de récupérer le QR code WhatsApp.");
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-green-300 transition-all group min-w-[180px] justify-center disabled:opacity-50"
+                                                                                                    >
+                                                                                                        {qrModalConfig?.loading && qrModalConfig.id === c.id ? (
+                                                                                                            <div className="flex items-center gap-2 text-green-700">
+                                                                                                                <div className="w-3 h-3 border-2 border-green-700 border-t-transparent animate-spin rounded-full"></div>
+                                                                                                                <span className="text-[10px] font-bold">Chargement QR...</span>
                                                                                                             </div>
-                                                                                                            <span className="text-[10px] font-bold text-gray-700">Connecter via Unipile</span>
-                                                                                                        </>
-                                                                                                    )}
-                                                                                                </button>
+                                                                                                        ) : (
+                                                                                                            <>
+                                                                                                                <div className="w-4 h-4 flex items-center justify-center rounded-sm font-black text-[10px] text-white" style={{ backgroundColor: '#25D366' }}>
+                                                                                                                    W
+                                                                                                                </div>
+                                                                                                                <span className="text-[10px] font-bold text-gray-700">Scanner le QR Code</span>
+                                                                                                            </>
+                                                                                                        )}
+                                                                                                    </button>
+                                                                                                ) : configTarget === 'linkedin' ? (
+                                                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
+                                                                                                        Non disponible
+                                                                                                    </span>
+                                                                                                ) : (
+                                                                                                    <button
+                                                                                                        disabled={redirectingIds.includes(c.id)}
+                                                                                                        onClick={async () => {
+                                                                                                            setRedirectingIds(prev => [...prev, c.id]);
+                                                                                                            try {
+                                                                                                                const url = await providerInfo.getUrl(c.id);
+                                                                                                                if (url) window.location.assign(url);
+                                                                                                                else throw new Error("No URL");
+                                                                                                            } catch {
+                                                                                                                setRedirectingIds(prev => prev.filter(id => id !== c.id));
+                                                                                                                alert("Impossible d'obtenir l'URL de connexion.");
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all group min-w-[180px] justify-center disabled:opacity-50"
+                                                                                                    >
+                                                                                                        {redirectingIds.includes(c.id) ? (
+                                                                                                            <div className="flex items-center gap-2 text-blue-900">
+                                                                                                                <div className="w-3 h-3 border-2 border-blue-900 border-t-transparent animate-spin rounded-full"></div>
+                                                                                                                <span className="text-[10px] font-bold">Redirection...</span>
+                                                                                                            </div>
+                                                                                                        ) : (
+                                                                                                            <>
+                                                                                                                <div className="w-4 h-4 flex items-center justify-center rounded-sm font-black text-[10px] text-white" style={{ backgroundColor: providerInfo.color }}>
+                                                                                                                    {providerInfo.icon}
+                                                                                                                </div>
+                                                                                                                <span className="text-[10px] font-bold text-gray-700">Connecter</span>
+                                                                                                            </>
+                                                                                                        )}
+                                                                                                    </button>
+                                                                                                )}
                                                                                             </div>
                                                                                         ) : (
                                                                                             <div className="flex items-center gap-3">
@@ -972,6 +1009,86 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
             </div>
 
         </div>
+
+        {/* QR Code Modal for WhatsApp */}
+        {qrModalConfig && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full mx-4 flex flex-col items-center gap-6">
+                    <div className="flex items-center justify-between w-full">
+                        <div>
+                            <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">Connecter WhatsApp</h3>
+                            <p className="text-[10px] text-gray-400 mt-1">Scannez avec l'application WhatsApp</p>
+                        </div>
+                        <button onClick={() => setQrModalConfig(null)} className="p-2 hover:bg-gray-100 rounded-xl transition">
+                            <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    {qrModalConfig.loading ? (
+                        <div className="flex flex-col items-center gap-3 py-8">
+                            <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-sm text-gray-500">Génération du QR code...</p>
+                        </div>
+                    ) : qrModalConfig.qr_code ? (
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="p-3 bg-white border-2 border-gray-100 rounded-2xl shadow-inner">
+                                <img src={qrModalConfig.qr_code} alt="QR Code WhatsApp" className="w-56 h-56 object-contain" />
+                            </div>
+                            <div className="bg-green-50 border border-green-100 rounded-2xl p-4 text-center">
+                                <p className="text-[10px] font-bold text-green-800 uppercase tracking-widest mb-1">Instructions</p>
+                                <p className="text-[11px] text-green-700 leading-relaxed">
+                                    Ouvrez WhatsApp → <strong>Appareils liés</strong> → <strong>Lier un appareil</strong> → Scannez ce code
+                                </p>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    setQrModalConfig(prev => prev ? { ...prev, loading: true } : null);
+                                    try {
+                                        const { API_BASE, getAuthHeadersOnly } = await import('../../../lib/api');
+                                        const res = await fetch(`${API_BASE}/whatsapp-config/${qrModalConfig.id}/get_connection_url/`, { headers: getAuthHeadersOnly() });
+                                        const data = await res.json();
+                                        if (data.status === 'connected') {
+                                            setQrModalConfig(null);
+                                            refreshWhatsAppConnection(qrModalConfig.id);
+                                        } else {
+                                            setQrModalConfig(prev => prev ? { ...prev, qr_code: data.qr_code || prev.qr_code, loading: false } : null);
+                                        }
+                                    } catch {
+                                        setQrModalConfig(prev => prev ? { ...prev, loading: false } : null);
+                                    }
+                                }}
+                                className="w-full px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition"
+                            >
+                                Vérifier la connexion
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center gap-3 py-6 text-center">
+                            <div className="w-12 h-12 bg-yellow-50 border border-yellow-100 rounded-2xl flex items-center justify-center">
+                                <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            </div>
+                            <p className="text-sm font-bold text-gray-800">QR code en cours de génération</p>
+                            <p className="text-[11px] text-gray-500 leading-relaxed">Le service WhatsApp génère votre QR code. Veuillez patienter quelques secondes puis réessayer.</p>
+                            <button
+                                onClick={async () => {
+                                    setQrModalConfig(prev => prev ? { ...prev, loading: true } : null);
+                                    try {
+                                        const { API_BASE, getAuthHeadersOnly } = await import('../../../lib/api');
+                                        const res = await fetch(`${API_BASE}/whatsapp-config/${qrModalConfig.id}/get_connection_url/`, { headers: getAuthHeadersOnly() });
+                                        const data = await res.json();
+                                        setQrModalConfig(prev => prev ? { ...prev, qr_code: data.qr_code || null, loading: false } : null);
+                                    } catch {
+                                        setQrModalConfig(prev => prev ? { ...prev, loading: false } : null);
+                                    }
+                                }}
+                                className="px-6 py-2.5 bg-gray-900 hover:bg-blue-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition"
+                            >
+                                Actualiser
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
     );
 }
 
