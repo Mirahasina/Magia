@@ -5,7 +5,7 @@ from .views import (
     RegisterView, LoginView, GoogleLoginView, LogoutView, MeView,
     ChangePasswordView, ForgotPasswordView, ResetPasswordView,
     ContactRequestCreateView, SubscriptionView, SecurityView,
-    VerifyEmailView, NotificationListView, CompleteOnboardingView,
+    VerifyEmailView, ResendVerificationEmailView, NotificationListView, CompleteOnboardingView,
     PlanLimitsView, InviteMemberView, CheckInvitationView, AcceptInvitationView, WorkspaceMembersView,
     UserSurveyView,
 )

@@ -1,4 +1,3 @@
-import { API_BASE } from "../../lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,6 +6,7 @@ import { Logo } from "./Logo";
 import { Play, X, Eye, EyeOff, Loader2, Check, ArrowLeft } from "lucide-react";
 import { Checkbox } from "./ui/checkbox";
 import { cn } from "./ui/utils";
+import { API_BASE } from "../../lib/api";
 import authImage from "../../assets/auth-futuristic.png";
 import { useGoogleLogin } from "@react-oauth/google";
 
@@ -213,7 +213,10 @@ export function AuthPage({ defaultView = "login", onSuccess, initialEmail }: Aut
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: formData.email }),
             });
-            const data = await res.json();
+            const contentType = res.headers.get("content-type") || "";
+            const data = contentType.includes("application/json")
+                ? await res.json()
+                : { error: await res.text() };
             if (!res.ok) throw new Error(data.error || "Impossible de renvoyer l'email de vérification.");
             setSuccessMsg(data.message || "Email de vérification renvoyé.");
         } catch (err: any) {
