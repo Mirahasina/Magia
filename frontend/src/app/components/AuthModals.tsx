@@ -1,5 +1,4 @@
 import { API_BASE } from "../../lib/api";
-"use client";
 
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";

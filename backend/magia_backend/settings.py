@@ -11,7 +11,12 @@ if os.path.exists(env_file):
 
 DJANGO_ENV = env('DJANGO_ENV', default='development')
 
-SECRET_KEY = env('SECRET_KEY', default='django-dev-secret-key')
+# In production a real SECRET_KEY must be provided via the environment; the
+# insecure development fallback is only allowed outside production.
+if DJANGO_ENV == 'production':
+    SECRET_KEY = env('SECRET_KEY')
+else:
+    SECRET_KEY = env('SECRET_KEY', default='django-insecure-dev-secret-key-change-me')
 DEBUG = env.bool('DEBUG', default=(DJANGO_ENV == 'development'))
 
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
@@ -166,3 +171,44 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Magia <noreply@magia.ai>')
 ADMIN_EMAIL = env('ADMIN_EMAIL', default='admin@magia.ai')
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+LOG_LEVEL = env('LOG_LEVEL', default='DEBUG' if DEBUG else 'INFO')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'accounts': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'agents': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}

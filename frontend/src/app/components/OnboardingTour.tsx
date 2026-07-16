@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Joyride, CallBackProps, STATUS, Step } from "react-joyride";
+import { Joyride, STATUS, type EventData, type Step } from "react-joyride";
 import { API_BASE, getAuthHeadersOnly } from "../../lib/api";
 
 interface OnboardingTourProps {
@@ -37,7 +37,7 @@ export function OnboardingTour({ hasCompletedOnboarding, onComplete }: Onboardin
         </div>
       ),
       placement: "center",
-      disableBeacon: true,
+      skipBeacon: true,
     },
     {
       target: "#tour-tableau-de-bord",
@@ -89,7 +89,7 @@ export function OnboardingTour({ hasCompletedOnboarding, onComplete }: Onboardin
     },
   ];
 
-  const handleJoyrideCallback = async (data: CallBackProps) => {
+  const handleJoyrideCallback = async (data: EventData) => {
     const { status } = data;
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
 
@@ -114,28 +114,25 @@ export function OnboardingTour({ hasCompletedOnboarding, onComplete }: Onboardin
 
   return (
     <Joyride
-      callback={handleJoyrideCallback}
+      onEvent={handleJoyrideCallback}
       continuous
-      hideCloseButton
       run={run}
       scrollToFirstStep
-      showProgress
-      showSkipButton
       steps={steps}
+      options={{
+        zIndex: 10000,
+        primaryColor: '#3b82f6', // blue-500
+        textColor: '#334155', // slate-700
+        overlayColor: 'rgba(15, 23, 42, 0.75)', // slate-900 with opacity
+        showProgress: true,
+        buttons: ['back', 'skip', 'primary'], // hide close, show skip
+      }}
       styles={{
-        options: {
-          zIndex: 10000,
-          primaryColor: '#3b82f6', // blue-500
-          textColor: '#334155', // slate-700
-          backgroundColor: '#ffffff',
-          arrowColor: '#ffffff',
-          overlayColor: 'rgba(15, 23, 42, 0.75)', // slate-900 with opacity
-        },
         tooltip: {
           borderRadius: '16px',
           padding: '20px',
         },
-        buttonNext: {
+        buttonPrimary: {
           backgroundColor: '#2563eb',
           borderRadius: '8px',
           fontSize: '14px',

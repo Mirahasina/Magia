@@ -3,17 +3,17 @@ from openai import OpenAI
 from anthropic import Anthropic
 import os
 import environ
-from PIL import Image
 import re
 import uuid
 import shutil
-import requests
 import urllib.parse
 from django.conf import settings
 from gradio_client import Client
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-import io
+import logging
+
+logger = logging.getLogger(__name__)
 
 env = environ.Env()
 environ.Env.read_env(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
@@ -43,7 +43,7 @@ def create_pdf_from_text(text, filepath):
         c.save()
         return True
     except Exception as e:
-        print(f"PDF Error: {e}")
+        logger.error("PDF Error: %s", e)
         return False
 
 def generate_video_huggingface(prompt):
@@ -92,7 +92,7 @@ def process_ai_response(response_text):
                 url = res.data[0].url
                 return f"\n<img class='rounded-lg max-w-full shadow-md mt-2' src='{url}' alt='Image générée' />\n"
             except Exception as oe:
-                print(f"OpenAI Image Error: {oe}")
+                logger.error("OpenAI Image Error: %s", oe)
                 pass
 
         gemini_key = env('GEMINI_API_KEY', default=None)
@@ -123,7 +123,7 @@ def process_ai_response(response_text):
                     elif hasattr(image_obj, 'save'):
                         image_obj.save(dest_path)
                     else:
-                        return f"\n*Image générée mais format de données inconnu.*\n"
+                        return "\n*Image générée mais format de données inconnu.*\n"
                     
                     file_url = f"{settings.MEDIA_URL}generated/{fname}"
                     url_path = file_url if file_url.startswith('/') else f"/{file_url}"
@@ -270,12 +270,12 @@ def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, u
 
             if last_error and ("429" in str(last_error) or "quota" in str(last_error).lower()):
                 return "Désolé, j'ai atteint ma limite de requêtes pour l'instant. Veuillez réessayer dans quelques secondes."
-            return f"Désolé, j'ai rencontré une erreur technique. Veuillez réessayer."
+            return "Désolé, j'ai rencontré une erreur technique. Veuillez réessayer."
 
         elif provider == 'openai':
             api_key = env('OPENAI_API_KEY', default=None)
             if not api_key: 
-                print("WARNING: OpenAI API Key missing. Falling back to Gemini if possible.")
+                logger.warning("OpenAI API Key missing. Falling back to Gemini if possible.")
                 return "Erreur: Clé OpenAI manquante dans le fichier .env. Veuillez configurer OPENAI_API_KEY ou utiliser un modèle Gemini."
             client = OpenAI(api_key=api_key)
             response = client.chat.completions.create(
@@ -300,7 +300,7 @@ def get_llm_response(agent_name, agent_role, system_prompt, knowledge_context, u
             return process_ai_response(response.content[0].text.strip())
 
     except Exception as e:
-        print(f"LLM Error: {e}")
+        logger.error("LLM Error: %s", e)
         return f"Désolé, j'ai rencontré une erreur technique avec {model_name}."
 
 def classify_pertinence(agent_role, message):

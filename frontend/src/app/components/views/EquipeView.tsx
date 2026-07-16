@@ -125,7 +125,7 @@ export function EquipeView() {
             name: newTeamName,
             description: newTeamDescription,
             color: newTeamColor,
-            avatar: newTeamAvatar || null
+            avatar: newTeamAvatar || undefined
         });
         if (team && templateAgents.length > 0) {
             const createdAgents: any[] = [];

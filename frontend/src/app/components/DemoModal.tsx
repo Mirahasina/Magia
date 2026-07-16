@@ -1,7 +1,10 @@
 import { Play, Volume2, X } from "lucide-react";
 import { useState, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import magiaVideo from "../../assets/MAGIA.mp4";
+
+// Served from /public so the large video streams on demand instead of being
+// bundled into the JS chunk.
+const magiaVideo = "/MAGIA.mp4";
 
 interface DemoModalProps {
     isOpen: boolean;

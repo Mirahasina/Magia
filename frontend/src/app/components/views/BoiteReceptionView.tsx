@@ -198,7 +198,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
       else setActiveTab("all");
       onInitialContactConsumed?.();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [initialContact]);
 
   useEffect(() => { setSearchQuery(globalSearchQuery); }, [globalSearchQuery]);
@@ -581,11 +581,11 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
               ) : (
                 <span className="text-sm">Aucune discussion</span>
               )}
-              {searchQuery && /^[\d\+]+$/.test(searchQuery.replace(/\s/g, "")) && (
+              {searchQuery && /^[\d+]+$/.test(searchQuery.replace(/\s/g, "")) && (
                 <button
                   onClick={() =>
                     setSelectedThread({
-                      contact: searchQuery.replace(/[\s\+]/g, "") + "@s.whatsapp.net",
+                      contact: searchQuery.replace(/[\s+]/g, "") + "@s.whatsapp.net",
                       contact_name: searchQuery,
                       source: "whatsapp",
                       type: "contact",
@@ -852,7 +852,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
                   {group.msgs.map((msg, mi) => {
                     const isMe = msg.sender === "ai";
                     const msgText = msg.content || "";
-                    const isHtml = /\<[a-z][\s\S]*>/i.test(msgText);
+                    const isHtml = /<[a-z][\s\S]*>/i.test(msgText);
                     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
                     return (

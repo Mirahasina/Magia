@@ -1,0 +1,20 @@
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+extend-exclude = [
+    "venv",
+    "*/migrations/*",
+    "staticfiles",
+]
+
+[tool.ruff.lint]
+# Pyflakes (F) catches real issues (unused imports/vars, redefinitions); the
+# pycodestyle (E) subset catches a few syntax-level problems. E402/E701 are
+# intentional stylistic patterns in this codebase (lazy module-level imports,
+# single-line guard clauses) so they are disabled.
+select = ["E4", "E7", "E9", "F"]
+ignore = [
+    "E402",  # module level import not at top of file
+    "E701",  # multiple statements on one line (colon)
+    "E741",  # ambiguous variable name
+]

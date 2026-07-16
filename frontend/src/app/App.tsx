@@ -33,7 +33,7 @@ export default function App() {
   );
   const [currentView, setCurrentView] = useState<"landing" | "dashboard">(
     (localStorage.getItem(StorageKeys.CURRENT_VIEW) as "landing" | "dashboard") ||
-    (!!localStorage.getItem(StorageKeys.ACCESS_TOKEN) ? "dashboard" : "landing")
+    (localStorage.getItem(StorageKeys.ACCESS_TOKEN) ? "dashboard" : "landing")
   );
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);

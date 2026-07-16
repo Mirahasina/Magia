@@ -2,9 +2,6 @@ from .messaging_service import MessagingService
 import logging
 import os
 import re
-import shutil
-import signal
-import subprocess
 import datetime
 import json
 import threading
@@ -21,7 +18,6 @@ import pandas as pd
 import PyPDF2
 import docx
 from accounts.models import User, PLAN_LIMITS, WorkspaceMember
-from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework import viewsets, status, parsers, permissions
 from rest_framework.permissions import AllowAny
@@ -31,10 +27,8 @@ from odf.opendocument import load as odf_load
 from odf.text import P
 from odf import teletype
 from pptx import Presentation
-from google_auth_oauthlib.flow import Flow
 from .models import (
-    Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentFeedback,
-    AgentTeam, AgentLink, ContactAssignment, AuditLog, Contact
+    Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, Contact
 )
 from .serializers import (
     AgentSerializer, KnowledgeBaseSerializer, TemplateSerializer, 
@@ -45,8 +39,7 @@ from .serializers import (
 )
 from .llm_service import get_llm_response, classify_pertinence, DEFAULT_GEMINI_MODELS
 from .email_service import (
-    process_emails_for_agent, test_email_connection, send_email_via_config,
-    sync_email_history, send_email_reply
+    process_emails_for_agent, test_email_connection, sync_email_history, send_email_reply
 )
 from django.db.models import Q, Count, Max as MaxAgg
 from django.db.models.functions import TruncDay
@@ -267,7 +260,7 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
             if not effective_agent:
                 effective_agent = active_agents.first()
 
-        msg = ChatMessage.objects.create(
+        ChatMessage.objects.create(
             user=user,
             agent=effective_agent,
             sender='ai' if is_me else 'user',

@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth import get_user_model
-from accounts.models import Subscription, Notification, PLAN_LIMITS
+from accounts.models import Subscription, Notification
 from django.core.management import call_command
 from django.core import mail
 

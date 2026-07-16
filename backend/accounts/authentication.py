@@ -1,6 +1,10 @@
+import logging
+
 from rest_framework import authentication
-from rest_framework import exceptions
 from .models import User
+
+logger = logging.getLogger(__name__)
+
 
 class MasterAPIKeyAuthentication(authentication.BaseAuthentication):
     def authenticate(self, request):
@@ -18,10 +22,10 @@ class MasterAPIKeyAuthentication(authentication.BaseAuthentication):
 
         try:
             user = User.objects.get(master_api_key=token)
-            print(f"DEBUG: User found: {user.email}")
+            logger.debug("Master API key authenticated user: %s", user.email)
             return (user, None)
         except User.DoesNotExist:
-            print(f"DEBUG: No user found for token")
+            logger.debug("No user found for provided master API key")
             # Important: return None instead of raising, to allow AllowAny to work
             # and to let other authenticators (like JWT) try if they haven't yet.
             return None

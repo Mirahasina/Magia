@@ -35,8 +35,8 @@ export function UpdateCardModal({ isOpen, onClose, onSuccess }: UpdateCardModalP
         const last4 = cleanNumber.slice(-4);
         
         const expiryParts = expiry.split('/');
-        let expMonth = (expiryParts[0] || "").trim().padStart(2, '0').slice(-2);
-        let expYear = (expiryParts[1] || "").trim().slice(-2);
+        const expMonth = (expiryParts[0] || "").trim().padStart(2, '0').slice(-2);
+        const expYear = (expiryParts[1] || "").trim().slice(-2);
         
         const brand = cleanNumber.startsWith('4') ? 'Visa' : cleanNumber.startsWith('5') ? 'Mastercard' : 'Card';
 

@@ -1,5 +1,4 @@
 import { API_BASE } from "../../lib/api";
-"use client";
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
@@ -77,7 +76,7 @@ function CardSetupForm({
         if (storedCard && hasPassword === false && !otpSent) {
             sendOtp();
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     }, [storedCard, hasPassword]);
 
     const targetPlan = planDetails.targetPlan || (planDetails.currentPlan === "pro" ? "entreprise" : "pro");

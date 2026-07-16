@@ -8,6 +8,12 @@ Thumbs.db
 *.tar.gz
 allfiles.txt
 
+# --- Node (any location) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # --- Backend (Django) ---
 backend/venv/
 backend/.env
@@ -20,6 +26,7 @@ backend/.pytest_cache/
 backend/auth_info_*/
 backend/faiss_indexes/
 backend/logs/
+.pytest_cache/
 
 # --- Frontend (React/Vite) ---
 frontend/node_modules/

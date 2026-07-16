@@ -1,6 +1,6 @@
 import { API_BASE } from "../../../lib/api";
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown, Linkedin, AlertTriangle } from "lucide-react";
+import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown, Linkedin, AlertTriangle, Sparkles } from "lucide-react";
 import { cn } from "../ui/utils";
 import { Button } from "../ui/button";
 import { useAgents } from "../../hooks/useAgents";
@@ -17,6 +17,11 @@ interface Agent {
     channels: string[];
     messages?: any[];
     stats?: any;
+    temperature?: number;
+    execution_mode?: string;
+    team?: number | string | null;
+    team_color?: string;
+    knowledge_bases?: any[];
 }
 
 export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToInbox }: { user?: any; agent: Agent; onBack: () => void; onRefresh?: () => void; onNavigateToInbox?: (agentId?: string) => void }) {
@@ -348,7 +353,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black uppercase text-gray-400">Mode d'exécution</p>
-                                    <p className="text-sm font-bold capitalize">{agent.execution_mode.replace('_', ' ')}</p>
+                                    <p className="text-sm font-bold capitalize">{agent.execution_mode?.replace('_', ' ')}</p>
                                 </div>
                                 <div className="space-y-1 pt-4 border-t border-gray-100">
                                     <p className="text-[10px] font-black uppercase text-gray-400">Équipe Assignée</p>

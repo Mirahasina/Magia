@@ -1,9 +1,8 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from django.urls import reverse
 from rest_framework.test import APIClient
 from accounts.models import User
-from agents.models import WhatsAppConfig, Agent, EmailConfig, ChatMessage
+from agents.models import Agent, EmailConfig, ChatMessage
 
 @pytest.fixture
 def api_client():
@@ -191,7 +190,13 @@ class TestEmailService:
 class TestTeamKnowledgeBase:
     def test_team_knowledge_base_creation_and_search(self, test_user):
         from agents.models import AgentTeam, KnowledgeBase
-        from agents.rag_service import add_texts_to_knowledge_base, search_agent_and_team_knowledge_base, search_knowledge_base
+        from agents.rag_service import add_texts_to_knowledge_base, search_agent_and_team_knowledge_base, search_knowledge_base, get_embeddings
+
+        # This is an integration test that depends on the sentence-transformers
+        # embedding model. Skip it (instead of failing) when the model cannot be
+        # loaded, e.g. in an offline CI environment without the cached weights.
+        if get_embeddings() is None:
+            pytest.skip("Embedding model unavailable (offline); skipping RAG integration test")
 
         # Create AgentTeam
         team = AgentTeam.objects.create(name="Support Team", user=test_user)

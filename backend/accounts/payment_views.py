@@ -1,14 +1,12 @@
 from datetime import timezone
-import uuid
+import logging
 from datetime import datetime
-import json
 # pyrefly: ignore [missing-import]
 import stripe
-from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import PaymentTransaction, Subscription
+from .models import PaymentTransaction
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 import random
@@ -20,6 +18,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from datetime import timedelta
+
+logger = logging.getLogger(__name__)
 
 
 class CreateCheckoutIntentView(APIView):
@@ -61,7 +61,7 @@ class CreateCheckoutIntentView(APIView):
                     ],
                     mode='payment',
                     success_url=f"http://localhost:5173/dashboard?payment_success=true&transaction_id={transaction.id}",
-                    cancel_url=f"http://localhost:5173/dashboard?payment_cancelled=true",
+                    cancel_url="http://localhost:5173/dashboard?payment_cancelled=true",
                     client_reference_id=str(transaction.id),
                 )
                 
@@ -194,7 +194,7 @@ class ConfirmCardPaymentView(APIView):
             intent = stripe.PaymentIntent.retrieve(payment_intent_id)
             # Accept succeeded OR requires_capture (in case of manual capture mode)
             if intent.status not in ('succeeded', 'requires_capture'):
-                print(f"[WARN] PaymentIntent {payment_intent_id} status: {intent.status}")
+                logger.warning("PaymentIntent %s status: %s", payment_intent_id, intent.status)
                 # Don't hard-fail here — trust the frontend that payment went through
                 # but log for monitoring
             # Use metadata as fallback only
@@ -212,7 +212,7 @@ class ConfirmCardPaymentView(APIView):
                 pm_exp_year = str(card.get('exp_year', ''))[-2:]
         except Exception as stripe_err:
             # If Stripe API is unreachable (blocked, key error, etc.), log but continue
-            print(f"[WARN] Stripe verification error (continuing anyway): {stripe_err}")
+            logger.warning("Stripe verification error (continuing anyway): %s", stripe_err)
 
         # --- 2. Mark transaction as completed ---
         try:
@@ -224,7 +224,7 @@ class ConfirmCardPaymentView(APIView):
                 transaction.status = 'completed'
                 transaction.save()
         except Exception as e:
-            print(f"[WARN] Transaction update error: {e}")
+            logger.warning("Transaction update error: %s", e)
 
         # --- 3. Update subscription plan ---
         try:
@@ -264,7 +264,7 @@ class ConfirmCardPaymentView(APIView):
                 type="payment"
             )
         except Exception as e:
-            print(f"[ERROR] Subscription update failed: {e}")
+            logger.error("Subscription update failed: %s", e)
             return Response({'error': f'Erreur lors de la mise à jour de l\'abonnement: {str(e)}'}, status=500)
 
         return Response({'message': 'Paiement confirmé avec succès.'})
@@ -282,7 +282,9 @@ class SendPaymentOTPView(APIView):
         cache_key = f"payment_otp_{user.id}"
         
         cache.set(cache_key, code, timeout=600)
-        print(f"\n========== CODE OTP MAGIA : {code} ==========\n")
+        # Debug-only convenience: never logged at INFO+ so the OTP is not exposed
+        # in production logs. Delivery to the user happens via email below.
+        logger.debug("Payment OTP for user %s: %s", user.id, code)
         
         try:
             send_mail(
@@ -293,7 +295,7 @@ class SendPaymentOTPView(APIView):
                 fail_silently=False,
             )
             return Response({'message': 'Code envoyé avec succès'})
-        except Exception as e:
+        except Exception:
             return Response({'error': "Impossible d'envoyer l'email."}, status=400)
 
 

@@ -1,5 +1,4 @@
 import { API_BASE } from "../../lib/api";
-"use client";
 
 import { useState } from "react";
 import {

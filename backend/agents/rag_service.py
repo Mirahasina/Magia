@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 # pyrefly: ignore [missing-import]
@@ -6,6 +7,8 @@ from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 # pyrefly: ignore [missing-import]
 from langchain_huggingface import HuggingFaceEmbeddings
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FAISS_STORE_DIR = os.path.join(BASE_DIR, 'faiss_indexes')
@@ -22,11 +25,11 @@ def get_embeddings():
     global _embeddings
     if _embeddings is None:
         try:
-            print("Loading HuggingFaceEmbeddings...")
+            logger.info("Loading HuggingFaceEmbeddings...")
             _embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-            print("HuggingFaceEmbeddings loaded successfully.")
+            logger.info("HuggingFaceEmbeddings loaded successfully.")
         except Exception as e:
-            print(f"Error loading HuggingFaceEmbeddings: {e}")
+            logger.error("Error loading HuggingFaceEmbeddings: %s", e)
             _embeddings = None
     return _embeddings
 
@@ -61,7 +64,7 @@ def add_texts_to_knowledge_base(agent_id=None, team_id=None, raw_text="", source
         vector_store.save_local(index_path)
         return True
     except Exception as e:
-        print(f"Error adding to FAISS: {e}")
+        logger.error("Error adding to FAISS: %s", e)
         return False
 
 def search_knowledge_base(agent_id=None, team_id=None, query="", top_k=4):
@@ -87,7 +90,7 @@ def search_knowledge_base(agent_id=None, team_id=None, query="", top_k=4):
             
         return "\n\n".join(context_parts)
     except Exception as e:
-        print(f"Error searching FAISS: {e}")
+        logger.error("Error searching FAISS: %s", e)
         return ""
 
 def search_agent_and_team_knowledge_base(agent_id, team_id=None, query="", top_k=4):

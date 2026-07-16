@@ -1,7 +1,6 @@
 import imaplib
 import smtplib
 import email
-import time
 import base64
 import requests
 import os
@@ -11,7 +10,7 @@ from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 from .llm_service import get_llm_response, classify_pertinence
-from .models import EmailConfig, ChatMessage, Agent
+from .models import ChatMessage, Agent
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -441,7 +440,6 @@ def sync_email_history(config):
 
                         msg = email.message_from_bytes(raw_email)
                         is_read = b'\\Seen' in flags
-                        subject = decode_mime_words(msg['Subject'])
                         sender_raw = decode_mime_words(msg['From'])
                         
                         # Détection si c'est un message envoyé par l'utilisateur

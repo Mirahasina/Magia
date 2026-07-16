@@ -1,6 +1,5 @@
 import logging
 import datetime
-import uuid
 from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives, send_mail
 from django.template.loader import render_to_string
@@ -26,7 +25,6 @@ from .models import (
     User, ContactRequest, Subscription, WorkspaceMember, 
     WorkspaceInvitation, Notification, PLAN_LIMITS, EnterpriseRequest
 )
-from .utils import send_verification_email
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
@@ -477,7 +475,7 @@ class SecurityView(APIView):
     def post(self, request, action=None):
         user = request.user
         if action in ('regenerate', 'regenerate_master_key'):
-            new_key = user.generate_master_api_key()
+            user.generate_master_api_key()
             return Response({
                 'message': 'Clé API régénérée avec succès.',
                 'master_api_key': UserProfileSerializer(user).to_representation(user).get('master_api_key')

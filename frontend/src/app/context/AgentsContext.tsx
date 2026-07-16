@@ -132,9 +132,7 @@ interface AgentsContextType {
   createLink: (data: Partial<AgentLink>) => Promise<AgentLink | null>;
   deleteLink: (id: number) => Promise<void>;
   syncLinkedInMessages: (id: number) => Promise<void>;
-  getLinkedInConnectionUrl: (id: number) => Promise<string | null>;
   startLinkedInProspecting: (id: number, query: string, message: string) => Promise<void>;
-  refreshLinkedInConnection: (id: number) => Promise<void>;
 }
 
 
