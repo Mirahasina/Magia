@@ -47,6 +47,13 @@ from rest_framework.exceptions import PermissionDenied
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .rag_service import add_texts_to_knowledge_base, search_knowledge_base, search_agent_and_team_knowledge_base
+from .prospection_service import (
+    mark_prospect_replied,
+    schedule_followup_after_ai,
+    infer_channels_for_team_agent,
+    attach_user_channel_configs,
+    build_handoff_intro,
+)
 
 
 
@@ -272,6 +279,13 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
             is_read=bool(is_historical),
             status='archived' if is_historical else 'new'
         )
+
+        if not is_historical and message:
+            if is_me:
+                schedule_followup_after_ai(user, wa_sender, 'whatsapp', analyze=False)
+            else:
+                mark_prospect_replied(user, wa_sender, 'whatsapp')
+
         return Response({'status': 'received'})
 
 
@@ -724,6 +738,11 @@ class AgentTeamViewSet(viewsets.ModelViewSet):
         
         agents_created = []
         for agent_def in plan['agents']:
+            channels = agent_def.get('channels') or infer_channels_for_team_agent(
+                agent_def.get('name', ''),
+                agent_def.get('role', ''),
+                agent_def.get('system_prompt', ''),
+            )
             agent = Agent.objects.create(
                 user=request.user,
                 team=team,
@@ -733,8 +752,10 @@ class AgentTeamViewSet(viewsets.ModelViewSet):
                 is_team_agent=True,
                 is_deployed=True,
                 llm_model='gemini-2.0-flash',
-                execution_mode='auto'
+                execution_mode='auto',
+                channels=channels,
             )
+            attach_user_channel_configs(agent, request.user)
             agents_created.append(agent)
             
         for link_def in plan.get('links', []):
@@ -801,7 +822,7 @@ Si l'équipe est prête :
     "description": "Objectif",
     "color": "#1e3a8a",
     "agents": [
-      {"name": "Nom Agent", "role": "Expertise", "system_prompt": "Instructions pro sans gras"}
+      {"name": "Nom Agent", "role": "Expertise", "system_prompt": "Instructions pro sans gras", "channels": ["chat", "whatsapp", "email"]}
     ],
     "links": [
       {"from": 0, "to": 1, "trigger": "interest", "description": "Trigger"}
@@ -809,7 +830,8 @@ Si l'équipe est prête :
   }
 }
 
-Triggers : interest, email_requested, whatsapp_requested, manual."""
+Triggers : interest, email_requested, whatsapp_requested, manual.
+Pour chaque agent, inclus "channels" parmi chat, whatsapp, email selon son rôle."""
 
         conversation_text = f"SYSTEM: {SYSTEM}\n\n"
         for msg in history[-10:]:
@@ -932,19 +954,34 @@ class LinkedInConfigViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def refresh_connection(self, request, pk=None):
-        return Response({"status": "disconnected", "message": "Canal LinkedIn inactif."})
+        return Response({
+            "status": "unavailable",
+            "message": "LinkedIn n'est plus disponible. Utilisez WhatsApp ou Email.",
+        })
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
-        return Response({"status": "LinkedIn inactif"})
+        return Response({
+            "status": "unavailable",
+            "message": "LinkedIn n'est plus disponible. Utilisez WhatsApp ou Email.",
+        })
 
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
-        return Response({"error": "La connexion LinkedIn automatique n'est plus supportée suite au décommissionnement d'Unipile."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "error": "LinkedIn n'est plus disponible. Utilisez WhatsApp ou Email."
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def prospect(self, request, pk=None):
-        return Response({"error": "La prospection automatique LinkedIn n'est plus supportée suite au décommissionnement d'Unipile."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "error": "LinkedIn n'est plus disponible. Utilisez WhatsApp ou Email."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        return Response({
+            "error": "LinkedIn n'est plus disponible. Utilisez WhatsApp ou Email."
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 class ContactAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = ContactAssignmentSerializer
@@ -959,7 +996,25 @@ class ContactViewSet(viewsets.ModelViewSet):
         return Contact.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
+        source = serializer.validated_data.get('source', '')
+        if source in ('linkedin', 'facebook'):
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({
+                'source': (
+                    f"Le canal {source} n'est plus disponible. "
+                    "Utilisez whatsapp ou email."
+                )
+            })
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def run_followups(self, request):
+        """Manual trigger for follow-up batch (also run by the background scheduler)."""
+        from django.core.management import call_command
+        from io import StringIO
+        out = StringIO()
+        call_command('run_followups', stdout=out)
+        return Response({'status': 'ok', 'output': out.getvalue()})
 
     @action(detail=False, methods=['post'], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
     def import_contacts(self, request):
@@ -997,6 +1052,7 @@ class ContactViewSet(viewsets.ModelViewSet):
         skipped_count = 0
         errors = []
         valid_statuses = {'new', 'contacted', 'interested', 'ready', 'no'}
+        # LinkedIn / Facebook outreach are retired; keep values for legacy imports but prefer WA/Email
         valid_sources = {'whatsapp', 'email', 'facebook', 'linkedin', 'chat'}
 
         for idx, row in df.iterrows():
@@ -1010,7 +1066,12 @@ class ContactViewSet(viewsets.ModelViewSet):
                 name = contact_info
 
             source = str(row.get('source', 'whatsapp')).strip().lower()
-            if source not in valid_sources:
+            if source in ('linkedin', 'facebook'):
+                errors.append(
+                    f"Ligne {idx + 2}: canal {source} indisponible — contact importé en 'whatsapp'."
+                )
+                source = 'whatsapp'
+            elif source not in valid_sources:
                 source = 'whatsapp'
 
             notes = str(row.get('notes', '')).strip()
@@ -1090,7 +1151,12 @@ class ContactViewSet(viewsets.ModelViewSet):
             response_text = f"Bonjour {contact_name}, je suis {agent.name}. Je serais ravi d'échanger avec vous."
 
         if source in ['facebook', 'linkedin']:
-            return Response({'error': f"Le canal {source} n'est plus supporté suite au décommissionnement d'Unipile."}, status=400)
+            return Response({
+                'error': (
+                    f"Le canal {source} n'est plus disponible. "
+                    "Utilisez WhatsApp ou Email pour contacter ce prospect."
+                )
+            }, status=400)
 
         sent = MessagingService.send_message(request.user, contact_info, response_text, source)
 
@@ -1116,7 +1182,9 @@ class ContactViewSet(viewsets.ModelViewSet):
 
         if contact.status == 'new':
             contact.status = 'contacted'
-            contact.save()
+        contact.replied_since_last_ai = False
+        contact.next_followup_date = timezone.now() + timezone.timedelta(hours=48)
+        contact.save()
 
         return Response({
             'status': 'sent' if sent else 'logged_only',
@@ -1228,7 +1296,14 @@ class AgentViewSet(viewsets.ModelViewSet):
                     f"Limite atteinte : votre abonnement {plan} personnalisé permet {max_agents} agent(s) maximum. "
                     f"Veuillez passer au niveau supérieur pour créer davantage d'agents."
                 )
-        serializer.save(user=self.request.user)
+        agent = serializer.save(user=self.request.user)
+        if agent.is_team_agent:
+            if not agent.channels:
+                agent.channels = infer_channels_for_team_agent(
+                    agent.name, agent.role, agent.system_prompt
+                )
+                agent.save(update_fields=['channels'])
+            attach_user_channel_configs(agent, self.request.user)
 
     @action(detail=False, methods=['get'])
     def dashboard_stats(self, request):
@@ -1432,25 +1507,64 @@ class AgentViewSet(viewsets.ModelViewSet):
         assignment = ContactAssignment.objects.filter(user=user, contact_info=contact_info).first()
         return assignment.agent if assignment else default_agent
 
-    def _check_handoff(self, agent, user_message, contact_info):
+    def _check_handoff(self, agent, user_message, contact_info, source=None):
         """
         Check if any trigger is met to hand off to another agent.
+        On success: reassign contact, log + optionally send an intro from the new agent.
+        Returns the target agent or None.
         """
         links = AgentLink.objects.filter(source_agent=agent)
         if not links.exists():
             return None
-        
-        # Classify trigger via LLM
+
         from .llm_service import classify_handoff
         for link in links:
+            # "manual" is reserved for human / UI escalation — skip auto LLM classification
+            if link.trigger_type == 'manual':
+                continue
             if classify_handoff(link.trigger_type, user_message):
-                # Perform handoff
+                target = link.target_agent
                 ContactAssignment.objects.update_or_create(
                     user=agent.user,
                     contact_info=contact_info,
-                    defaults={'agent': link.target_agent}
+                    defaults={'agent': target},
                 )
-                return link.target_agent
+
+                intro = build_handoff_intro(target, previous_agent=agent)
+                resolved_source = source
+                if not resolved_source:
+                    contact = Contact.objects.filter(
+                        user=agent.user, contact_info=contact_info
+                    ).first()
+                    resolved_source = contact.source if contact else 'chat'
+
+                ChatMessage.objects.create(
+                    user=agent.user,
+                    agent=target,
+                    sender='ai',
+                    content=intro,
+                    contact_info=contact_info,
+                    source=resolved_source or 'chat',
+                    status='new',
+                )
+
+                if resolved_source in ('whatsapp', 'email'):
+                    try:
+                        MessagingService.send_message(
+                            agent.user, contact_info, intro, resolved_source
+                        )
+                    except Exception as exc:
+                        logger.warning("Handoff intro send failed: %s", exc)
+
+                AuditLog.objects.create(
+                    user=agent.user,
+                    action="Handoff d'agent",
+                    details=(
+                        f"{agent.name} → {target.name} "
+                        f"(trigger={link.trigger_type}, contact={contact_info})"
+                    ),
+                )
+                return target
         return None
 
     @action(detail=True, methods=['post'])
@@ -1464,9 +1578,13 @@ class AgentViewSet(viewsets.ModelViewSet):
         
         effective_agent = self._get_assigned_agent(request.user, contact_info, agent)
         
-        self._check_handoff(effective_agent, user_message, contact_info)
+        handed_to = self._check_handoff(effective_agent, user_message, contact_info, source='chat')
+        if handed_to:
+            effective_agent = handed_to
+
+        mark_prospect_replied(request.user, contact_info)
         
-        ChatMessage.objects.create(agent=effective_agent, sender='user', content=user_message, contact_info=contact_info)
+        ChatMessage.objects.create(agent=effective_agent, user=request.user, sender='user', content=user_message, contact_info=contact_info)
 
         history = list(ChatMessage.objects.filter(agent=effective_agent, contact_info=contact_info).order_by('-created_at')[:6])
         history.reverse()
@@ -1492,10 +1610,12 @@ class AgentViewSet(viewsets.ModelViewSet):
             user_plan=user_plan
         )
 
-        ChatMessage.objects.create(agent=effective_agent, sender='ai', content=response, contact_info=contact_info)
+        ChatMessage.objects.create(agent=effective_agent, user=request.user, sender='ai', content=response, contact_info=contact_info)
+        schedule_followup_after_ai(request.user, contact_info, analyze=True)
         return Response({
             'reply': response,
             'agent': effective_agent.name,
+            'handoff': handed_to.name if handed_to else None,
             'timestamp': time.time()
         })
 
@@ -1540,7 +1660,11 @@ class AgentViewSet(viewsets.ModelViewSet):
 
         effective_agent = self._get_assigned_agent(request.user, wa_sender, agent)
         
-        self._check_handoff(effective_agent, message, wa_sender)
+        handed_to = self._check_handoff(effective_agent, message, wa_sender, source='whatsapp')
+        if handed_to:
+            effective_agent = handed_to
+
+        mark_prospect_replied(request.user, wa_sender, 'whatsapp')
 
         config = effective_agent.whatsapp_config
         is_connected = config is not None and config.is_connected
@@ -1564,14 +1688,16 @@ class AgentViewSet(viewsets.ModelViewSet):
             model_name=effective_agent.llm_model
         )
 
-        ChatMessage.objects.create(agent=effective_agent, sender='user', content=message, contact_info=wa_sender, source='whatsapp', whatsapp_message_id=wa_id, status=status)
-        ChatMessage.objects.create(agent=effective_agent, sender='ai', content=answer, contact_info=wa_sender, source='whatsapp', status='new')
+        ChatMessage.objects.create(agent=effective_agent, user=request.user, sender='user', content=message, contact_info=wa_sender, source='whatsapp', whatsapp_message_id=wa_id, status=status)
+        ChatMessage.objects.create(agent=effective_agent, user=request.user, sender='ai', content=answer, contact_info=wa_sender, source='whatsapp', status='new')
+        schedule_followup_after_ai(request.user, wa_sender, 'whatsapp', analyze=True)
 
         return Response({
             'status': 'responded',
             'response': answer,
             'source': 'ai',
-            'agent': effective_agent.name
+            'agent': effective_agent.name,
+            'handoff': handed_to.name if handed_to else None,
         })
 
     @action(detail=True, methods=['get'])
@@ -1629,6 +1755,7 @@ class AgentViewSet(viewsets.ModelViewSet):
                 model_name=agent.llm_model
             )
             ChatMessage.objects.create(agent=agent, sender='ai', content=response_text, contact_info=contact_info, source=source, status='new')
+            schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
             return Response({'status': 'sent', 'reply': response_text})
             
         elif source == 'email':
@@ -1646,15 +1773,19 @@ class AgentViewSet(viewsets.ModelViewSet):
             if not success:
                 return Response({'error': 'Failed to send email'}, status=500)
             ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
+            schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
             
         elif source == 'whatsapp':
             success = MessagingService.send_message(request.user, contact_info, content, 'whatsapp')
             if not success:
                 return Response({'error': 'WhatsApp service error'}, status=500)
             ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
+            schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
             
         elif source in ['facebook', 'linkedin']:
-            return Response({'error': f"Le canal {source} n'est plus supporté suite au décommissionnement d'Unipile."}, status=400)
+            return Response({
+                'error': f"Le canal {source} n'est plus disponible. Utilisez WhatsApp ou Email."
+            }, status=400)
                 
         return Response({'status': 'sent'})
         
@@ -1691,17 +1822,21 @@ class AgentViewSet(viewsets.ModelViewSet):
                 status='pertinent',
                 email_config=config
             )
+            schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
             return Response({'status': 'sent'})
             
         elif source == 'whatsapp':
              success = MessagingService.send_message(request.user, contact_info, content, 'whatsapp')
              if success:
                  ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
+                 schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
                  return Response({'status': 'sent'})
              return Response({'error': 'Failed to send WhatsApp message'}, status=500)
 
         elif source in ['facebook', 'linkedin']:
-            return Response({'error': f"Le canal {source} n'est plus supporté suite au décommissionnement d'Unipile."}, status=400)
+            return Response({
+                'error': f"Le canal {source} n'est plus disponible. Utilisez WhatsApp ou Email."
+            }, status=400)
 
         return Response({'error': 'Source not supported for direct reply'}, status=400)
 

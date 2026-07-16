@@ -69,7 +69,7 @@ export function OnboardingTour({ hasCompletedOnboarding, onComplete }: Onboardin
         <div className="text-left space-y-2">
           <h3 className="font-bold text-slate-800">La Boîte de Réception Centrale</h3>
           <p className="text-sm text-slate-600">
-            Retrouvez tous les messages provenant de WhatsApp, Facebook, LinkedIn et de vos emails. Vos Agents IA y répondront automatiquement !
+            Retrouvez tous les messages provenant de WhatsApp et de vos emails. Vos Agents IA y répondront automatiquement !
           </p>
         </div>
       ),

@@ -1,6 +1,6 @@
 import { API_BASE } from "../../../lib/api";
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown, Linkedin, AlertTriangle, Sparkles } from "lucide-react";
+import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown, AlertTriangle, Sparkles } from "lucide-react";
 import { cn } from "../ui/utils";
 import { Button } from "../ui/button";
 import { useAgents } from "../../hooks/useAgents";
@@ -219,7 +219,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                         <div className="p-8 bg-white border border-gray-100 rounded-[2rem] shadow-sm">
                             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2"> <Globe className="w-4 h-4 text-gray-400" /> Canaux actifs</h3>
                             <div className="space-y-4">
-                                {['chat', 'email', 'whatsapp', 'linkedin'].map((chan) => {
+                                {['chat', 'email', 'whatsapp'].map((chan) => {
                                     const isActive = agent.channels?.includes(chan);
                                     return (
                                         <div key={chan} className={cn(
@@ -234,7 +234,6 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                                 {chan === 'chat' && <Globe className={cn("w-4 h-4", isActive ? "text-blue-500" : "text-gray-400")} />}
                                                 {chan === 'email' && <Mail className={cn("w-4 h-4", isActive ? "text-orange-500" : "text-gray-400")} />}
                                                 {chan === 'whatsapp' && <MessageSquare className={cn("w-4 h-4", isActive ? "text-green-500" : "text-gray-400")} />}
-                                                {chan === 'linkedin' && <Linkedin className={cn("w-4 h-4", isActive ? "text-blue-700" : "text-gray-400")} />}
                                                 <span className={cn("text-sm font-bold capitalize", isActive ? "text-blue-900" : "text-gray-400")}>{chan === 'chat' ? 'Web Chat' : chan}</span>
                                             </div>
                                             <div className={cn(
@@ -249,6 +248,9 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                         </div>
                                     );
                                 })}
+                                <p className="text-[10px] text-gray-400 italic px-1">
+                                    LinkedIn n&apos;est plus disponible — utilisez WhatsApp ou Email.
+                                </p>
                             </div>
                             <p className="mt-4 text-[10px] text-gray-400 italic text-center">Cliquez sur un canal pour l'activer ou le désactiver.</p>
                         </div>

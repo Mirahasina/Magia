@@ -13,10 +13,10 @@ const TEAM_TEMPLATES = [
         color: "#1e3a8a",
         description: "Prospection, qualification, closing et suivi client. Chaque agent prend le relais au bon moment du cycle de vente.",
         agents: [
-            { name: "Prospecteur", role: "Qualification de leads", system_prompt: "Tu es un agent de prospection. Ton rôle est d'accueillir les prospects, de cerner leur besoin et de détecter leur niveau d'intérêt. Tu es chaleureux, curieux et efficace. Dès qu'un prospect montre un intérêt concret, tu passes le relais." },
-            { name: "Closer", role: "Closing & proposition commerciale", system_prompt: "Tu es un expert en closing. Tu reçois des leads déjà qualifiés et intéressés. Ton rôle est de les convaincre, de répondre à leurs objections et de finaliser la vente ou le rendez-vous." },
-            { name: "Agent Email", role: "Suivi par email", system_prompt: "Tu es responsable du suivi par email. Tu rédiges des emails professionnels et personnalisés pour relancer les prospects ou confirmer les prochaines étapes." },
-            { name: "Agent WhatsApp", role: "Suivi WhatsApp", system_prompt: "Tu es responsable du suivi WhatsApp. Tu envoies des messages courts, directs et engageants pour maintenir le contact avec les prospects sur leur canal préféré." },
+            { name: "Prospecteur", role: "Qualification de leads", system_prompt: "Tu es un agent de prospection. Ton rôle est d'accueillir les prospects, de cerner leur besoin et de détecter leur niveau d'intérêt. Tu es chaleureux, curieux et efficace. Dès qu'un prospect montre un intérêt concret, tu passes le relais.", channels: ["chat", "whatsapp", "email"] },
+            { name: "Closer", role: "Closing & proposition commerciale", system_prompt: "Tu es un expert en closing. Tu reçois des leads déjà qualifiés et intéressés. Ton rôle est de les convaincre, de répondre à leurs objections et de finaliser la vente ou le rendez-vous.", channels: ["chat", "whatsapp", "email"] },
+            { name: "Agent Email", role: "Suivi par email", system_prompt: "Tu es responsable du suivi par email. Tu rédiges des emails professionnels et personnalisés pour relancer les prospects ou confirmer les prochaines étapes.", channels: ["chat", "email"] },
+            { name: "Agent WhatsApp", role: "Suivi WhatsApp", system_prompt: "Tu es responsable du suivi WhatsApp. Tu envoies des messages courts, directs et engageants pour maintenir le contact avec les prospects sur leur canal préféré.", channels: ["chat", "whatsapp"] },
         ],
         links: [
             { from: 0, to: 1, trigger: "interest", description: "Dès que le prospect exprime un intérêt, le Closer prend le relais pour finaliser." },
@@ -30,8 +30,8 @@ const TEAM_TEMPLATES = [
         color: "#10b981",
         description: "FAQ automatique, escalade vers un expert et passage manuel pour les cas complexes.",
         agents: [
-            { name: "Réception", role: "Triage & FAQ", system_prompt: "Tu es le premier contact du support. Tu réponds aux questions fréquentes et tu qualifies la demande. Si le problème est technique ou complexe, tu passes le relais à l'expert." },
-            { name: "Expert Technique", role: "Résolution technique", system_prompt: "Tu es un expert technique. Tu reçois les demandes escaladées et tu résous les problèmes complexes avec précision et professionnalisme." },
+            { name: "Réception", role: "Triage & FAQ", system_prompt: "Tu es le premier contact du support. Tu réponds aux questions fréquentes et tu qualifies la demande. Si le problème est technique ou complexe, tu passes le relais à l'expert.", channels: ["chat", "whatsapp", "email"] },
+            { name: "Expert Technique", role: "Résolution technique", system_prompt: "Tu es un expert technique. Tu reçois les demandes escaladées et tu résous les problèmes complexes avec précision et professionnalisme.", channels: ["chat", "email"] },
         ],
         links: [
             { from: 0, to: 1, trigger: "interest", description: "Problème complexe détecté : transfert vers l'Expert Technique." },
@@ -44,8 +44,8 @@ const TEAM_TEMPLATES = [
         color: "#ec4899",
         description: "Lead nurturing automatisé : contenu, email marketing et qualification pour les commerciaux.",
         agents: [
-            { name: "Éducateur", role: "Content & Lead Nurturing", system_prompt: "Tu partages du contenu de valeur pour éduquer les prospects sur notre offre. Tu entretiens la relation sur le long terme." },
-            { name: "Qualificateur", role: "Lead Scoring & Qualification", system_prompt: "Tu analyses le niveau de maturité du prospect et tu décides quand il est prêt à être transféré à l'équipe commerciale." },
+            { name: "Éducateur", role: "Content & Lead Nurturing", system_prompt: "Tu partages du contenu de valeur pour éduquer les prospects sur notre offre. Tu entretiens la relation sur le long terme.", channels: ["chat", "email"] },
+            { name: "Qualificateur", role: "Lead Scoring & Qualification", system_prompt: "Tu analyses le niveau de maturité du prospect et tu décides quand il est prêt à être transféré à l'équipe commerciale.", channels: ["chat", "whatsapp", "email"] },
         ],
         links: [
             { from: 0, to: 1, trigger: "interest", description: "Le prospect montre de l'intérêt → Le Qualificateur évalue et prépare le passage aux commerciaux." },
@@ -64,7 +64,7 @@ export function EquipeView() {
     const [newTeamColor, setNewTeamColor] = useState("#1e3a8a");
     const [newTeamAvatar, setNewTeamAvatar] = useState("");
     const [newTeamDescription, setNewTeamDescription] = useState("");
-    const [templateAgents, setTemplateAgents] = useState<{ name: string; role: string; system_prompt: string }[]>([]);
+    const [templateAgents, setTemplateAgents] = useState<{ name: string; role: string; system_prompt: string; channels?: string[] }[]>([]);
     const [templateLinks, setTemplateLinks] = useState<{ from: number; to: number; trigger: string; description: string }[]>([]);
     const [selectedTeamForDetails, setSelectedTeamForDetails] = useState<any | null>(null);
 
@@ -238,12 +238,11 @@ export function EquipeView() {
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Composition de l'unité :</p>
                                     <div className="flex items-center gap-1.5">
-                                        {/* Dynamic channel visibility based on roles/tasks */}
-                                        {agents.some(a => a.team === team.id && (a.role?.toLowerCase().includes('email') || a.system_prompt?.toLowerCase().includes('email'))) && (
-                                            <span className="w-3.5 h-3.5 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-[7px] font-black border border-blue-100" title="Email active">E</span>
+                                        {agents.some(a => a.team === team.id && (a.channels || []).some((c: string) => String(c).toLowerCase() === 'email')) && (
+                                            <span className="w-3.5 h-3.5 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-[7px] font-black border border-blue-100" title="Email actif">E</span>
                                         )}
-                                        {agents.some(a => a.team === team.id && (a.role?.toLowerCase().includes('whatsapp') || a.system_prompt?.toLowerCase().includes('whatsapp'))) && (
-                                            <span className="w-3.5 h-3.5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-[7px] font-black border border-green-100" title="WhatsApp active">W</span>
+                                        {agents.some(a => a.team === team.id && (a.channels || []).some((c: string) => String(c).toLowerCase() === 'whatsapp')) && (
+                                            <span className="w-3.5 h-3.5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-[7px] font-black border border-green-100" title="WhatsApp actif">W</span>
                                         )}
                                     </div>
                                 </div>

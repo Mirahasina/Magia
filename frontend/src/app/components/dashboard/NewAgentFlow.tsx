@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Target, Mail, Clock, MessageSquare, Zap, Database, Globe, Terminal, FileText, Check, Sparkles, Shield, Plus, Loader2, Linkedin } from "lucide-react";
+import { ChevronRight, Target, Mail, Clock, MessageSquare, Zap, Database, Globe, Terminal, FileText, Check, Sparkles, Shield, Plus, Loader2 } from "lucide-react";
 import { cn } from "../ui/utils";
 import { useAgents } from "../../hooks/useAgents";
 
@@ -318,7 +318,6 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                         {[
                             { id: 'email', name: 'Email Protocol', icon: Mail, configs: emailConfigs },
                             { id: 'whatsapp', name: 'WhatsApp API', icon: MessageSquare, configs: whatsappConfigs },
-                            { id: 'linkedin', name: 'LinkedIn Search', icon: Linkedin, configs: [] }, // Configs to be implemented later
                         ].map((c: any) => (
                             <div key={c.id} className="space-y-4">
                                 <div

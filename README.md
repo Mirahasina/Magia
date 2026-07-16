@@ -81,6 +81,7 @@ Le frontend démarre sur http://localhost:5173 et proxifie `/api` vers le backen
 | `ruff check .` | Linting Python |
 | `ruff check . --fix` | Linting + corrections automatiques |
 | `python manage.py check` | Vérification de configuration Django |
+| `python manage.py run_followups` | Relances CRM dues (aussi via scheduler / service Docker `followups`) |
 
 > Le test d'intégration RAG télécharge le modèle d'embeddings
 > `all-MiniLM-L6-v2` au premier lancement. Il est automatiquement ignoré si le

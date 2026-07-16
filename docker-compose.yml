@@ -60,10 +60,33 @@ services:
       UNIPILE_DSN: ${UNIPILE_DSN}
       # Daily.co
       DAILY_API_KEY: ${DAILY_API_KEY}
+      # Dedicated followups container handles this
+      FOLLOWUP_SCHEDULER_ENABLED: "false"
     ports:
       - "8000:8000"
     volumes:
       - media_data:/app/media
+
+  # ─── Follow-up scheduler (hourly CRM relances) ─────────────────────────────
+  followups:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: magia_followups
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: postgres://postgres:postgres@db:5432/magia
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      FOLLOWUP_SCHEDULER_ENABLED: "false"
+    command: sh -c "while true; do python manage.py run_followups; sleep 3600; done"
 
   # ─── WhatsApp Node.js Microservice ────────────────────────────────────────
   whatsapp:

@@ -502,11 +502,10 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
 
                                     {configTarget === null ? (
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            {['WhatsApp', 'Email', 'LinkedIn', 'Facebook'].map((app) => {
+                                            {['WhatsApp', 'Email', 'Facebook'].map((app) => {
                                                 const configs =
                                                     app === 'WhatsApp' ? whatsappConfigs :
-                                                        (app === 'Email' ? emailConfigs :
-                                                            (app === 'LinkedIn' ? linkedinConfigs : facebookConfigs));
+                                                        (app === 'Email' ? emailConfigs : facebookConfigs);
 
                                                 const isConnected = configs && configs.some((c: any) => c.is_connected || c.is_active);
 
@@ -532,6 +531,15 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                     </div>
                                                 );
                                             })}
+                                            <div className="p-5 bg-gray-50 border border-dashed border-gray-200 rounded-2xl flex flex-col items-center gap-4 text-center opacity-70 cursor-not-allowed">
+                                                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-lg font-black italic text-gray-300">
+                                                    L
+                                                </div>
+                                                <div>
+                                                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">LinkedIn</span>
+                                                    <span className="text-[8px] font-black uppercase px-2 py-1 rounded-md text-amber-700 bg-amber-50 border border-amber-100">Indisponible</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="space-y-6">

@@ -87,7 +87,10 @@ class MessagingService:
         elif source == 'facebook':
             return MessagingService.send_facebook(user, contact_info, text)
         elif source == 'linkedin':
-            logger.warning(f"L'envoi automatique LinkedIn n'est plus supporté après la suppression d'Unipile. Destinataire: {contact_info}")
+            logger.warning(
+                "Envoi LinkedIn indisponible (canal retiré). Destinataire: %s",
+                contact_info,
+            )
             return False
         else:
             logger.error(f"Source de messagerie inconnue ou non supportée : {source}")

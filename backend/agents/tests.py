@@ -237,3 +237,90 @@ class TestTeamKnowledgeBase:
 
         # 4. Test database string representation
         assert str(kb_team) == "Global Product Manual (Team: Support Team)"
+
+
+@pytest.mark.django_db
+class TestProspectionFollowups:
+    def test_mark_replied_and_schedule_followup(self, test_user):
+        from agents.models import Contact
+        from agents.prospection_service import (
+            mark_prospect_replied,
+            schedule_followup_after_ai,
+            infer_channels_for_team_agent,
+        )
+        from django.utils import timezone
+
+        Contact.objects.create(
+            user=test_user,
+            source='whatsapp',
+            contact_info='261340000001',
+            status='contacted',
+            replied_since_last_ai=True,
+        )
+        ChatMessage.objects.create(
+            user=test_user,
+            sender='user',
+            content='Bonjour je suis intéressé',
+            contact_info='261340000001',
+            source='whatsapp',
+        )
+
+        with patch('agents.llm_service.analyze_prospection_context') as mock_analyze:
+            mock_analyze.return_value = {'status': 'interested', 'next_followup_hours': 24}
+            schedule_followup_after_ai(test_user, '261340000001', 'whatsapp', analyze=True)
+
+        contact = Contact.objects.get(contact_info='261340000001')
+        assert contact.replied_since_last_ai is False
+        assert contact.status == 'interested'
+        assert contact.next_followup_date is not None
+        assert contact.next_followup_date > timezone.now()
+
+        mark_prospect_replied(test_user, '261340000001', 'whatsapp')
+        contact.refresh_from_db()
+        assert contact.replied_since_last_ai is True
+
+        channels = infer_channels_for_team_agent('Agent Email', 'Suivi par email', 'Tu rédiges des emails')
+        assert 'email' in channels
+        assert 'whatsapp' not in channels
+
+    def test_run_followups_uses_assigned_agent(self, test_user, test_agent):
+        from agents.models import Contact, ContactAssignment
+        from django.core.management import call_command
+        from django.utils import timezone
+        from io import StringIO
+
+        contact = Contact.objects.create(
+            user=test_user,
+            source='whatsapp',
+            contact_info='261340000099',
+            status='contacted',
+            replied_since_last_ai=False,
+            next_followup_date=timezone.now() - timezone.timedelta(hours=1),
+            followup_count=0,
+        )
+        ContactAssignment.objects.create(
+            user=test_user,
+            contact_info=contact.contact_info,
+            agent=test_agent,
+        )
+
+        with patch('agents.management.commands.run_followups.get_llm_response') as mock_llm, \
+             patch('agents.management.commands.run_followups.MessagingService.send_message') as mock_send:
+            mock_llm.return_value = 'Bonjour, je relance.'
+            mock_send.return_value = True
+            out = StringIO()
+            call_command('run_followups', stdout=out)
+
+        contact.refresh_from_db()
+        assert contact.followup_count == 1
+        assert contact.replied_since_last_ai is False
+        assert 'Relance' in out.getvalue()
+        assert ChatMessage.objects.filter(
+            contact_info=contact.contact_info, sender='ai'
+        ).exists()
+
+    def test_linkedin_config_create_rejected(self, api_client, test_user):
+        api_client.force_authenticate(user=test_user)
+        response = api_client.post('/api/linkedin-config/', {'name': 'Test'}, format='json')
+        assert response.status_code == 400
+        assert 'LinkedIn' in response.data.get('error', '')

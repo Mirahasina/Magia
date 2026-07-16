@@ -5,6 +5,11 @@ SQLite database so tests do not require a running PostgreSQL server, and uses a
 fast password hasher plus a local-memory email backend for speed/isolation.
 """
 
+import os
+
+# Must be set before importing the main settings (AppConfig.ready reads this).
+os.environ['FOLLOWUP_SCHEDULER_ENABLED'] = 'false'
+
 from .settings import *  # noqa: F401,F403
 
 # Run tests against an isolated in-memory SQLite database.

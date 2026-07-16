@@ -11,6 +11,7 @@ from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 from .llm_service import get_llm_response, classify_pertinence
 from .models import ChatMessage, Agent
+from .prospection_service import mark_prospect_replied, schedule_followup_after_ai
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -207,6 +208,8 @@ def process_emails_for_agent(agent_id):
                 status='new' if is_recent else 'archived',
                 email_config=config
             )
+            if is_recent:
+                mark_prospect_replied(config.user, sender, 'email')
 
             # AI processing is only for recent emails, limited to 10 per run
             if not is_recent or ai_processed_count >= 10:
@@ -305,6 +308,7 @@ def process_emails_for_agent(agent_id):
             success = send_email_reply(config, sender, f"Re: {subject}", response_text)
             if success:
                 logger.info(f"Réponse envoyée avec succès à {sender}")
+                schedule_followup_after_ai(config.user, sender, 'email', analyze=True)
                 mail.store(num, '+FLAGS', '\\Seen')
             else:
                 logger.error(f"ÉCHEC de l'envoi de la réponse à {sender}")
