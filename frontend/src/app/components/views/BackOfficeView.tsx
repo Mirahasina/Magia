@@ -1,6 +1,8 @@
 import { API_BASE } from "../../../lib/api";
 import { useState, useEffect } from "react";
 import { cn } from "../ui/utils";
+import { toast } from "sonner";
+import { confirmDialog } from "../shared/ConfirmDialog";
 import {
     Users,
     Bot,
@@ -121,7 +123,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                 fetchStats();
             } else {
                 const err = await res.json();
-                alert(err.error || "Une erreur est survenue");
+                toast.error(err.error || "Une erreur est survenue");
             }
         } catch (err) {
             console.error("Action failed", err);
@@ -149,7 +151,12 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
     };
 
     const handleRefund = async (txId: string) => {
-        if (!confirm("Voulez-vous vraiment rembourser cette transaction ?")) return;
+        const ok = await confirmDialog({
+            title: "Rembourser cette transaction ?",
+            confirmLabel: "Rembourser",
+            danger: true,
+        });
+        if (!ok) return;
         try {
             const res = await fetch(`${API_BASE}/admin/stats/refund_transaction/`, {
                 method: "POST",
@@ -162,7 +169,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
             if (res.ok) {
                 fetchData("Transactions");
             } else {
-                alert("Erreur lors du remboursement");
+                toast.error("Erreur lors du remboursement");
             }
         } catch (err) {
             console.error("Refund failed", err);
@@ -180,10 +187,10 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                 body: JSON.stringify({ title, message, type })
             });
             if (res.ok) {
-                alert("Notification envoyée avec succès !");
+                toast.success("Notification envoyée avec succès !");
                 setIsNotifModalOpen(false);
             } else {
-                alert("Erreur lors de l'envoi");
+                toast.error("Erreur lors de l'envoi");
             }
         } catch (err) {
             console.error("Notif failed", err);
@@ -299,12 +306,12 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
 
                     <div className="space-y-6">
                         <div onClick={() => setActiveTab("Demandes")} className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform">
-                            <h4 className="font-medium mb-1 opacity-80 uppercase text-[10px] tracking-widest font-black">Entreprise</h4>
+                            <h4 className="font-medium mb-1 opacity-80 text-[10px] font-semibold">Entreprise</h4>
                             <div className="text-4xl font-bold mt-2">{stats.pending_enterprise || 0}</div>
                             <p className="text-xs mt-1 opacity-60">Demandes en attente</p>
                         </div>
                         <div onClick={() => setActiveTab("Contacts")} className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform">
-                            <h4 className="font-medium mb-1 opacity-80 uppercase text-[10px] tracking-widest font-black">Messages</h4>
+                            <h4 className="font-medium mb-1 opacity-80 text-[10px] font-semibold">Messages</h4>
                             <div className="text-4xl font-bold mt-2">{stats.pending_contacts || 0}</div>
                             <p className="text-xs mt-1 opacity-60">Requêtes de contact</p>
                         </div>
@@ -454,7 +461,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
             <div className="overflow-x-auto">
                 <table className="w-full text-left">
                     <thead>
-                        <tr className="bg-gray-50/50 text-gray-500 text-xs font-semibold uppercase tracking-wider">
+                        <tr className="bg-gray-50/50 text-gray-500 text-xs font-semibold">
                             <th className="px-6 py-4">Détails</th>
                             {activeTab === "Utilisateurs" && <th className="px-6 py-4">Plan</th>}
                             {activeTab === "Agents" && <th className="px-6 py-4">Modèle</th>}
@@ -472,7 +479,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                             <tr key={idx} className="hover:bg-gray-50/50 transition-colors group">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-bold uppercase">
+                                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-bold">
                                             {String(item.email || item.name || item.user_email || "?").charAt(0)}
                                         </div>
                                         <div>
@@ -509,7 +516,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                                 {activeTab === "Demandes" && <td className="px-6 py-4 text-sm text-gray-600">{item.company || "N/A"}</td>}
                                 {activeTab === "Historique" && (
                                     <td className="px-6 py-4">
-                                        <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium uppercase", item.status === 'approved' ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700")}>
+                                        <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium", item.status === 'approved' ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700")}>
                                             {item.status}
                                         </span>
                                     </td>
@@ -595,7 +602,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
                             {Object.entries(selectedItem).map(([key, value]: [string, any]) => (
                                 <div key={key} className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{key}</span>
+                                    <span className="text-[10px] font-semibold text-gray-400">{key}</span>
                                     <div className="p-3 bg-gray-50 rounded-xl text-sm text-gray-700 break-all">{String(value)}</div>
                                 </div>
                             ))}
@@ -616,7 +623,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Titre</label>
+                                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Titre</label>
                                 <input
                                     type="text"
                                     className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-500/20"
@@ -626,7 +633,7 @@ export function BackOfficeView({ activeTab: initialTab }: { activeTab?: BackOffi
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Message</label>
+                                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Message</label>
                                 <textarea
                                     className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-500/20 h-32"
                                     placeholder="Contenu..."
@@ -663,7 +670,7 @@ function StatCard({ title, value, icon, trend, trendText, color }: any) {
                     </div>
                 )}
             </div>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">{title}</p>
+            <p className="text-xs font-semibold text-gray-400">{title}</p>
             <h4 className="text-2xl font-bold text-gray-900 mt-1">{value}</h4>
             {trendText && <p className="text-[10px] text-gray-400 font-medium mt-1">{trendText}</p>}
         </div>

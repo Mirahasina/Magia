@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Target, Mail, Clock, MessageSquare, Zap, Database, Globe, Terminal, FileText, Check, Sparkles, Shield, Plus, Loader2 } from "lucide-react";
+import { ChevronRight, Target, Mail, Clock, MessageSquare, Facebook, Zap, Database, Globe, Terminal, FileText, Check, Sparkles, Shield, Plus, Loader2 } from "lucide-react";
 import { cn } from "../ui/utils";
 import { useAgents } from "../../hooks/useAgents";
 
@@ -13,6 +13,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
     const {
         whatsappConfigs,
         emailConfigs,
+        facebookConfigs,
         templates,
         createAgent,
         uploadKnowledge,
@@ -117,7 +118,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                 </div>
 
                 <div className="space-y-4">
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Déploiement en cours...</h2>
+                    <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Déploiement en cours...</h2>
                     <p className="text-gray-500 font-medium">{deploymentMessage}</p>
                 </div>
 
@@ -128,7 +129,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                             style={{ width: `${progress}%` }}
                         />
                     </div>
-                    <div className="flex justify-between text-[11px] font-black uppercase text-gray-400 tracking-widest px-1">
+                    <div className="flex justify-between text-[11px] font-semibold text-gray-400 px-1">
                         <span>{progress}% Complété</span>
                         <span>Estimé : {Math.ceil((100 - progress) * 0.05)}s restants</span>
                     </div>
@@ -140,7 +141,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
     return (
         <div className="max-w-4xl mx-auto py-8">
             <div className="flex items-center justify-between mb-12">
-                <button onClick={onCancel} className="text-sm font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 flex items-center gap-2 transition-colors">
+                <button onClick={onCancel} className="text-sm font-medium text-gray-400 hover:text-gray-900 flex items-center gap-2 transition-colors">
                     <ChevronRight className="w-3 h-3 rotate-180" />
                     Annuler la création
                 </button>
@@ -155,7 +156,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-1">
                         <span className="magia-label text-blue-900">Configuration Initiale / Étape 01</span>
-                        <h2 className="magia-h1 uppercase">Architecture Métier</h2>
+                        <h2 className="magia-h1">Architecture Métier</h2>
                         <p className="magia-subtitle italic">Sélectionnez une structure neuronale pré-configurée.</p>
                     </div>
 
@@ -173,12 +174,12 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                     selectedTemplate?.id === t.id ? "border-blue-900 ring-4 ring-blue-50" : "border-gray-100 hover:border-blue-200"
                                 )}
                             >
-                                <div className="p-4 bg-gray-50 rounded-lg mb-6 group-hover:bg-blue-50 transition-colors w-12 h-12 flex items-center justify-center font-black italic text-gray-300 group-hover:text-blue-900">
+                                <div className="p-4 bg-gray-50 rounded-lg mb-6 group-hover:bg-blue-50 transition-colors w-12 h-12 flex items-center justify-center font-semibold italic text-gray-300 group-hover:text-blue-900">
                                     {t.name.charAt(0)}
                                 </div>
-                                <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-2">{t.name}</h3>
+                                <h3 className="text-xs font-semibold text-gray-900 mb-2">{t.name}</h3>
                                 <p className="text-[11px] text-gray-500 mb-6 line-clamp-2 leading-relaxed">{t.description}</p>
-                                <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest border-t border-gray-50 pt-4">
+                                <div className="flex items-center justify-between text-xs font-medium border-t border-gray-50 pt-4">
                                     <span className="text-blue-900">{t.estimated_time}s</span>
                                     <span className="text-gray-300">Template</span>
                                 </div>
@@ -193,7 +194,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                             className="p-8 bg-gray-50/50 border-2 border-dashed border-gray-100 rounded-xl flex flex-col items-center justify-center text-center hover:bg-white hover:border-blue-700 transition-all cursor-pointer group"
                         >
                             <Plus className="w-8 h-8 text-gray-300 mb-3 group-hover:text-blue-900 transition-colors" />
-                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest group-hover:text-gray-900">Architecture Custom</h3>
+                            <h3 className="text-[10px] font-semibold text-gray-400 group-hover:text-gray-900">Architecture Custom</h3>
                         </div>
                     </div>
                 </div>
@@ -203,7 +204,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-1">
                         <span className="magia-label text-blue-900">Identité / Étape 02</span>
-                        <h2 className="magia-h1 uppercase">Persona & Cognition</h2>
+                        <h2 className="magia-h1">Persona & Cognition</h2>
                         <p className="magia-subtitle italic">Définissez le spectre d'action et le ton de l'agent.</p>
                     </div>
                     <div className="bg-white border border-gray-100 rounded-xl p-10 shadow-sm space-y-10">
@@ -215,7 +216,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                         type="text"
                                         value={config.name}
                                         onChange={(e) => setConfig({ ...config, name: e.target.value })}
-                                        className="w-full px-0 py-3 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-black transition-colors font-serif"
+                                        className="w-full px-0 py-3 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-semibold transition-colors"
                                         placeholder="Ex: SDR Expert"
                                     />
                                 </div>
@@ -224,7 +225,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                     <select
                                         value={config.llm}
                                         onChange={(e) => setConfig({ ...config, llm: e.target.value })}
-                                        className="w-full px-0 py-3 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-black transition-colors cursor-pointer"
+                                        className="w-full px-0 py-3 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-semibold transition-colors cursor-pointer"
                                     >
                                         <option value="gemini-1.5-flash">Gemini 1.5 Flash (Gratuit)</option>
                                         <option value="gemini-1.5-pro">Gemini 1.5 Pro (PRO)</option>
@@ -280,7 +281,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                             value={config.avatar.startsWith('/avatars/') ? "" : config.avatar}
                                             onChange={(e) => setConfig({ ...config, avatar: e.target.value })}
                                             placeholder="OU URL PERSONNALISÉE..."
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-black uppercase outline-none focus:border-blue-900 transition-all"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-semibold outline-none focus:border-blue-900 transition-all"
                                         />
                                     </div>
                                 </div>
@@ -299,8 +300,8 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                         </div>
 
                         <div className="flex items-center justify-between pt-6 border-t border-gray-50">
-                            <button onClick={() => setStep(1)} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors">Précédent</button>
-                            <button onClick={() => setStep(3)} className="px-12 py-3 bg-gray-900 text-white rounded-md text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all">Suivant</button>
+                            <button onClick={() => setStep(1)} className="text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors">Précédent</button>
+                            <button onClick={() => setStep(3)} className="px-12 py-3 bg-gray-900 text-white rounded-md text-xs font-medium shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all">Suivant</button>
                         </div>
                     </div>
                 </div>
@@ -310,14 +311,15 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-1">
                         <span className="magia-label text-blue-900">Transmission / Étape 03</span>
-                        <h2 className="magia-h1 uppercase">Flux de Communication</h2>
+                        <h2 className="magia-h1">Flux de Communication</h2>
                         <p className="magia-subtitle italic">Activez les canaux de sortie de l'agent.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {[
-                            { id: 'email', name: 'Email Protocol', icon: Mail, configs: emailConfigs },
-                            { id: 'whatsapp', name: 'WhatsApp API', icon: MessageSquare, configs: whatsappConfigs },
+                            { id: 'email', name: 'Email Protocol', icon: Mail, configs: emailConfigs, configKey: 'email_config' as const },
+                            { id: 'whatsapp', name: 'WhatsApp API', icon: MessageSquare, configs: whatsappConfigs, configKey: 'whatsapp_config' as const },
+                            { id: 'facebook', name: 'Facebook Messenger', icon: Facebook, configs: facebookConfigs, configKey: null },
                         ].map((c: any) => (
                             <div key={c.id} className="space-y-4">
                                 <div
@@ -336,33 +338,40 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                         <c.icon className="w-6 h-6" />
                                     </div>
                                     <div>
-                                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest block">{c.name}</span>
-                                        <span className="text-[8px] font-black uppercase text-gray-400">{config.channels.includes(c.id) ? 'Activé' : 'Désactivé'}</span>
+                                        <span className="text-[10px] font-semibold text-gray-900 block">{c.name}</span>
+                                        <span className="text-[8px] font-semibold text-gray-400">{config.channels.includes(c.id) ? 'Activé' : 'Désactivé'}</span>
                                     </div>
                                     <div className="absolute top-0 right-0 w-1 h-full bg-blue-900 scale-y-0 group-hover:scale-y-100 transition-transform origin-top" />
                                 </div>
 
-                                {config.channels.includes(c.id) && c.configs && (
+                                {config.channels.includes(c.id) && c.configs && c.configKey && (
                                     <div className="px-2 animate-in slide-in-from-top-2 duration-300">
                                         <select
-                                            value={c.id === 'whatsapp' ? (config.whatsapp_config || '') : (config.email_config || '')}
-                                            onChange={(e) => setConfig({ ...config, [c.id === 'whatsapp' ? 'whatsapp_config' : 'email_config']: Number(e.target.value) || null })}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-black uppercase tracking-widest outline-none focus:border-blue-900 transition-all"
+                                            value={(config as any)[c.configKey] || ''}
+                                            onChange={(e) => setConfig({ ...config, [c.configKey]: Number(e.target.value) || null })}
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-xs font-medium outline-none focus:border-blue-900 transition-all"
                                         >
                                             <option value="">Sélectionner un compte</option>
                                             {c.configs.map((cfg: any) => (
-                                                <option key={cfg.id} value={cfg.id}>{cfg.name} ({cfg.phone_number || cfg.email})</option>
+                                                <option key={cfg.id} value={cfg.id}>
+                                                    {cfg.name} ({cfg.phone_number || cfg.email || cfg.page_name || cfg.page_id || 'compte'})
+                                                </option>
                                             ))}
                                         </select>
                                     </div>
+                                )}
+                                {config.channels.includes(c.id) && c.id === 'facebook' && (
+                                    <p className="px-2 text-[10px] text-gray-400">
+                                        Utilise la Page Facebook connectée dans Paramètres.
+                                    </p>
                                 )}
                             </div>
                         ))}
                     </div>
 
                     <div className="flex items-center justify-between pt-10">
-                        <button onClick={() => setStep(2)} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors">Précédent</button>
-                        <button onClick={() => setStep(4)} className="px-12 py-3 bg-gray-900 text-white rounded-md text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all">Suivant</button>
+                        <button onClick={() => setStep(2)} className="text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors">Précédent</button>
+                        <button onClick={() => setStep(4)} className="px-12 py-3 bg-gray-900 text-white rounded-md text-xs font-medium shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all">Suivant</button>
                     </div>
                 </div>
             )}
@@ -371,7 +380,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-1">
                         <span className="magia-label text-blue-900">Mémoire / Étape 04</span>
-                        <h2 className="magia-h1 uppercase">Base de Connaissances</h2>
+                        <h2 className="magia-h1">Base de Connaissances</h2>
                         <p className="magia-subtitle italic">Importez les données contextuelles pour le moteur RAG.</p>
                     </div>
 
@@ -382,19 +391,19 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                             className="flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-xl p-16 bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all cursor-pointer group"
                         >
                             <Plus className="w-10 h-10 text-gray-300 mb-6 group-hover:text-blue-900 transition-colors" />
-                            <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest mb-1">Architecture Documentation</p>
+                            <p className="text-[10px] font-semibold text-gray-900 mb-1">Architecture Documentation</p>
                             <p className="text-[9px] text-gray-400 font-medium italic">PDF, DOCX, TXT ou URLs (Max 50MB)</p>
                         </div>
 
                         {config.kb.length > 0 && (
                             <div className="space-y-3 pt-4">
-                                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest pl-2">Files indexées ({config.kb.length})</p>
+                                <p className="text-[9px] font-semibold text-gray-300 pl-2">Files indexées ({config.kb.length})</p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {config.kb.map((f: any, idx) => (
                                         <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                             <div className="flex items-center gap-3">
                                                 <div className="p-2 bg-white rounded shadow-sm text-blue-900"><FileText className="w-4 h-4" /></div>
-                                                <span className="text-[10px] font-black text-gray-900 uppercase truncate max-w-[150px]">{f.name}</span>
+                                                <span className="text-[10px] font-semibold text-gray-900 truncate max-w-[150px]">{f.name}</span>
                                             </div>
                                             <button
                                                 onClick={() => setConfig(prev => ({ ...prev, kb: prev.kb.filter((_, i) => i !== idx) }))}
@@ -409,8 +418,8 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                         )}
 
                         <div className="flex items-center justify-between pt-8 border-t border-gray-50">
-                            <button onClick={() => setStep(3)} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors">Précédent</button>
-                            <button onClick={() => setStep(5)} className="px-12 py-3 bg-gray-900 text-white rounded-md text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all">Suivant</button>
+                            <button onClick={() => setStep(3)} className="text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors">Précédent</button>
+                            <button onClick={() => setStep(5)} className="px-12 py-3 bg-gray-900 text-white rounded-md text-xs font-medium shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all">Suivant</button>
                         </div>
                     </div>
                 </div>
@@ -420,7 +429,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-1">
                         <span className="magia-label text-blue-900">Autonomie / Étape 05</span>
-                        <h2 className="magia-h1 uppercase">Niveau de Contrôle</h2>
+                        <h2 className="magia-h1">Niveau de Contrôle</h2>
                         <p className="magia-subtitle italic">Déterminez le degré de liberté décisionnelle de l'agent.</p>
                     </div>
 
@@ -439,7 +448,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                 )}
                             >
                                 <div className="flex-1">
-                                    <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-widest mb-2">{m.title}</h4>
+                                    <h4 className="text-[10px] font-semibold text-gray-900 mb-2">{m.title}</h4>
                                     <p className="text-[11px] text-gray-500 italic leading-relaxed">{m.desc}</p>
                                 </div>
                                 <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all", config.mode === m.id ? "border-blue-900 bg-blue-900" : "border-gray-200")}>
@@ -451,8 +460,8 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                     </div>
 
                     <div className="flex items-center justify-between pt-10">
-                        <button onClick={() => setStep(4)} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors">Précédent</button>
-                        <button onClick={() => setStep(7)} className="px-12 py-3 bg-gray-900 text-white rounded-md text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all">Phase de Lancement</button>
+                        <button onClick={() => setStep(4)} className="text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors">Précédent</button>
+                        <button onClick={() => setStep(7)} className="px-12 py-3 bg-gray-900 text-white rounded-md text-xs font-medium shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all">Phase de Lancement</button>
                     </div>
                 </div>
             )}
@@ -461,7 +470,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-1">
                         <span className="magia-label text-blue-900">Déploiement / Étape Finale</span>
-                        <h2 className="magia-h1 uppercase">Initialisation de l'Agent</h2>
+                        <h2 className="magia-h1">Initialisation de l'Agent</h2>
                         <p className="magia-subtitle italic">Vérifiez les paramètres de déploiement réseau.</p>
                     </div>
 
@@ -474,8 +483,8 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                 { label: 'Mode', value: config.mode, color: 'text-blue-900' }
                             ].map((item, i) => (
                                 <div key={i} className="space-y-2">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{item.label}</p>
-                                    <p className={cn("text-[10px] font-black uppercase tracking-widest truncate", item.color || "text-gray-900")}>{item.value}</p>
+                                    <p className="text-[9px] font-semibold text-gray-400">{item.label}</p>
+                                    <p className={cn("text-xs font-medium truncate", item.color || "text-gray-900")}>{item.value}</p>
                                 </div>
                             ))}
                         </div>
@@ -483,19 +492,19 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                         <div className="p-12 bg-gray-900 rounded-xl text-center relative overflow-hidden group">
                             <div className="relative z-10 space-y-8">
                                 <div className="space-y-2">
-                                    <div className="text-4xl font-serif italic text-white flex items-center justify-center gap-2">
+                                    <div className="text-4xl italic text-white flex items-center justify-center gap-2">
                                         {config.confidence}<span className="text-blue-700 text-2xl">%</span>
                                     </div>
-                                    <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em]">Score de Fidélité Cognitive</p>
+                                    <p className="text-[9px] font-semibold text-white/40 tracking-[0.3em]">Score de Fidélité Cognitive</p>
                                 </div>
                                 <button
                                     onClick={handleDeploy}
-                                    className="px-16 py-4 bg-blue-900 hover:bg-blue-900 text-white rounded-md font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-blue-800/20 transition-all active:scale-95 group"
+                                    className="px-16 py-4 bg-blue-900 hover:bg-blue-900 text-white rounded-md font-semibold text-[11px] shadow-2xl shadow-blue-800/20 transition-all active:scale-95 group"
                                 >
                                     DÉPLOYER L'UNITÉ IA
                                     <ChevronRight className="w-4 h-4 inline ml-2 group-hover:translate-x-1 transition-transform" />
                                 </button>
-                                <p className="text-[9px] font-black text-blue-700/60 uppercase tracking-widest">Temps de synchronisation estimé : {Math.ceil((100 - progress) * 0.05)}s</p>
+                                <p className="text-[9px] font-semibold text-blue-700/60">Temps de synchronisation estimé : {Math.ceil((100 - progress) * 0.05)}s</p>
                             </div>
                             <div className="absolute top-0 left-0 w-full h-1 bg-blue-900" />
                             <Shield className="absolute -bottom-10 -right-10 w-48 h-48 text-white/5 -rotate-12 group-hover:rotate-0 transition-transform duration-1000" />

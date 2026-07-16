@@ -115,7 +115,7 @@ export function Topbar({ user, onLogout, onToggleSidebar, isSidebarOpen, searchQ
                     {isNotificationsOpen && (
                         <div className="absolute right-0 mt-4 w-72 bg-white/95 backdrop-blur-3xl border border-gray-100/50 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-300 z-50 notif-dropdown">
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-xs font-black uppercase tracking-widest text-gray-900">Notifications</h3>
+                                <h3 className="text-xs font-medium text-gray-900">Notifications</h3>
                                 {unreadCount > 0 && <button onClick={() => markAsRead()} className="text-[9px] text-blue-600 hover:text-blue-800 font-bold transition-colors">TOUT MARQUER LU</button>}
                             </div>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
@@ -123,13 +123,13 @@ export function Topbar({ user, onLogout, onToggleSidebar, isSidebarOpen, searchQ
                                     <div key={notif.id} onClick={() => notif.is_read ? null : markAsRead(notif.id)} className={cn("p-3 rounded-xl border transition-all", notif.is_read ? "opacity-50 border-gray-100 bg-gray-50/50" : notif.type === 'alert' ? "bg-amber-50/50 border-amber-100/50 cursor-pointer" : "bg-blue-50/50 border-blue-100/50 cursor-pointer")}>
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className={cn("w-2 h-2 rounded-full", notif.type === 'alert' ? "bg-amber-500" : "bg-blue-900", notif.is_read && "opacity-30")} />
-                                            <span className={cn("text-[10px] font-black uppercase tracking-widest", notif.type === 'alert' ? "text-amber-600" : "text-blue-900")}>{notif.type}</span>
+                                            <span className={cn("text-xs font-medium", notif.type === 'alert' ? "text-amber-600" : "text-blue-900")}>{notif.type}</span>
                                         </div>
                                         <h4 className="text-[11px] font-bold text-gray-900 mb-0.5">{notif.title}</h4>
                                         <p className="text-[10px] text-gray-600 font-medium leading-relaxed">{notif.message}</p>
                                     </div>
                                 )) : (
-                                    <p className="text-[11px] text-gray-400 font-medium text-center py-6 border-2 border-dashed border-gray-100 rounded-xl uppercase tracking-widest">Aucune alerte.</p>
+                                    <p className="text-[11px] text-gray-400 font-medium text-center py-6 border-2 border-dashed border-gray-100 rounded-xl">Aucune alerte.</p>
                                 )}
                             </div>
                         </div>
@@ -139,7 +139,7 @@ export function Topbar({ user, onLogout, onToggleSidebar, isSidebarOpen, searchQ
                 <div className="relative">
                     <div className="flex items-center gap-4 pl-8 border-l border-gray-100/50 group">
                         <div className="flex flex-col items-end">
-                            <span className="text-[13px] font-serif font-black text-gray-900 leading-none">{fullName}</span>
+                            <span className="text-[13px] font-semibold text-gray-900 leading-none">{fullName}</span>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center overflow-hidden border-2 border-white shadow-xl group-hover:scale-105 transition-transform duration-300">
                             <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover" />

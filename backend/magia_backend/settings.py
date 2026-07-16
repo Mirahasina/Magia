@@ -23,13 +23,18 @@ STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 
 
-# ALLOWED_HOSTS — Railway domains are included by default so no env var is needed
+# ALLOWED_HOSTS - Railway domains are included by default so no env var is needed
 _default_hosts = [
     'localhost',
     '127.0.0.1',
-    '.up.railway.app', 
-    '.railway.app', 
+    '.up.railway.app',
+    '.railway.app',
     'healthcheck.railway.app',
+    # Local tunnels for Meta/Google webhook callbacks
+    '.ngrok-free.dev',
+    '.ngrok-free.app',
+    '.ngrok.io',
+    '.ngrok.app',
 ]
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=_default_hosts)
 
@@ -171,6 +176,12 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Magia <noreply@magia.ai>')
 ADMIN_EMAIL = env('ADMIN_EMAIL', default='admin@magia.ai')
+
+# ── Apollo.io (recherche de prospects B2B) ───────────────────────────────────
+APOLLO_API_KEY = env('APOLLO_API_KEY', default='')
+APOLLO_WEBHOOK_SECRET = env('APOLLO_WEBHOOK_SECRET', default='magia_apollo_webhook_2024')
+# URL publique atteignable par Apollo (ngrok en local) - sans slash final
+APOLLO_WEBHOOK_BASE_URL = env('APOLLO_WEBHOOK_BASE_URL', default='')
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 LOG_LEVEL = env('LOG_LEVEL', default='DEBUG' if DEBUG else 'INFO')

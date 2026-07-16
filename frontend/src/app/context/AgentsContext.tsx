@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { API_BASE, getAuthHeaders, getAuthHeadersOnly } from "../../lib/api";
+import { toast } from "sonner";
+import { confirmDialog } from "../components/shared/ConfirmDialog";
 
 /* ───────────────────── Domain Interfaces ───────────────────── */
 
@@ -109,7 +111,7 @@ interface AgentsContextType {
   testEmailConnection: (configId: number) => Promise<boolean>;
   addEmailConfig: (data: Record<string, unknown>) => Promise<void>;
   deleteEmailConfig: (id: number) => Promise<void>;
-  getEmailConnectionUrl: (id: number) => Promise<string | null>;
+  getEmailConnectionUrl: (id: number) => Promise<{ url: string | null; error?: string }>;
   refreshEmailConnection: (id: number) => Promise<void>;
   addWhatsAppConfig: (data: Record<string, unknown>) => Promise<void>;
   deleteWhatsAppConfig: (id: number) => Promise<void>;
@@ -121,7 +123,7 @@ interface AgentsContextType {
   refreshLinkedInConnection: (id: number) => Promise<void>;
   addFacebookConfig: (data: Record<string, unknown>) => Promise<void>;
   deleteFacebookConfig: (id: number) => Promise<void>;
-  getFacebookConnectionUrl: (id: number, redirectUri?: string) => Promise<string | null>;
+  getFacebookConnectionUrl: (id: number, redirectUri?: string) => Promise<{ url: string | null; error?: string }>;
   exchangeFacebookCode: (id: number, code: string, redirectUri: string) => Promise<any>;
   refreshFacebookConnection: (id: number) => Promise<void>;
   fetchSecuritySettings: () => Promise<void>;
@@ -219,12 +221,13 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
 
 
   const deleteAgent = async (agentId: string): Promise<boolean> => {
-    if (
-      !window.confirm(
-        "Voulez-vous vraiment supprimer cette unité IA ? Toutes les données (connaissances, messages) seront effacées."
-      )
-    )
-      return false;
+    const ok = await confirmDialog({
+      title: "Supprimer cette unité IA ?",
+      description: "Toutes les données (connaissances, messages) seront effacées. Cette action est irréversible.",
+      confirmLabel: "Supprimer",
+      danger: true,
+    });
+    if (!ok) return false;
     try {
       const res = await fetch(`${API_BASE}/agents/${agentId}/`, {
         method: "DELETE",
@@ -513,13 +516,15 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         if (data.status === 'connected') {
           fetchLinkedInConfigs();
         } else {
-          alert("Aucun compte correspondant trouvé. Assurez-vous d'avoir bien terminé la connexion sur LinkedIn.");
+          toast.error("Aucun compte correspondant trouvé", {
+            description: "Assurez-vous d'avoir bien terminé la connexion sur LinkedIn.",
+          });
         }
       } else {
-        alert("Erreur lors de la synchronisation.");
+        toast.error("Erreur lors de la synchronisation.");
       }
     } catch {
-      alert("Erreur réseau lors de la synchronisation.");
+      toast.error("Erreur réseau lors de la synchronisation.");
     }
   };
 
@@ -546,19 +551,26 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const getFacebookConnectionUrl = async (id: number, redirectUri?: string): Promise<string | null> => {
+  const getFacebookConnectionUrl = async (
+    id: number,
+    redirectUri?: string,
+  ): Promise<{ url: string | null; error?: string }> => {
     try {
       const url = `${API_BASE}/facebook-config/${id}/get_connection_url/${redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : ''}`;
       const res = await fetch(url, {
         headers: getAuthHeadersOnly(),
       });
-      if (res.ok) {
-        const data = await res.json();
-        return data.url;
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        return { url: data.url };
       }
+      return {
+        url: null,
+        error: data.error || "Impossible d'obtenir l'URL de connexion Facebook.",
+      };
     } catch {
+      return { url: null, error: "Erreur réseau lors de la connexion Facebook." };
     }
-    return null;
   };
 
   const exchangeFacebookCode = async (id: number, code: string, redirectUri: string): Promise<any> => {
@@ -578,7 +590,7 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errData.error || "Échec échange du code Facebook.");
       }
     } catch (err: any) {
-      alert(err.message || "Erreur de communication avec le serveur.");
+      toast.error("Connexion Facebook échouée", { description: err.message || "Erreur de communication avec le serveur." });
       return null;
     }
   };
@@ -629,18 +641,22 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const getEmailConnectionUrl = async (id: number): Promise<string | null> => {
+  const getEmailConnectionUrl = async (id: number): Promise<{ url: string | null; error?: string }> => {
     try {
       const res = await fetch(`${API_BASE}/email-config/${id}/get_connection_url/`, {
         headers: getAuthHeadersOnly(),
       });
-      if (res.ok) {
-        const data = await res.json();
-        return data.url;
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        return { url: data.url };
       }
+      return {
+        url: null,
+        error: data.error || "Impossible d'obtenir l'URL de connexion Gmail.",
+      };
     } catch {
+      return { url: null, error: "Erreur réseau lors de la connexion Gmail." };
     }
-    return null;
   };
 
   const refreshEmailConnection = async (id: number): Promise<void> => {

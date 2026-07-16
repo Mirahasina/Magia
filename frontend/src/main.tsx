@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { Toaster } from "sonner";
 import App from "./app/App.tsx";
 import { PlanProvider } from "./app/context/PlanContext.tsx";
 import "./styles/index.css";
@@ -12,6 +13,7 @@ createRoot(document.getElementById("root")!).render(
   <GoogleOAuthProvider clientId={googleClientId}>
     <PlanProvider>
       <App />
+      <Toaster position="top-right" richColors closeButton />
     </PlanProvider>
   </GoogleOAuthProvider>
 );

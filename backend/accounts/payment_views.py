@@ -171,14 +171,14 @@ class CreatePaymentIntentView(APIView):
 
 
 class ConfirmCardPaymentView(APIView):
-    """Called after Stripe confirms payment on frontend — saves card & updates subscription."""
+    """Called after Stripe confirms payment on frontend - saves card & updates subscription."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         stripe.api_key = settings.STRIPE_SECRET_KEY
 
         payment_intent_id = request.data.get('payment_intent_id')
-        # Use values from request body as primary source — more reliable than Stripe metadata
+        # Use values from request body as primary source - more reliable than Stripe metadata
         req_plan = request.data.get('plan_name', 'pro')
         req_agents = int(request.data.get('num_agents', 1))
 
@@ -195,7 +195,7 @@ class ConfirmCardPaymentView(APIView):
             # Accept succeeded OR requires_capture (in case of manual capture mode)
             if intent.status not in ('succeeded', 'requires_capture'):
                 logger.warning("PaymentIntent %s status: %s", payment_intent_id, intent.status)
-                # Don't hard-fail here — trust the frontend that payment went through
+                # Don't hard-fail here - trust the frontend that payment went through
                 # but log for monitoring
             # Use metadata as fallback only
             req_plan = req_plan or intent.metadata.get('plan_name', 'pro')

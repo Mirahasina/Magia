@@ -16,7 +16,7 @@ const agents = [
   },
   {
     title: "PLANIFICATEUR DE RÉUNIONS",
-    description: "Prise de RDV automatique synchronisée avec Google Calendar. Mode Suggest par défaut — vous validez avant confirmation.",
+    description: "Prise de RDV automatique synchronisée avec Google Calendar. Mode Suggest par défaut - vous validez avant confirmation.",
     tags: ["GMAIL", "CHAT"],
     time: "2 min",
   },
@@ -34,7 +34,7 @@ const agents = [
   },
   {
     title: "ENRICHISSEUR CRM",
-    description: "Enrichissement automatique de HubSpot et Salesforce. Full Auto — aucune intervention humaine. 99% de précision.",
+    description: "Enrichissement automatique de HubSpot et Salesforce. Full Auto - aucune intervention humaine. 99% de précision.",
     tags: ["HUBSPOT", "SALESFORCE"],
     time: "2 min",
   },

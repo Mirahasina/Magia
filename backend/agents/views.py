@@ -28,27 +28,32 @@ from odf.text import P
 from odf import teletype
 from pptx import Presentation
 from .models import (
-    Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, Contact
+    Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, Contact,
+    ProspectSearchJob, ProspectLead,
 )
 from .serializers import (
     AgentSerializer, KnowledgeBaseSerializer, TemplateSerializer, 
     WhatsAppConfigSerializer, ChatMessageSerializer, EmailConfigSerializer,
     AgentFeedbackSerializer, AgentTeamSerializer, AgentLinkSerializer,
     ContactAssignmentSerializer, AuditLogSerializer, LinkedInConfigSerializer,
-    FacebookConfigSerializer
+    FacebookConfigSerializer, ProspectSearchJobSerializer,
 )
 from .llm_service import get_llm_response, classify_pertinence, DEFAULT_GEMINI_MODELS
 from .email_service import (
-    process_emails_for_agent, test_email_connection, sync_email_history, send_email_reply
+    process_emails_for_agent, sync_email_history,
+    send_email_reply, refresh_google_token,
 )
 from django.db.models import Q, Count, Max as MaxAgg
 from django.db.models.functions import TruncDay
+from django.shortcuts import redirect
 from rest_framework.exceptions import PermissionDenied
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from magia_backend.settings_constants import FRONTEND_URL
 from .rag_service import add_texts_to_knowledge_base, search_knowledge_base, search_agent_and_team_knowledge_base
 from .prospection_service import (
     mark_prospect_replied,
+    purge_passive_crm_contacts,
     schedule_followup_after_ai,
     infer_channels_for_team_agent,
     attach_user_channel_configs,
@@ -61,6 +66,109 @@ env = environ.Env()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
+
+
+def sync_facebook_history(config, user):
+    try:
+        resp = requests.get(
+            f"https://graph.facebook.com/v18.0/{config.page_id}/conversations",
+            params={
+                'access_token': config.page_access_token,
+                'fields': 'participants{id,name},messages{message,from,created_time,id}',
+            },
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            err = resp.json().get('error', {}).get('message', 'Erreur Graph API')
+            return {'imported': 0, 'error': err, 'status_code': 400}
+        data = resp.json()
+        synced = 0
+        for conv in data.get('data', []):
+            participants = (conv.get('participants') or {}).get('data') or []
+            peer_id = None
+            peer_name = None
+            for p in participants:
+                pid = p.get('id')
+                if pid and str(pid) != str(config.page_id):
+                    peer_id = str(pid)
+                    peer_name = p.get('name') or peer_id
+                    break
+            if not peer_id:
+                continue
+            for msg_data in (conv.get('messages') or {}).get('data') or []:
+                mid = msg_data.get('id', '')
+                text = (msg_data.get('message') or '').strip()
+                sender_id = str((msg_data.get('from') or {}).get('id', '') or '')
+                is_me = sender_id == str(config.page_id)
+                if not text:
+                    continue
+                if ChatMessage.objects.filter(user=user, whatsapp_message_id=mid).exists():
+                    continue
+                ChatMessage.objects.create(
+                    user=user,
+                    sender='ai' if is_me else 'user',
+                    content=text,
+                    contact_info=peer_id,
+                    contact_name=peer_name,
+                    source='facebook',
+                    whatsapp_message_id=mid,
+                    is_read=True,
+                    status='archived',
+                )
+                synced += 1
+        return {'imported': synced, 'error': None}
+    except Exception as exc:
+        return {'imported': 0, 'error': str(exc), 'status_code': 500}
+
+
+def facebook_auto_reply(user_id, agent_id, sender_psid, text):
+    try:
+        user = User.objects.get(id=user_id)
+        agent = Agent.objects.get(id=agent_id)
+        if not agent.is_active:
+            return
+
+        history = list(
+            ChatMessage.objects.filter(
+                user=user, contact_info=sender_psid, source='facebook'
+            ).order_by('-created_at')[:6]
+        )
+        history.reverse()
+        history_str = "\n".join(f"{m.sender}: {m.content}" for m in history)
+
+        rag_context = search_knowledge_base(agent.id, text, top_k=4)
+        context_for_llm = (
+            "Documents sources (Extraits pertinents par recherche sémantique RAG) :\n"
+            f"{rag_context if rag_context.strip() else '[Aucun document fourni]'}\n\n"
+            f"Historique récent :\n{history_str}"
+        )
+
+        answer = get_llm_response(
+            agent_name=agent.name,
+            agent_role=agent.role,
+            system_prompt=agent.system_prompt,
+            knowledge_context=context_for_llm,
+            user_message=text,
+            model_name=agent.llm_model,
+        )
+
+        sent = MessagingService.send_message(user, sender_psid, answer, 'facebook')
+        if not sent:
+            logger.warning("Facebook auto-reply: envoi échoué pour PSID %s", sender_psid)
+            return
+
+        ChatMessage.objects.create(
+            user=user,
+            agent=agent,
+            sender='ai',
+            content=answer,
+            contact_info=sender_psid,
+            source='facebook',
+            status='new',
+        )
+        schedule_followup_after_ai(user, sender_psid, 'facebook', analyze=False)
+    except Exception as exc:
+        logger.error("Facebook auto-reply error (PSID %s): %s", sender_psid, exc)
 
 
 def get_whatsapp_port(user_id):
@@ -124,18 +232,177 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def _auth_token_for_wa(self, request):
+        auth = request.META.get('HTTP_AUTHORIZATION', '')
+        if auth.lower().startswith('bearer '):
+            return auth.split(' ', 1)[1].strip()
+        user = request.user
+        if getattr(user, 'master_api_key', None):
+            return user.master_api_key
+        return ''
+
+    @action(detail=True, methods=['post'])
+    def start_session(self, request, pk=None):
+        """
+        Start Baileys and wait for a QR code.
+        If the account is not currently connected, credentials are wiped first so
+        a fresh QR scan is always required (no silent auto-reconnect).
+        """
+        from .whatsapp_process import (
+            start_for_user, wait_for_qr, is_running, clear_auth_for_user, stop_for_user,
+        )
+
+        config = self.get_object()
+
+        if config.is_connected:
+            # Already linked - do not wipe session
+            if not is_running(request.user.id):
+                start_for_user(
+                    request.user,
+                    auth_token=self._auth_token_for_wa(request),
+                    force_restart=False,
+                )
+            return Response({
+                'status': 'connected',
+                'phone_number': config.phone_number,
+                'service_running': is_running(request.user.id),
+            })
+
+        # Security: disconnected -> must scan again (no silent session restore)
+        stop_for_user(request.user.id)
+        clear_auth_for_user(request.user.id)
+        config.is_connected = False
+        config.qr_code = None
+        config.phone_number = None
+        config.save(update_fields=['is_connected', 'qr_code', 'phone_number'])
+
+        result = start_for_user(
+            request.user,
+            auth_token=self._auth_token_for_wa(request),
+            force_restart=True,
+        )
+        if result.get('error') and not result.get('already_running'):
+            return Response(
+                {'error': result['error'], 'status': 'error'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        qr = wait_for_qr(request.user, timeout_seconds=20.0)
+        config.refresh_from_db()
+
+        # Refuse "connected without QR" after a wipe - must have scanned
+        if config.is_connected and not (qr or config.qr_code):
+            # Race: session somehow restored - wipe again and ask for QR
+            stop_for_user(request.user.id)
+            clear_auth_for_user(request.user.id)
+            config.is_connected = False
+            config.qr_code = None
+            config.save(update_fields=['is_connected', 'qr_code'])
+            start_for_user(
+                request.user,
+                auth_token=self._auth_token_for_wa(request),
+                force_restart=True,
+            )
+            qr = wait_for_qr(request.user, timeout_seconds=15.0)
+            config.refresh_from_db()
+
+        if qr or config.qr_code:
+            return Response({
+                'status': 'qr_ready',
+                'qr_code': qr or config.qr_code,
+                'service_running': True,
+                'started': result.get('started'),
+                'already_running': result.get('already_running'),
+            })
+
+        return Response({
+            'status': 'generating_qr',
+            'message': (
+                'Service WhatsApp démarré. Scannez le QR code qui apparaît '
+                '(aucune connexion automatique sans scan).'
+            ),
+            'service_running': is_running(request.user.id),
+            'started': result.get('started'),
+            'already_running': result.get('already_running'),
+        })
+
+    @action(detail=True, methods=['post'])
+    def stop_session(self, request, pk=None):
+        from .whatsapp_process import disconnect_for_user
+        config = self.get_object()
+        disconnect_for_user(request.user.id)
+        config.is_connected = False
+        config.qr_code = None
+        config.phone_number = None
+        config.save(update_fields=['is_connected', 'qr_code', 'phone_number'])
+        return Response({'status': 'disconnected'})
+
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
+        """
+        Poll status / current QR. Does NOT wipe credentials (use start_session for that).
+        """
+        from .whatsapp_process import start_for_user, is_running, wait_for_qr
+
         config = self.get_object()
         if config.is_connected:
-            return Response({"status": "connected", "phone_number": config.phone_number})
+            return Response({
+                "status": "connected",
+                "phone_number": config.phone_number,
+            })
+
         if config.qr_code:
-            return Response({"qr_code": config.qr_code})
-        return Response({"status": "generating_qr", "message": "Le code QR est en cours de génération par le service WhatsApp local. Veuillez rafraîchir dans quelques secondes."})
+            return Response({
+                "qr_code": config.qr_code,
+                "status": "qr_ready",
+            })
+
+        # Keep process alive while user waits for QR (after start_session)
+        if not is_running(request.user.id):
+            start_result = start_for_user(
+                request.user,
+                auth_token=self._auth_token_for_wa(request),
+                force_restart=False,
+            )
+            if start_result.get('error') and not start_result.get('already_running'):
+                return Response({
+                    "status": "error",
+                    "error": start_result['error'],
+                    "message": start_result['error'],
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        qr = wait_for_qr(request.user, timeout_seconds=8.0)
+        config.refresh_from_db()
+        if config.is_connected:
+            return Response({
+                "status": "connected",
+                "phone_number": config.phone_number,
+            })
+        if qr or config.qr_code:
+            return Response({
+                "qr_code": qr or config.qr_code,
+                "status": "qr_ready",
+            })
+        return Response({
+            "status": "generating_qr",
+            "message": (
+                "Le service WhatsApp génère votre QR code. "
+                "Scannez-le pour connecter - aucune connexion automatique."
+            ),
+        })
 
     @action(detail=True, methods=['get'])
     def refresh_connection(self, request, pk=None):
+        from .whatsapp_process import auth_dir_for_user
+
         config = self.get_object()
+        creds = auth_dir_for_user(request.user.id) / 'creds.json'
+        # Stale DB flag without session file => treat as disconnected (must rescan)
+        if config.is_connected and not creds.exists():
+            config.is_connected = False
+            config.phone_number = None
+            config.qr_code = None
+            config.save(update_fields=['is_connected', 'phone_number', 'qr_code'])
         return Response({
             "status": "connected" if config.is_connected else "not_connected",
             "is_connected": config.is_connected,
@@ -158,10 +425,12 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=404)
         
-        config, created = WhatsAppConfig.objects.get_or_create(user=user)
+        config = WhatsAppConfig.objects.filter(user=user).order_by('-updated_at').first()
+        if not config:
+            return Response({'status': 'ignored', 'message': 'No WhatsApp config for user'})
         config.qr_code = qr_code
         config.is_connected = False
-        config.save()
+        config.save(update_fields=['qr_code', 'is_connected', 'updated_at'])
         return Response({'status': 'updated'})
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
@@ -174,12 +443,15 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=404)
-        
-        config, created = WhatsAppConfig.objects.get_or_create(user=user)
+
+        # Never auto-create a default account - user must add one in Paramètres first
+        config = WhatsAppConfig.objects.filter(user=user).order_by('-updated_at').first()
+        if not config:
+            return Response({'status': 'ignored', 'message': 'No WhatsApp config for user'})
         config.is_connected = True
         config.phone_number = phone_number
         config.qr_code = None
-        config.save()
+        config.save(update_fields=['is_connected', 'phone_number', 'qr_code', 'updated_at'])
         return Response({'status': 'connected'})
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
@@ -191,11 +463,12 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=404)
-        
-        config, created = WhatsAppConfig.objects.get_or_create(user=user)
-        config.is_connected = False
-        config.qr_code = None
-        config.save()
+
+        from .whatsapp_process import disconnect_for_user
+        disconnect_for_user(user.id)
+
+        configs = WhatsAppConfig.objects.filter(user=user)
+        configs.update(is_connected=False, qr_code=None, phone_number=None)
         return Response({'status': 'disconnected'})
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
@@ -209,26 +482,34 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=404)
         
-        synced_count = 0
+        # Address-book sync must NOT flood the CRM pipeline. Only refresh names
+        # for prospects already intentionally added to Prospection.
+        updated = 0
         for c in contacts:
             contact_info = c.get('id')
             if not contact_info:
                 continue
             name = c.get('name') or c.get('notify') or c.get('verifiedName') or contact_info.split('@')[0]
-            contact, created = Contact.objects.get_or_create(
-                user=user,
-                source='whatsapp',
-                contact_info=contact_info,
-                defaults={'name': name, 'status': 'new'}
-            )
-            if not created and name and contact.name != name:
+            contact = Contact.objects.filter(
+                user=user, source='whatsapp', contact_info=contact_info
+            ).first()
+            if contact and name and contact.name != name:
                 contact.name = name
-                contact.save()
-            synced_count += 1
-            
-        return Response({'status': 'success', 'synced': synced_count})
+                contact.save(update_fields=['name'])
+                updated += 1
+
+        purged = purge_passive_crm_contacts(user)
+        return Response({
+            'status': 'success',
+            'synced': 0,
+            'updated_existing': updated,
+            'purged_passive': purged,
+        })
 
     def perform_destroy(self, instance):
+        from .whatsapp_process import disconnect_for_user
+        if instance.user_id:
+            disconnect_for_user(instance.user_id)
         ChatMessage.objects.filter(user=instance.user, source='whatsapp').delete()
         Contact.objects.filter(user=instance.user, source='whatsapp').delete()
         super().perform_destroy(instance)
@@ -336,12 +617,13 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
         
         if new_messages:
             ChatMessage.objects.bulk_create(new_messages, ignore_conflicts=True)
-            
+            # Update display names on existing CRM prospects only - never auto-create.
             for sender, name in contacts_to_update.items():
-                contact, _ = Contact.objects.get_or_create(user=user, source='whatsapp', contact_info=sender)
-                if name: 
-                    contact.name = name
-                    contact.save()
+                if not name:
+                    continue
+                Contact.objects.filter(
+                    user=user, source='whatsapp', contact_info=sender
+                ).exclude(name=name).update(name=name)
 
         return Response({'status': 'success', 'processed': len(new_messages)})
 
@@ -350,6 +632,9 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
     serializer_class = EmailConfigSerializer
 
     def get_queryset(self):
+        # oauth2_callback is AllowAny and has no authenticated user
+        if getattr(self, 'action', None) == 'oauth2_callback':
+            return EmailConfig.objects.all()
         return EmailConfig.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
@@ -364,48 +649,226 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
             instance.password = password
             instance.save(update_fields=['password'])
 
+    def _google_oauth_credentials(self):
+        # Strip whitespace/quotes - common cause of Google "invalid_client"
+        client_id = env('GOOGLE_CLIENT_ID', default='').strip().strip('"').strip("'")
+        client_secret = env('GOOGLE_CLIENT_SECRET', default='').strip().strip('"').strip("'")
+        redirect_uri = env('GOOGLE_REDIRECT_URI', default='').strip().strip('"').strip("'")
+        return client_id, client_secret, redirect_uri
+
+    def _frontend_gmail_redirect(self, **params):
+        query = urllib.parse.urlencode(params)
+        base = FRONTEND_URL.rstrip('/')
+        return f"{base}/?view=integration&{query}"
+
     @action(detail=True, methods=['get'])
     def get_connection_url(self, request, pk=None):
-        return Response({"error": "Veuillez configurer directement votre serveur SMTP/IMAP dans les champs de saisie (pas d'URL de connexion nécessaire)."}, status=status.HTTP_400_BAD_REQUEST)
+        """Build Google OAuth URL for one-click Gmail connection."""
+        self.get_object()  # ensure config belongs to the current user
+        client_id, client_secret, redirect_uri = self._google_oauth_credentials()
+        if not client_id or not client_secret or not redirect_uri:
+            return Response(
+                {
+                    "error": (
+                        "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET ou GOOGLE_REDIRECT_URI "
+                        "n'est pas configuré dans le fichier .env du backend."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-    @action(detail=True, methods=['post'])
-    def test_connection(self, request, pk=None):
-        """Test IMAP + SMTP connectivity with current config."""
+        params = {
+            'client_id': client_id,
+            'redirect_uri': redirect_uri,
+            'response_type': 'code',
+            'scope': ' '.join([
+                'openid',
+                'email',
+                'profile',
+                'https://mail.google.com/',
+            ]),
+            'access_type': 'offline',
+            'prompt': 'consent',
+            'state': str(pk),
+        }
+        url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+        return Response({"url": url})
+
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='oauth2_callback',
+        permission_classes=[AllowAny],
+        authentication_classes=[],
+    )
+    def oauth2_callback(self, request):
+        """Google redirects here after consent; store tokens and send user back to the app."""
+        error = request.query_params.get('error')
+        if error:
+            return redirect(self._frontend_gmail_redirect(gmail_error=error))
+
+        code = request.query_params.get('code')
+        state = request.query_params.get('state')
+        if not code or not state:
+            return redirect(self._frontend_gmail_redirect(gmail_error='missing_code'))
+
+        try:
+            config_id = int(state)
+        except (TypeError, ValueError):
+            return redirect(self._frontend_gmail_redirect(gmail_error='invalid_state'))
+
+        try:
+            config = EmailConfig.objects.get(pk=config_id)
+        except EmailConfig.DoesNotExist:
+            return redirect(self._frontend_gmail_redirect(gmail_error='config_not_found'))
+
+        client_id, client_secret, redirect_uri = self._google_oauth_credentials()
+        if not client_id or not client_secret or not redirect_uri:
+            return redirect(self._frontend_gmail_redirect(gmail_error='google_not_configured'))
+
+        try:
+            token_resp = requests.post(
+                'https://oauth2.googleapis.com/token',
+                data={
+                    'code': code,
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'redirect_uri': redirect_uri,
+                    'grant_type': 'authorization_code',
+                },
+                timeout=15,
+            )
+            if token_resp.status_code != 200:
+                logger.error('Google token exchange failed: %s', token_resp.text)
+                return redirect(self._frontend_gmail_redirect(gmail_error='token_exchange_failed'))
+
+            tokens = token_resp.json()
+            access_token = tokens.get('access_token')
+            refresh_token = tokens.get('refresh_token')
+            if not access_token:
+                return redirect(self._frontend_gmail_redirect(gmail_error='no_access_token'))
+
+            userinfo_resp = requests.get(
+                'https://www.googleapis.com/oauth2/v3/userinfo',
+                headers={'Authorization': f'Bearer {access_token}'},
+                timeout=10,
+            )
+            if userinfo_resp.status_code != 200:
+                return redirect(self._frontend_gmail_redirect(gmail_error='userinfo_failed'))
+
+            email = userinfo_resp.json().get('email')
+            if not email:
+                return redirect(self._frontend_gmail_redirect(gmail_error='email_missing'))
+
+            config.email = email
+            config.oauth_token = access_token
+            if refresh_token:
+                config.refresh_token = refresh_token
+            config.imap_server = 'imap.gmail.com'
+            config.smtp_server = 'smtp.gmail.com'
+            config.password = ''
+            config.is_active = True
+            if not config.name or config.name in ('Default Email', 'Nouveau Email'):
+                config.name = email
+            config.save()
+
+            thread = threading.Thread(target=sync_email_history, args=(config,))
+            thread.daemon = True
+            thread.start()
+
+            return redirect(self._frontend_gmail_redirect(gmail_connected='1'))
+        except Exception as exc:
+            logger.exception('Gmail OAuth callback failed: %s', exc)
+            return redirect(self._frontend_gmail_redirect(gmail_error='callback_failed'))
+
+    @action(detail=True, methods=['get'])
+    def refresh_connection(self, request, pk=None):
+        """Verify / refresh Gmail OAuth token. Google OAuth only (no SMTP password)."""
         config = self.get_object()
-        # Allow overriding password inline (not persisted)
-        password_override = request.data.get('password')
-        if password_override:
-            config.password = password_override
-        results = test_email_connection(config)
-        imap_ok = results.get('imap', {}).get('status') == 'success'
-        smtp_ok = results.get('smtp', {}).get('status') == 'success'
+        if not config.oauth_token and not config.refresh_token:
+            if config.is_active:
+                config.is_active = False
+                config.save(update_fields=['is_active'])
+            return Response({
+                'status': 'disconnected',
+                'is_active': False,
+                'email': config.email,
+                'message': 'Seule la connexion Google est autorisée. Connectez Gmail via OAuth.',
+            })
+
+        token = config.oauth_token
+        if config.refresh_token:
+            refreshed = refresh_google_token(config)
+            if refreshed:
+                token = refreshed
+                config.refresh_from_db()
+        if token:
+            try:
+                resp = requests.get(
+                    'https://www.googleapis.com/oauth2/v3/userinfo',
+                    headers={'Authorization': f'Bearer {token}'},
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    if not config.is_active:
+                        config.is_active = True
+                        config.save(update_fields=['is_active'])
+                    return Response({
+                        'status': 'connected',
+                        'is_active': True,
+                        'email': config.email,
+                    })
+            except Exception:
+                pass
+        config.is_active = False
+        config.save(update_fields=['is_active'])
         return Response({
-            'imap': results.get('imap', {}),
-            'smtp': results.get('smtp', {}),
-            'success': imap_ok and smtp_ok
+            'status': 'disconnected',
+            'is_active': False,
+            'email': config.email,
+            'message': 'Token Google invalide ou expiré. Reconnectez Gmail.',
         })
 
     @action(detail=True, methods=['post'])
+    def test_connection(self, request, pk=None):
+        """Google OAuth only - SMTP password login is disabled."""
+        return Response(
+            {
+                'success': False,
+                'error': (
+                    'La connexion email par SMTP / mot de passe n\'est plus disponible. '
+                    'Utilisez « Se connecter avec Google ».'
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    @action(detail=True, methods=['post'])
     def configure(self, request, pk=None):
-        """Save IMAP/SMTP config and activate the account."""
-        config = self.get_object()
-        config.email = request.data.get('email', config.email)
-        config.imap_server = request.data.get('imap_server', config.imap_server)
-        config.smtp_server = request.data.get('smtp_server', config.smtp_server)
-        password = request.data.get('password')
-        if password:
-            config.password = password
-        config.is_active = True
-        config.save()
-        # Kick off history sync in background
-        thread = threading.Thread(target=sync_email_history, args=(config,))
-        thread.daemon = True
-        thread.start()
-        return Response({'status': 'configured', 'email': config.email, 'is_active': True})
+        """SMTP/password activation disabled - use Google OAuth only."""
+        return Response(
+            {
+                'error': (
+                    'La configuration SMTP n\'est plus autorisée. '
+                    'Connectez Gmail uniquement via Google OAuth.'
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     @action(detail=True, methods=['post'])
     def sync_messages(self, request, pk=None):
+        """Re-import IMAP history into the inbox. wait=true (default) runs sync in-request."""
         config = self.get_object()
+        wait = str(request.data.get('wait', 'true')).lower() not in ('0', 'false', 'no')
+        if wait:
+            stats = sync_email_history(config)
+            if stats.get('error') and stats.get('imported', 0) == 0:
+                return Response(
+                    {'status': 'error', 'error': stats['error'], **stats},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response({'status': 'done', **stats})
         thread = threading.Thread(target=sync_email_history, args=(config,))
         thread.daemon = True
         thread.start()
@@ -415,11 +878,24 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
         ChatMessage.objects.filter(email_config=instance).delete()
         super().perform_destroy(instance)
 
+@method_decorator(csrf_exempt, name='dispatch')
 class FacebookConfigViewSet(viewsets.ModelViewSet):
     serializer_class = FacebookConfigSerializer
 
     def get_queryset(self):
+        if getattr(self, 'action', None) == 'webhook':
+            return FacebookConfig.objects.all()
         return FacebookConfig.objects.filter(user=self.request.user)
+
+    def get_permissions(self):
+        if getattr(self, 'action', None) == 'webhook':
+            return [AllowAny()]
+        return super().get_permissions()
+
+    def get_authenticators(self):
+        if getattr(self, 'action', None) == 'webhook':
+            return []
+        return super().get_authenticators()
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -571,11 +1047,42 @@ class FacebookConfigViewSet(viewsets.ModelViewSet):
         config.page_name = page_data.get('name', '')
         config.is_connected = True
         config.save()
-        return Response({
+
+        # Subscribe the Page to the app webhook so Messenger events arrive
+        subscribe_warning = None
+        try:
+            sub = requests.post(
+                f"https://graph.facebook.com/v18.0/{page_id}/subscribed_apps",
+                params={'access_token': page_access_token},
+                data={
+                    'subscribed_fields': (
+                        'messages,messaging_postbacks,messaging_optins,'
+                        'message_deliveries,message_reads'
+                    ),
+                },
+                timeout=12,
+            )
+            if sub.status_code != 200 or not sub.json().get('success'):
+                subscribe_warning = (
+                    sub.json().get('error', {}).get('message')
+                    or f'Abonnement webhook échoué (HTTP {sub.status_code})'
+                )
+                logger.warning("Facebook subscribed_apps failed for page %s: %s", page_id, subscribe_warning)
+        except Exception as exc:
+            subscribe_warning = str(exc)
+            logger.warning("Facebook subscribed_apps error for page %s: %s", page_id, exc)
+
+        payload = {
             'status': 'connected',
             'page_name': config.page_name,
-            'page_id': config.page_id
-        })
+            'page_id': config.page_id,
+        }
+        if subscribe_warning:
+            payload['webhook_warning'] = (
+                f"Page connectée, mais webhook non abonné : {subscribe_warning}. "
+                "Les messages live peuvent ne pas arriver tant que le webhook Meta n'est pas configuré."
+            )
+        return Response(payload)
 
     @action(detail=True, methods=['post'])
     def send_facebook_message(self, request, pk=None):
@@ -655,11 +1162,18 @@ class FacebookConfigViewSet(viewsets.ModelViewSet):
                     whatsapp_message_id=msg_id,
                     status='new'
                 )
-                # Update/create contact
-                Contact.objects.get_or_create(
-                    user=user, source='facebook', contact_info=sender_id,
-                    defaults={'name': sender_id, 'status': 'new'}
-                )
+                # Inbox only - do not auto-add every Messenger sender to CRM
+                mark_prospect_replied(user, sender_id, 'facebook')
+
+                # Auto-réponse IA si un agent actif couvre le canal Facebook
+                if agent and agent.is_active and agent.channels and any(
+                    str(c).lower() == 'facebook' for c in agent.channels
+                ):
+                    threading.Thread(
+                        target=facebook_auto_reply,
+                        args=(user.id, agent.id, sender_id, text),
+                        daemon=True,
+                    ).start()
 
         return Response({'status': 'EVENT_RECEIVED'})
 
@@ -668,43 +1182,10 @@ class FacebookConfigViewSet(viewsets.ModelViewSet):
         config = self.get_object()
         if not config.is_connected or not config.page_access_token:
             return Response({'status': 'Facebook non connecté'})
-        # Poll recent conversations via Graph API
-        try:
-            resp = requests.get(
-                f"https://graph.facebook.com/v18.0/{config.page_id}/conversations",
-                params={'access_token': config.page_access_token, 'fields': 'participants,messages{message,from,created_time,id}'},
-                timeout=15
-            )
-            if resp.status_code != 200:
-                return Response({'error': 'Erreur Graph API'}, status=400)
-            data = resp.json()
-            synced = 0
-            user = request.user
-            for conv in data.get('data', []):
-                for msg_data in conv.get('messages', {}).get('data', []):
-                    mid = msg_data.get('id', '')
-                    text = msg_data.get('message', '').strip()
-                    sender_info = msg_data.get('from', {})
-                    sender_id = sender_info.get('id', '')
-                    is_me = sender_id == config.page_id
-                    if not text:
-                        continue
-                    if ChatMessage.objects.filter(user=user, whatsapp_message_id=mid).exists():
-                        continue
-                    ChatMessage.objects.create(
-                        user=user,
-                        sender='ai' if is_me else 'user',
-                        content=text,
-                        contact_info=sender_id,
-                        source='facebook',
-                        whatsapp_message_id=mid,
-                        is_read=True,
-                        status='archived'
-                    )
-                    synced += 1
-            return Response({'status': 'synced', 'count': synced})
-        except Exception as e:
-            return Response({'error': str(e)}, status=500)
+        result = sync_facebook_history(config, request.user)
+        if result.get('error'):
+            return Response({'error': result['error']}, status=result.get('status_code', 500))
+        return Response({'status': 'synced', 'count': result['imported']})
 
     def perform_destroy(self, instance):
         ChatMessage.objects.filter(user=instance.user, source='facebook').delete()
@@ -993,16 +1474,19 @@ class ContactViewSet(viewsets.ModelViewSet):
     serializer_class = ContactSerializer
 
     def get_queryset(self):
-        return Contact.objects.filter(user=self.request.user)
+        # One-shot cleanup of auto-imported CRM junk (sync carnet / chat Manual)
+        if self.action == 'list':
+            purge_passive_crm_contacts(self.request.user)
+        return Contact.objects.filter(user=self.request.user).exclude(source='chat')
 
     def perform_create(self, serializer):
         source = serializer.validated_data.get('source', '')
-        if source in ('linkedin', 'facebook'):
+        if source == 'linkedin':
             from rest_framework.exceptions import ValidationError
             raise ValidationError({
                 'source': (
-                    f"Le canal {source} n'est plus disponible. "
-                    "Utilisez whatsapp ou email."
+                    "Le canal linkedin n'est plus disponible. "
+                    "Utilisez whatsapp, email ou facebook."
                 )
             })
         serializer.save(user=self.request.user)
@@ -1020,7 +1504,7 @@ class ContactViewSet(viewsets.ModelViewSet):
     def import_contacts(self, request):
         """
         Import contacts from a CSV or Excel file.
-        Expected columns: name, contact_info, source (whatsapp/email), notes (optional), status (optional)
+        Expected columns: name, contact_info, source (whatsapp/email/facebook), notes (optional), status (optional)
         """
         file_obj = request.FILES.get('file')
         if not file_obj:
@@ -1052,7 +1536,7 @@ class ContactViewSet(viewsets.ModelViewSet):
         skipped_count = 0
         errors = []
         valid_statuses = {'new', 'contacted', 'interested', 'ready', 'no'}
-        # LinkedIn / Facebook outreach are retired; keep values for legacy imports but prefer WA/Email
+        # LinkedIn outreach is retired; Facebook is supported (PSID ou URL de profil)
         valid_sources = {'whatsapp', 'email', 'facebook', 'linkedin', 'chat'}
 
         for idx, row in df.iterrows():
@@ -1066,9 +1550,9 @@ class ContactViewSet(viewsets.ModelViewSet):
                 name = contact_info
 
             source = str(row.get('source', 'whatsapp')).strip().lower()
-            if source in ('linkedin', 'facebook'):
+            if source == 'linkedin':
                 errors.append(
-                    f"Ligne {idx + 2}: canal {source} indisponible — contact importé en 'whatsapp'."
+                    f"Ligne {idx + 2}: canal linkedin indisponible - contact importé en 'whatsapp'."
                 )
                 source = 'whatsapp'
             elif source not in valid_sources:
@@ -1112,7 +1596,7 @@ class ContactViewSet(viewsets.ModelViewSet):
     def contact_via_agent(self, request, pk=None):
         """
         Confie ce prospect à un Agent IA qui génère et envoie un premier message
-        via WhatsApp ou Email selon le canal du contact.
+        via WhatsApp, Email ou Facebook (Messenger) selon le canal du contact.
         """
         contact = self.get_object()
         agent_id = request.data.get('agent_id')
@@ -1125,72 +1609,16 @@ class ContactViewSet(viewsets.ModelViewSet):
         except Agent.DoesNotExist:
             return Response({'error': 'Agent introuvable.'}, status=404)
 
-        source = contact.source
-        contact_info = contact.contact_info
-        contact_name = contact.name or contact_info
-        notes = contact.notes or ''
-
-        intro_prompt = (
-            f"Tu dois écrire un premier message de prise de contact à destination de {contact_name}. "
-            f"Tes notes sur ce prospect : {notes if notes else 'Aucune note spécifique.'}. "
-            f"Ce message doit être court, chaleureux, professionnel et adapté à ton rôle. "
-            f"N'utilise pas de gras ni de formatage spécial. Écris uniquement le message."
-        )
-
-        try:
-            response_text = get_llm_response(
-                agent_name=agent.name,
-                agent_role=agent.role,
-                system_prompt=agent.system_prompt,
-                knowledge_context='',
-                user_message=intro_prompt,
-                model_name=agent.llm_model,
-            )
-        except Exception as exc:
-            logger.error('contact_via_agent LLM error: %s', exc)
-            response_text = f"Bonjour {contact_name}, je suis {agent.name}. Je serais ravi d'échanger avec vous."
-
-        if source in ['facebook', 'linkedin']:
-            return Response({
-                'error': (
-                    f"Le canal {source} n'est plus disponible. "
-                    "Utilisez WhatsApp ou Email pour contacter ce prospect."
-                )
-            }, status=400)
-
-        sent = MessagingService.send_message(request.user, contact_info, response_text, source)
-
+        from .prospect_search_service import send_agent_intro
+        sent, message = send_agent_intro(request.user, contact, agent)
         if not sent:
-            return Response({'error': f'Échec de l\'envoi via {source}'}, status=500)
-
-        ChatMessage.objects.create(
-            user=request.user,
-            agent=agent,
-            sender='ai',
-            content=response_text,
-            contact_info=contact_info,
-            contact_name=contact_name,
-            source=source,
-            status='new',
-        )
-
-        ContactAssignment.objects.update_or_create(
-            user=request.user,
-            contact_info=contact_info,
-            defaults={'agent': agent},
-        )
-
-        if contact.status == 'new':
-            contact.status = 'contacted'
-        contact.replied_since_last_ai = False
-        contact.next_followup_date = timezone.now() + timezone.timedelta(hours=48)
-        contact.save()
+            return Response({'error': message}, status=400)
 
         return Response({
-            'status': 'sent' if sent else 'logged_only',
-            'message': response_text,
+            'status': 'sent',
+            'message': message,
             'agent': agent.name,
-            'source': source,
+            'source': contact.source,
         })
 
 
@@ -1519,7 +1947,7 @@ class AgentViewSet(viewsets.ModelViewSet):
 
         from .llm_service import classify_handoff
         for link in links:
-            # "manual" is reserved for human / UI escalation — skip auto LLM classification
+            # "manual" is reserved for human / UI escalation - skip auto LLM classification
             if link.trigger_type == 'manual':
                 continue
             if classify_handoff(link.trigger_type, user_message):
@@ -1738,14 +2166,27 @@ class AgentViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Missing data'}, status=400)
             
         if source == 'chat':
-            ChatMessage.objects.create(agent=agent, sender='user', content=content, contact_info=contact_info, source=source, status='new')
-            history = list(ChatMessage.objects.filter(agent=agent).order_by('-created_at')[:6])
+            # Chatbot / widget thread only - never mixes WhatsApp/Email history
+            ChatMessage.objects.create(
+                agent=agent,
+                user=request.user,
+                sender='user',
+                content=content,
+                contact_info=contact_info,
+                source=source,
+                status='new',
+            )
+            history = list(
+                ChatMessage.objects.filter(
+                    agent=agent, source='chat', contact_info=contact_info
+                ).order_by('-created_at')[:6]
+            )
             history.reverse()
             history_str = "\n".join([f"{m.sender}: {m.content}" for m in history])
 
             rag_context = search_knowledge_base(agent.id, content, top_k=4)
             context_for_llm = f"Documents sources (Extraits pertinents par recherche sémantique RAG) :\n{rag_context if rag_context.strip() else '[Aucun document fourni]'}\n\nHistorique récent :\n{history_str}"
-            
+
             response_text = get_llm_response(
                 agent_name=agent.name,
                 agent_role=agent.role,
@@ -1754,37 +2195,96 @@ class AgentViewSet(viewsets.ModelViewSet):
                 user_message=content,
                 model_name=agent.llm_model
             )
-            ChatMessage.objects.create(agent=agent, sender='ai', content=response_text, contact_info=contact_info, source=source, status='new')
+            ChatMessage.objects.create(
+                agent=agent,
+                user=request.user,
+                sender='ai',
+                content=response_text,
+                contact_info=contact_info,
+                source=source,
+                status='new',
+            )
             schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
             return Response({'status': 'sent', 'reply': response_text})
-            
+
         elif source == 'email':
             config = None
             if email_config_id:
                 config = EmailConfig.objects.filter(id=email_config_id, user=request.user).first()
-            
+
             if not config and agent and agent.email_config:
                 config = agent.email_config
 
             if not config:
+                config = EmailConfig.objects.filter(user=request.user).filter(
+                    Q(is_active=True) | Q(oauth_token__isnull=False)
+                ).first()
+
+            if not config:
                 return Response({'error': 'Reliez votre email avec MAGIA pour effectuer cette opération'}, status=400)
-                
+
             success = send_email_reply(config, contact_info, "Re: Contact", content)
             if not success:
-                return Response({'error': 'Failed to send email'}, status=500)
-            ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
+                return Response({'error': 'Échec de l\'envoi email. Vérifiez la connexion dans Paramètres.'}, status=500)
+            ChatMessage.objects.create(
+                agent=agent,
+                user=request.user,
+                sender='ai',
+                content=content,
+                contact_info=contact_info,
+                source=source,
+                status='new',
+                email_config=config,
+            )
             schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
-            
+
         elif source == 'whatsapp':
-            success = MessagingService.send_message(request.user, contact_info, content, 'whatsapp')
+            success, wa_err = MessagingService.send_whatsapp_detailed(
+                request.user, contact_info, content
+            )
             if not success:
-                return Response({'error': 'WhatsApp service error'}, status=500)
-            ChatMessage.objects.create(agent=agent, sender='ai', content=content, contact_info=contact_info, source=source, status='new')
+                return Response({
+                    'error': wa_err or (
+                        'WhatsApp non connecté ou service indisponible. '
+                        'Activez WhatsApp dans Paramètres.'
+                    )
+                }, status=500)
+            ChatMessage.objects.create(
+                agent=agent,
+                user=request.user,
+                sender='ai',
+                content=content,
+                contact_info=contact_info,
+                source=source,
+                status='new',
+            )
             schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
-            
-        elif source in ['facebook', 'linkedin']:
+
+        elif source == 'facebook':
+            success, fb_err = MessagingService.send_facebook_detailed(
+                request.user, contact_info, content
+            )
+            if not success:
+                return Response({
+                    'error': fb_err or (
+                        "Échec de l'envoi Messenger. Vérifiez que la Page est connectée et que "
+                        "le contact a écrit à la Page il y a moins de 24h (règle Meta)."
+                    )
+                }, status=500)
+            ChatMessage.objects.create(
+                agent=agent,
+                user=request.user,
+                sender='ai',
+                content=content,
+                contact_info=contact_info,
+                source=source,
+                status='new',
+            )
+            schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
+
+        elif source == 'linkedin':
             return Response({
-                'error': f"Le canal {source} n'est plus disponible. Utilisez WhatsApp ou Email."
+                'error': "Le canal linkedin n'est plus disponible. Utilisez WhatsApp, Email ou Facebook."
             }, status=400)
                 
         return Response({'status': 'sent'})
@@ -1826,26 +2326,142 @@ class AgentViewSet(viewsets.ModelViewSet):
             return Response({'status': 'sent'})
             
         elif source == 'whatsapp':
-             success = MessagingService.send_message(request.user, contact_info, content, 'whatsapp')
-             if success:
-                 ChatMessage.objects.create(user=request.user, sender='ai', content=content, contact_info=contact_info, source=source, status='pertinent')
-                 schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
-                 return Response({'status': 'sent'})
-             return Response({'error': 'Failed to send WhatsApp message'}, status=500)
-
-        elif source in ['facebook', 'linkedin']:
+            success, wa_err = MessagingService.send_whatsapp_detailed(
+                request.user, contact_info, content
+            )
+            if success:
+                ChatMessage.objects.create(
+                    user=request.user,
+                    sender='ai',
+                    content=content,
+                    contact_info=contact_info,
+                    source=source,
+                    status='pertinent',
+                )
+                schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
+                return Response({'status': 'sent'})
             return Response({
-                'error': f"Le canal {source} n'est plus disponible. Utilisez WhatsApp ou Email."
+                'error': wa_err or 'Échec de l\'envoi WhatsApp. Reconnectez WhatsApp dans Paramètres.'
+            }, status=500)
+
+        elif source == 'facebook':
+            success, fb_err = MessagingService.send_facebook_detailed(
+                request.user, contact_info, content
+            )
+            if success:
+                ChatMessage.objects.create(
+                    user=request.user,
+                    sender='ai',
+                    content=content,
+                    contact_info=contact_info,
+                    source=source,
+                    status='pertinent',
+                )
+                schedule_followup_after_ai(request.user, contact_info, source, analyze=False)
+                return Response({'status': 'sent'})
+            return Response({
+                'error': fb_err or (
+                    "Échec de l'envoi Messenger. Vérifiez que la Page est connectée et que "
+                    "le contact a écrit à la Page il y a moins de 24h (règle Meta)."
+                )
+            }, status=500)
+
+        elif source == 'linkedin':
+            return Response({
+                'error': "Le canal linkedin n'est plus disponible. Utilisez WhatsApp, Email ou Facebook."
             }, status=400)
 
         return Response({'error': 'Source not supported for direct reply'}, status=400)
 
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
+        """
+        Agent chatbot threads only by default (source=chat).
+        Channel traffic (whatsapp/email/facebook) belongs in inbox channel tabs.
+        """
         agent = self.get_object()
-        msgs = ChatMessage.objects.filter(agent=agent).order_by('created_at')
+        source = request.query_params.get('source', 'chat')
+        contact = request.query_params.get('contact')
+        msgs = ChatMessage.objects.filter(agent=agent)
+        if source:
+            msgs = msgs.filter(source=source)
+        if contact:
+            msgs = msgs.filter(contact_info=contact)
+        msgs = msgs.order_by('created_at')
         serializer = ChatMessageSerializer(msgs, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def sync_inbox(self, request):
+        """
+        Re-sync email / Facebook (and optionally restart WhatsApp session) so
+        the inbox shows a fuller message history.
+        Body: { "source": "email" | "whatsapp" | "facebook" | "all" }
+        """
+        source = (request.data.get('source') or 'all').lower()
+        results = {'email': None, 'whatsapp': None, 'facebook': None}
+
+        if source in ('email', 'all'):
+            configs = EmailConfig.objects.filter(user=request.user).filter(
+                Q(is_active=True) | Q(oauth_token__isnull=False)
+            )
+            if not configs.exists():
+                results['email'] = {
+                    'status': 'error',
+                    'error': 'Aucun compte email connecté. Reliez Gmail dans Paramètres.',
+                }
+            else:
+                total = {'imported': 0, 'skipped': 0, 'errors': []}
+                for config in configs:
+                    # Ensure active for sync path
+                    if not config.is_active and config.oauth_token:
+                        config.is_active = True
+                        config.save(update_fields=['is_active'])
+                    stats = sync_email_history(config)
+                    total['imported'] += stats.get('imported', 0)
+                    total['skipped'] += stats.get('skipped', 0)
+                    if stats.get('error'):
+                        total['errors'].append(stats['error'])
+                results['email'] = {'status': 'done', **total}
+
+        if source in ('whatsapp', 'all'):
+            from .whatsapp_process import start_for_user, is_running
+            wa = WhatsAppConfig.objects.filter(user=request.user).first()
+            if not wa:
+                results['whatsapp'] = {
+                    'status': 'error',
+                    'error': 'Aucun WhatsApp configuré. Connectez WhatsApp dans Paramètres.',
+                }
+            else:
+                auth = request.META.get('HTTP_AUTHORIZATION', '')
+                token = auth.split(' ', 1)[1].strip() if auth.lower().startswith('bearer ') else ''
+                start = start_for_user(request.user, auth_token=token)
+                results['whatsapp'] = {
+                    'status': 'running' if is_running(request.user.id) or start.get('already_running') or start.get('started') else 'error',
+                    'message': (
+                        'Service WhatsApp actif - l\'historique continue de se synchroniser '
+                        'en arrière-plan (texte + médias indiqués).'
+                    ),
+                    'error': start.get('error'),
+                    'started': start.get('started'),
+                    'already_running': start.get('already_running'),
+                }
+
+        if source in ('facebook', 'all'):
+            fb = FacebookConfig.objects.filter(user=request.user, is_connected=True).first()
+            if not fb or not fb.page_access_token:
+                results['facebook'] = {
+                    'status': 'error',
+                    'error': 'Aucune Page Facebook connectée. Connectez-la dans Paramètres.',
+                }
+            else:
+                stats = sync_facebook_history(fb, request.user)
+                if stats.get('error'):
+                    results['facebook'] = {'status': 'error', 'error': stats['error']}
+                else:
+                    results['facebook'] = {'status': 'done', 'imported': stats['imported']}
+
+        return Response(results)
 
     @action(detail=False, methods=['get'])
     def all_conversations(self, request):
@@ -1859,6 +2475,9 @@ class AgentViewSet(viewsets.ModelViewSet):
         )
         if source_filter:
             base_qs = base_qs.filter(source=source_filter)
+        else:
+            # "Tout" = channel inboxes only; chatbot threads live under Agents
+            base_qs = base_qs.exclude(source='chat')
 
         # Search across contacts
         if search:
@@ -1960,29 +2579,69 @@ class AgentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def contacts_list(self, request):
-        """Return all known contacts sorted by latest activity, for search/autocomplete."""
+        """
+        Inbox search/autocomplete from message history (not CRM sync dump).
+        Falls back to intentional CRM contacts for numbers not yet messaged in MAGIA.
+        """
         search = request.query_params.get('search', '')
         source = request.query_params.get('source', '')
-        contacts = Contact.objects.filter(user=request.user)
+        user_agents = Agent.objects.filter(user=request.user).values_list('id', flat=True)
+
+        msg_qs = ChatMessage.objects.filter(
+            Q(user=request.user) | Q(agent_id__in=user_agents)
+        ).exclude(contact_info__isnull=True).exclude(contact_info='')
         if source:
-            contacts = contacts.filter(source=source)
+            msg_qs = msg_qs.filter(source=source)
         if search:
-            contacts = contacts.filter(
+            msg_qs = msg_qs.filter(
+                Q(contact_info__icontains=search) | Q(contact_name__icontains=search)
+            )
+
+        latest_ids = msg_qs.values('source', 'contact_info').annotate(
+            latest_id=MaxAgg('id')
+        ).values_list('latest_id', flat=True)
+        latest_msgs = ChatMessage.objects.filter(id__in=latest_ids).order_by('-created_at')[:100]
+
+        seen = set()
+        result = []
+        for m in latest_msgs:
+            key = (m.source, m.contact_info)
+            if key in seen:
+                continue
+            seen.add(key)
+            name = m.contact_name or m.contact_info
+            result.append({
+                'id': m.id,
+                'name': name,
+                'contact_info': m.contact_info,
+                'source': m.source,
+                'avatar_letter': (name or '?')[0].upper(),
+                'last_message_at': m.created_at,
+            })
+
+        crm = Contact.objects.filter(user=request.user).exclude(source='chat')
+        if source:
+            crm = crm.filter(source=source)
+        if search:
+            crm = crm.filter(
                 Q(name__icontains=search) | Q(contact_info__icontains=search)
             )
-        contacts = contacts.order_by('-last_message_at')[:100]
-        result = [
-            {
+        for c in crm.order_by('-last_message_at', '-created_at')[:50]:
+            key = (c.source, c.contact_info)
+            if key in seen:
+                continue
+            seen.add(key)
+            name = c.name or c.contact_info
+            result.append({
                 'id': c.id,
-                'name': c.name or c.contact_info,
+                'name': name,
                 'contact_info': c.contact_info,
                 'source': c.source,
-                'avatar_letter': (c.name or c.contact_info or '?')[0].upper(),
+                'avatar_letter': (name or '?')[0].upper(),
                 'last_message_at': c.last_message_at,
-            }
-            for c in contacts
-        ]
-        return Response(result)
+            })
+
+        return Response(result[:100])
 
     @action(detail=False, methods=['get'])
     def boite_reception(self, request):
@@ -1999,4 +2658,127 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
     def get_queryset(self):
         return AuditLog.objects.filter(user=self.request.user).order_by('-created_at')
+
+
+class ProspectSearchJobViewSet(viewsets.ModelViewSet):
+    """
+    Recherche Apollo → enrichissement → CRM → envoi auto Email/WhatsApp
+    (+ ajout CRM des profils Facebook pour prise de contact manuelle).
+    """
+    serializer_class = ProspectSearchJobSerializer
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def get_queryset(self):
+        return (
+            ProspectSearchJob.objects.filter(user=self.request.user)
+            .prefetch_related('leads')
+            .select_related('agent')
+            .order_by('-created_at')
+        )
+
+    def create(self, request, *args, **kwargs):
+        from django.conf import settings as dj_settings
+        from .prospect_search_service import MAX_RESULTS_CAP, start_job_async
+
+        if not (getattr(dj_settings, 'APOLLO_API_KEY', None) or '').strip():
+            return Response(
+                {
+                    'error': (
+                        "APOLLO_API_KEY manquante. Ajoutez votre clé Apollo dans backend/.env "
+                        "puis redémarrez Django."
+                    )
+                },
+                status=400,
+            )
+
+        agent_id = request.data.get('agent_id')
+        if not agent_id:
+            return Response({'error': 'agent_id requis.'}, status=400)
+
+        try:
+            agent = Agent.objects.get(id=agent_id, user=request.user)
+        except Agent.DoesNotExist:
+            return Response({'error': 'Agent introuvable.'}, status=404)
+
+        if not agent.is_deployed:
+            return Response({'error': "L'agent doit être déployé."}, status=400)
+
+        channels = (request.data.get('channels') or 'both').lower()
+        if channels not in ('email', 'whatsapp', 'facebook', 'both', 'all'):
+            return Response(
+                {'error': 'channels doit être email, whatsapp, facebook, both ou all.'},
+                status=400,
+            )
+
+        try:
+            max_results = int(request.data.get('max_results') or 10)
+        except (TypeError, ValueError):
+            max_results = 10
+        max_results = min(max(max_results, 1), MAX_RESULTS_CAP)
+
+        filters = request.data.get('filters') or {}
+        if not isinstance(filters, dict):
+            return Response({'error': 'filters doit être un objet JSON.'}, status=400)
+
+        # Normalize simple string filters from the UI
+        for key in (
+            'person_titles', 'person_locations', 'organization_locations',
+            'q_organization_keyword_tags', 'person_seniorities',
+        ):
+            if key in filters and isinstance(filters[key], str):
+                filters[key] = [t.strip() for t in filters[key].split(',') if t.strip()]
+
+        job = ProspectSearchJob.objects.create(
+            user=request.user,
+            agent=agent,
+            filters=filters,
+            channels=channels,
+            max_results=max_results,
+            status='pending',
+        )
+
+        from django.db import transaction as db_transaction
+
+        def _kick():
+            start_job_async(job.id)
+
+        db_transaction.on_commit(_kick)
+
+        serializer = self.get_serializer(job)
+        return Response(serializer.data, status=201)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ApolloPhoneWebhookView(viewsets.ViewSet):
+    """Apollo async phone enrichment callback."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def create(self, request):
+        from django.conf import settings as dj_settings
+        from .prospect_search_service import handle_apollo_phone_webhook
+
+        expected = (getattr(dj_settings, 'APOLLO_WEBHOOK_SECRET', None) or '').strip()
+        token = (
+            request.query_params.get('token')
+            or request.headers.get('X-Apollo-Token')
+            or ''
+        ).strip()
+        if expected and token != expected:
+            return Response({'error': 'Unauthorized'}, status=401)
+
+        job_id = request.query_params.get('job_id')
+        lead_id = request.query_params.get('lead_id')
+        try:
+            job_id_int = int(job_id) if job_id else None
+        except ValueError:
+            job_id_int = None
+        try:
+            lead_id_int = int(lead_id) if lead_id else None
+        except ValueError:
+            lead_id_int = None
+
+        payload = request.data if isinstance(request.data, dict) else {}
+        result = handle_apollo_phone_webhook(payload, job_id=job_id_int, lead_id=lead_id_int)
+        return Response({'status': 'ok', **result})
 

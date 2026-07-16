@@ -1,6 +1,6 @@
 import { API_BASE } from "../../../lib/api";
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown, AlertTriangle, Sparkles } from "lucide-react";
+import { ChevronRight, Pause, Play, Settings, Globe, Mail, MessageSquare, Facebook, Terminal, BookOpen, Clock, Shield, Plus, FileText, Database, Search, Filter, ExternalLink, Zap, Send, Loader2, User, Upload, Trash2, X, ThumbsUp, ThumbsDown, AlertTriangle, Sparkles } from "lucide-react";
 import { cn } from "../ui/utils";
 import { Button } from "../ui/button";
 import { useAgents } from "../../hooks/useAgents";
@@ -118,7 +118,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                     <button onClick={onBack} className="p-2 bg-white border border-gray-100 rounded-xl hover:bg-gray-50 transition-all shadow-sm">
                         <ChevronRight className="w-5 h-5 rotate-180" />
                     </button>
-                    <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-xl italic shadow-sm overflow-hidden shrink-0 bg-blue-900")}>
+                    <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center text-white font-semibold text-xl italic shadow-sm overflow-hidden shrink-0 bg-blue-900")}>
                         {agent.avatar ? (
                             <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
                         ) : (
@@ -135,7 +135,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                 {displayStatus === "active" ? "Actif" : "Brouillon"}
                             </span>
                         </div>
-                        <p className="text-sm text-gray-500">{agent.role} — {agent.llm_model}</p>
+                        <p className="text-sm text-gray-500">{agent.role} - {agent.llm_model}</p>
                     </div>
                 </div>
 
@@ -161,15 +161,15 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                     <div className="lg:col-span-2 space-y-8">
                         <div className="grid grid-cols-3 gap-6">
                             <div className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Conversations</p>
+                                <p className="text-xs font-bold text-gray-400 mb-1">Conversations</p>
                                 <p className="text-2xl font-bold text-gray-900">{displayStats.conversations}</p>
                             </div>
                             <div className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Résolution</p>
+                                <p className="text-xs font-bold text-gray-400 mb-1">Résolution</p>
                                 <p className="text-2xl font-bold text-gray-900">{displayStats.resolution}</p>
                             </div>
                             <div className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Leads</p>
+                                <p className="text-xs font-bold text-gray-400 mb-1">Leads</p>
                                 <p className="text-2xl font-bold text-gray-900">{displayStats.leads}</p>
                             </div>
                         </div>
@@ -202,7 +202,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4">
-                                            <span className="text-[9px] font-black uppercase tracking-tighter text-gray-300 px-1.5 py-0.5 border border-gray-100 rounded">{msg.source || 'chat'}</span>
+                                            <span className="text-[9px] font-semibold tracking-tighter text-gray-300 px-1.5 py-0.5 border border-gray-100 rounded">{msg.source || 'chat'}</span>
                                             <p className="text-[10px] font-bold text-gray-400">{new Date(msg.created_at).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
                                         </div>
                                     </div>
@@ -219,8 +219,12 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                         <div className="p-8 bg-white border border-gray-100 rounded-[2rem] shadow-sm">
                             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2"> <Globe className="w-4 h-4 text-gray-400" /> Canaux actifs</h3>
                             <div className="space-y-4">
-                                {['chat', 'email', 'whatsapp'].map((chan) => {
+                                {['chat', 'email', 'whatsapp', 'facebook'].map((chan) => {
                                     const isActive = agent.channels?.includes(chan);
+                                    const label =
+                                        chan === 'chat' ? 'Web Chat'
+                                        : chan === 'facebook' ? 'Facebook'
+                                        : chan;
                                     return (
                                         <div key={chan} className={cn(
                                             "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group",
@@ -234,7 +238,8 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                                 {chan === 'chat' && <Globe className={cn("w-4 h-4", isActive ? "text-blue-500" : "text-gray-400")} />}
                                                 {chan === 'email' && <Mail className={cn("w-4 h-4", isActive ? "text-orange-500" : "text-gray-400")} />}
                                                 {chan === 'whatsapp' && <MessageSquare className={cn("w-4 h-4", isActive ? "text-green-500" : "text-gray-400")} />}
-                                                <span className={cn("text-sm font-bold capitalize", isActive ? "text-blue-900" : "text-gray-400")}>{chan === 'chat' ? 'Web Chat' : chan}</span>
+                                                {chan === 'facebook' && <Facebook className={cn("w-4 h-4", isActive ? "text-[#1877F2]" : "text-gray-400")} />}
+                                                <span className={cn("text-sm font-bold capitalize", isActive ? "text-blue-900" : "text-gray-400")}>{label}</span>
                                             </div>
                                             <div className={cn(
                                                 "w-10 h-5 rounded-full relative transition-all duration-300 p-1",
@@ -249,7 +254,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                     );
                                 })}
                                 <p className="text-[10px] text-gray-400 italic px-1">
-                                    LinkedIn n&apos;est plus disponible — utilisez WhatsApp ou Email.
+                                    Activez Facebook pour que l&apos;agent réponde aux messages Messenger de votre Page.
                                 </p>
                             </div>
                             <p className="mt-4 text-[10px] text-gray-400 italic text-center">Cliquez sur un canal pour l'activer ou le désactiver.</p>
@@ -308,7 +313,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                             <h3 className="font-bold text-gray-900 mb-4">Détails de l'unité</h3>
                             <div className="space-y-4">
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">Modèle IA</p>
+                                    <p className="text-[10px] font-semibold text-gray-400">Modèle IA</p>
                                     <select
                                         className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold focus:outline-none"
                                         value={agent.llm_model || ""}
@@ -350,15 +355,15 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                     })()}
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">Température</p>
+                                    <p className="text-[10px] font-semibold text-gray-400">Température</p>
                                     <p className="text-sm font-bold">{agent.temperature}</p>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">Mode d'exécution</p>
+                                    <p className="text-[10px] font-semibold text-gray-400">Mode d'exécution</p>
                                     <p className="text-sm font-bold capitalize">{agent.execution_mode?.replace('_', ' ')}</p>
                                 </div>
                                 <div className="space-y-1 pt-4 border-t border-gray-100">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">Équipe Assignée</p>
+                                    <p className="text-[10px] font-semibold text-gray-400">Équipe Assignée</p>
                                     <div className="flex items-center gap-2">
                                         {agent.team_color && (
                                             <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: agent.team_color }} />
@@ -417,7 +422,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-gray-900 truncate">{kb.name}</h4>
-                                    <p className="text-xs text-gray-400 uppercase font-black">{kb.source_type}</p>
+                                    <p className="text-xs text-gray-400 font-semibold">{kb.source_type}</p>
                                     <p className="text-[10px] text-gray-300 mt-2">{new Date(kb.created_at).toLocaleDateString()}</p>
                                 </div>
                                 <button className="p-2 text-gray-300 hover:text-red-500 transition-colors">
@@ -427,7 +432,7 @@ export function AgentDetailView({ user, agent, onBack, onRefresh, onNavigateToIn
                         ))}
                         {(!agent.knowledge_bases || agent.knowledge_bases.length === 0) && (
                             <div className="col-span-full py-16 text-center border-2 border-dashed border-gray-100 rounded-3xl bg-gray-50/50">
-                                <p className="text-sm font-bold text-gray-300 uppercase tracking-widest">Aucune connaissance chargée</p>
+                                <p className="text-sm font-bold text-gray-300">Aucune connaissance chargée</p>
                             </div>
                         )}
                     </div>
@@ -474,8 +479,8 @@ function SandboxModal({ isOpen, onClose, agent, messages, input, setInput, onSen
                             <Terminal className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-gray-900">Sandbox Test — {agent.name}</h3>
-                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Environnement de simulation Isolé</p>
+                            <h3 className="font-bold text-gray-900">Sandbox Test - {agent.name}</h3>
+                            <p className="text-[10px] text-gray-400 font-medium">Environnement de simulation Isolé</p>
                         </div>
                     </div>
                     <button
@@ -532,7 +537,7 @@ function SandboxModal({ isOpen, onClose, agent, messages, input, setInput, onSen
                                     )}
                                     {msg.feedback && (
                                         <div className="absolute top-1/2 -translate-y-1/2 -right-10">
-                                            <span className={cn("text-[8px] font-black uppercase", msg.feedback === 'good' ? "text-emerald-500" : "text-red-400")}>
+                                            <span className={cn("text-[8px] font-semibold", msg.feedback === 'good' ? "text-emerald-500" : "text-red-400")}>
                                                 {msg.feedback === 'good' ? 'Utile' : 'Inutile'}
                                             </span>
                                         </div>

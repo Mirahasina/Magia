@@ -46,12 +46,12 @@ export function JournauxAuditView() {
         <div className="space-y-6 animate-in fade-in duration-500 pb-12">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Audit Log</h1>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Historique des actions système</p>
+                    <h1 className="text-3xl font-semibold text-gray-900">Audit Log</h1>
+                    <p className="text-xs text-gray-400 font-bold mt-1">Historique des actions système</p>
                 </div>
                 <div className="bg-primary/10 text-primary px-4 py-2 rounded-xl flex items-center gap-2 border border-primary/20">
                     <Shield className="w-4 h-4" />
-                    <span className="text-xs font-black uppercase tracking-widest">Sécurisé</span>
+                    <span className="text-xs font-medium">Sécurisé</span>
                 </div>
             </div>
 
@@ -60,9 +60,9 @@ export function JournauxAuditView() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date & Heure</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Type d'action</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Détails</th>
+                                <th className="px-6 py-4 text-[10px] font-semibold text-gray-400">Date & Heure</th>
+                                <th className="px-6 py-4 text-[10px] font-semibold text-gray-400">Type d'action</th>
+                                <th className="px-6 py-4 text-[10px] font-semibold text-gray-400">Détails</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -71,7 +71,7 @@ export function JournauxAuditView() {
                                     <td colSpan={3} className="px-6 py-12 text-center">
                                         <div className="flex flex-col items-center gap-2 opacity-30">
                                             <Activity className="w-8 h-8" />
-                                            <p className="text-[10px] font-black uppercase tracking-widest">Aucun log enregistré</p>
+                                            <p className="text-xs font-medium">Aucun log enregistré</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -89,7 +89,7 @@ export function JournauxAuditView() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={cn(
-                                                "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider",
+                                                "px-2.5 py-1 rounded-lg text-xs font-medium",
                                                 log.action.includes("Déploiement") ? "bg-emerald-50 text-emerald-600" :
                                                     log.action.includes("Création") ? "bg-blue-50 text-blue-600" :
                                                         "bg-gray-100 text-gray-500"
@@ -111,7 +111,7 @@ export function JournauxAuditView() {
             </div>
 
             <div className="bg-gray-900 rounded-none p-6 font-mono text-sm overflow-hidden border border-gray-800 shadow-2xl mt-8">
-                <div className="flex items-center gap-2 text-gray-500 mb-4 text-[10px] font-bold uppercase tracking-widest border-b border-gray-800 pb-4">
+                <div className="flex items-center gap-2 text-gray-500 mb-4 text-[10px] font-bold border-b border-gray-800 pb-4">
                     <Activity className="w-3 h-3" />
                     <span>system_terminal_output</span>
                 </div>

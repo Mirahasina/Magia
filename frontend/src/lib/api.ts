@@ -1,6 +1,6 @@
 /**
  * Centralised API configuration.
- * All fetch calls must reference these helpers — never hardcode the base URL.
+ * All fetch calls must reference these helpers - never hardcode the base URL.
  */
 
 export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";

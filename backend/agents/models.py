@@ -77,7 +77,7 @@ class KnowledgeBase(models.Model):
         return f"{self.name} (Unlinked)"
 
 class WhatsAppConfig(models.Model):
-    name = models.CharField(max_length=255, default="Default WhatsApp")
+    name = models.CharField(max_length=255, default="Nouveau WhatsApp")
     is_connected = models.BooleanField(default=False)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     unipile_account_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID du compte Unipile")
@@ -89,7 +89,7 @@ class WhatsAppConfig(models.Model):
         return f"{self.name} ({self.phone_number if self.phone_number else 'No number'})"
 
 class EmailConfig(models.Model):
-    name = models.CharField(max_length=255, default="Default Email")
+    name = models.CharField(max_length=255, default="Nouveau Email")
     is_active = models.BooleanField(default=False)
     email = models.EmailField(max_length=255, blank=True, null=True)
     unipile_account_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID du compte Unipile")
@@ -230,6 +230,9 @@ class Contact(models.Model):
     replied_since_last_ai = models.BooleanField(default=True)
     next_followup_date = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True, help_text="Besoins ou informations sur le prospect")
+    company = models.CharField(max_length=255, blank=True, null=True)
+    title = models.CharField(max_length=255, blank=True, null=True)
+    apollo_id = models.CharField(max_length=64, blank=True, null=True, db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -238,3 +241,79 @@ class Contact(models.Model):
 
     def __str__(self):
         return f"{self.name or self.contact_info} ({self.source})"
+
+
+class ProspectSearchJob(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('running', 'Running'),
+        ('done', 'Done'),
+        ('failed', 'Failed'),
+    ]
+    CHANNEL_CHOICES = [
+        ('email', 'Email'),
+        ('whatsapp', 'WhatsApp'),
+        ('facebook', 'Facebook'),
+        ('both', 'Email + WhatsApp'),
+        ('all', 'Email + WhatsApp + Facebook'),
+    ]
+
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='prospect_search_jobs')
+    agent = models.ForeignKey(Agent, on_delete=models.SET_NULL, null=True, blank=True)
+    filters = models.JSONField(default=dict)
+    channels = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='both')
+    max_results = models.PositiveIntegerField(default=10)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    found_count = models.PositiveIntegerField(default=0)
+    enriched_count = models.PositiveIntegerField(default=0)
+    sent_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    error = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"ProspectSearchJob #{self.id} ({self.status})"
+
+
+class ProspectLead(models.Model):
+    STATUS_CHOICES = [
+        ('found', 'Found'),
+        ('enriched', 'Enriched'),
+        ('awaiting_phone', 'Awaiting phone'),
+        ('contacted', 'Contacted'),
+        ('skipped', 'Skipped'),
+        ('failed', 'Failed'),
+    ]
+
+    job = models.ForeignKey(ProspectSearchJob, on_delete=models.CASCADE, related_name='leads')
+    apollo_person_id = models.CharField(max_length=64, db_index=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    title = models.CharField(max_length=255, blank=True, null=True)
+    company = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=64, blank=True, null=True)
+    facebook_url = models.URLField(max_length=500, blank=True, null=True)
+    raw = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='found')
+    skip_reason = models.CharField(max_length=255, blank=True, null=True)
+    contact_email = models.ForeignKey(
+        Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name='apollo_email_leads'
+    )
+    contact_wa = models.ForeignKey(
+        Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name='apollo_wa_leads'
+    )
+    contact_fb = models.ForeignKey(
+        Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name='apollo_fb_leads'
+    )
+    enrich_request_id = models.CharField(max_length=128, blank=True, null=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('job', 'apollo_person_id')
+
+    def __str__(self):
+        return f"{self.name or self.apollo_person_id} ({self.status})"

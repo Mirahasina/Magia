@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "../ui/utils";
 import {
-  Search, Send, ArrowLeft, MessageSquare, Mail, Bot,
-  Check, CheckCheck, Phone, PhoneOff, Mic, MicOff, Video, VideoOff
+  Search, Send, ArrowLeft, MessageSquare, Mail, Bot, Facebook,
+  Check, CheckCheck, Phone, PhoneOff, Mic, MicOff, Video, VideoOff, RefreshCw
 } from "lucide-react";
 import { API_BASE, getAuthHeaders, getAuthHeadersOnly } from "../../../lib/api";
 import { useDailyAudioCall } from "../../hooks/useDailyAudioCall";
 import { useAgents } from "../../hooks/useAgents";
+import { toast } from "sonner";
+import { Skeleton } from "../ui/skeleton";
 
 /* ───────────────────── Domain Types ───────────────────── */
 
@@ -135,6 +137,7 @@ function SourceBadge({ source }: { source: string }) {
       </svg>
     );
   if (source === "email") return <Mail size={12} className="shrink-0 text-[#8696a0]" />;
+  if (source === "facebook") return <Facebook size={12} className="shrink-0 text-[#1877F2]" />;
   return <Bot size={12} className="shrink-0 text-[#8696a0]" />;
 }
 
@@ -148,15 +151,17 @@ interface Props {
 }
 
 export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", initialContact, onInitialContactConsumed }: Props) {
-  const { whatsappConfigs, emailConfigs } = useAgents();
+  const { whatsappConfigs, emailConfigs, facebookConfigs } = useAgents();
 
   const hasWhatsApp = whatsappConfigs && whatsappConfigs.some((c: any) => c.is_connected);
   const hasEmail = emailConfigs && emailConfigs.some((c: any) => c.is_active);
+  const hasFacebook = facebookConfigs && facebookConfigs.some((c: any) => c.is_connected);
 
   const availableTabs = [
     { id: "all" as const, label: "Tout" },
     ...(hasWhatsApp ? [{ id: "whatsapp" as const, label: "WhatsApp" }] : []),
     ...(hasEmail ? [{ id: "email" as const, label: "Email" }] : []),
+    ...(hasFacebook ? [{ id: "facebook" as const, label: "Facebook" }] : []),
     { id: "agents" as const, label: "Agents" }
   ];
 
@@ -168,8 +173,10 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
   const [newMessage, setNewMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState(globalSearchQuery);
   const [filter, setFilter] = useState<"all" | "unread">("all");
-  const [activeTab, setActiveTab] = useState<"all" | "whatsapp" | "email" | "agents">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "whatsapp" | "email" | "facebook" | "agents">("all");
   const [sending, setSending] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
 
   const [activeVideoRoom, setActiveVideoRoom] = useState<string | null>(null);
   const [videoCallState, setVideoCallState] = useState<"idle" | "creating" | "error">("idle");
@@ -195,6 +202,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
       // Basculer sur l'onglet correspondant
       if (initialContact.source === "whatsapp") setActiveTab("whatsapp");
       else if (initialContact.source === "email") setActiveTab("email");
+      else if (initialContact.source === "facebook") setActiveTab("facebook");
       else setActiveTab("all");
       onInitialContactConsumed?.();
     }
@@ -210,7 +218,9 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
       const token = localStorage.getItem("access_token");
       if (!token) return;
       try {
-        const source = activeTab === "agents" || activeTab === "all" ? "" : activeTab;
+        // agents → chatbot threads (source=chat); all → channels only; else channel filter
+        const source =
+          activeTab === "all" ? "" : activeTab === "agents" ? "chat" : activeTab;
         const res = await fetch(
           `${API_BASE}/agents/all_conversations/?search=${encodeURIComponent(q)}${source ? `&source=${source}` : ""}`,
           { headers: getAuthHeadersOnly() }
@@ -223,8 +233,10 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
         }
 
         if (q && activeTab !== "agents" && activeTab !== "email") {
+          const searchSource =
+            activeTab === "facebook" ? "facebook" : "whatsapp";
           const cRes = await fetch(
-            `${API_BASE}/agents/contacts_list/?search=${encodeURIComponent(q)}&source=whatsapp`,
+            `${API_BASE}/agents/contacts_list/?search=${encodeURIComponent(q)}&source=${searchSource}`,
             { headers: getAuthHeadersOnly() }
           );
           if (cRes.ok) {
@@ -256,7 +268,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
   }, [searchQuery]);
 
   useEffect(() => {
-    fetchConversations();
+    fetchConversations().finally(() => setInitialFetchDone(true));
     fetchAgents();
     const interval = setInterval(() => fetchConversations(), 5000);
     return () => clearInterval(interval);
@@ -276,7 +288,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
     try {
       const url =
         selectedThread.type === "agent"
-          ? `${API_BASE}/agents/${(selectedThread as AgentThread).id}/messages/`
+          ? `${API_BASE}/agents/${(selectedThread as AgentThread).id}/messages/?source=chat&contact=${encodeURIComponent("Manual")}`
           : `${API_BASE}/agents/contact_messages/?contact=${encodeURIComponent((selectedThread as Conversation).contact)}&source=${encodeURIComponent((selectedThread as Conversation).source)}`;
 
       const res = await fetch(url, { headers: getAuthHeadersOnly() });
@@ -333,7 +345,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
       if (!res.ok) {
         setVideoCallState("error");
         setVideoCallError(data.error || "Failed to create video room");
-        alert(data.error || "Échec de création de la salle vidéo");
+        toast.error("Échec de création de la salle vidéo", { description: data.error });
         return;
       }
 
@@ -353,12 +365,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
       const conv = selectedThread as Conversation;
-      const agentId = conv.agent?.id;
-      const endpoint = agentId
-        ? `${API_BASE}/agents/${agentId}/send_manual_reply/`
-        : `${API_BASE}/agents/universal_reply/`;
-
-      await fetch(endpoint, {
+      const resSend = await fetch(`${API_BASE}/agents/universal_reply/`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -368,11 +375,15 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
           email_config_id: conv.email_config_id,
         }),
       });
+      if (!resSend.ok) {
+        const data = await resSend.json().catch(() => ({}));
+        toast.error("Lien vidéo non envoyé", { description: data.error });
+      }
 
     } catch (err: any) {
       setVideoCallState("error");
       setVideoCallError(err.message || "Unknown error");
-      alert(err.message || "Unknown error");
+      toast.error("Échec de l'appel vidéo", { description: err.message });
     }
   };
 
@@ -385,7 +396,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Échec de création de la salle vocale");
+        toast.error("Échec de création de la salle vocale", { description: data.error });
         return;
       }
 
@@ -403,12 +414,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
       const conv = selectedThread as Conversation;
-      const agentId = conv.agent?.id;
-      const endpoint = agentId
-        ? `${API_BASE}/agents/${agentId}/send_manual_reply/`
-        : `${API_BASE}/agents/universal_reply/`;
-
-      await fetch(endpoint, {
+      const resSend = await fetch(`${API_BASE}/agents/universal_reply/`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -418,12 +424,63 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
           email_config_id: conv.email_config_id,
         }),
       });
+      if (!resSend.ok) {
+        const data = await resSend.json().catch(() => ({}));
+        toast.error("Lien vocal non envoyé", { description: data.error });
+      }
 
       // Join the call object locally
       await startCall(roomUrl);
 
     } catch (err: any) {
-      alert(err.message || "Unknown error");
+      toast.error("Échec de l'appel vocal", { description: err.message });
+    }
+  };
+
+  const handleSyncInbox = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const source =
+        activeTab === "email" || activeTab === "whatsapp" || activeTab === "facebook"
+          ? activeTab
+          : "all";
+      const res = await fetch(`${API_BASE}/agents/sync_inbox/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ source }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Échec de la synchronisation.");
+      }
+      const parts: string[] = [];
+      if (data.email?.status === "done") {
+        parts.push(`Email : ${data.email.imported ?? 0} nouveaux messages`);
+        if (data.email.errors?.length) {
+          parts.push(`(avertissement: ${data.email.errors[0]})`);
+        }
+      } else if (data.email?.error) {
+        parts.push(`Email : ${data.email.error}`);
+      }
+      if (data.whatsapp?.status === "running") {
+        parts.push("WhatsApp : sync en cours (historique enrichi)");
+      } else if (data.whatsapp?.error) {
+        parts.push(`WhatsApp : ${data.whatsapp.error}`);
+      }
+      if (data.facebook?.status === "done") {
+        parts.push(`Facebook : ${data.facebook.imported ?? 0} messages`);
+      } else if (data.facebook?.error) {
+        parts.push(`Facebook : ${data.facebook.error}`);
+      }
+      toast.success("Synchronisation terminée", {
+        description: parts.length ? parts.join(" · ") : undefined,
+      });
+      await fetchConversations(searchQuery);
+    } catch (err: any) {
+      toast.error("Impossible de synchroniser la boîte", { description: err?.message });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -442,20 +499,23 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
     try {
-      const token = localStorage.getItem("access_token");
+      let res: Response;
       if (selectedThread.type === "agent") {
-        await fetch(`${API_BASE}/agents/${(selectedThread as AgentThread).id}/send_manual_reply/`, {
+        // Test / widget chat with the AI agent (not a channel send)
+        res = await fetch(`${API_BASE}/agents/${(selectedThread as AgentThread).id}/send_manual_reply/`, {
           method: "POST",
           headers: getAuthHeaders(),
           body: JSON.stringify({ content: text, source: "chat", contact_info: "Manual" }),
         });
       } else {
         const conv = selectedThread as Conversation;
-        const agentId = conv.agent?.id;
-        const endpoint = agentId
-          ? `${API_BASE}/agents/${agentId}/send_manual_reply/`
-          : `${API_BASE}/agents/universal_reply/`;
-        await fetch(endpoint, {
+        // Channel replies go out on WhatsApp/Email/Facebook - prefer universal_reply
+        // so a missing agent never blocks manual send.
+        const endpoint =
+          conv.source === "chat" && conv.agent?.id
+            ? `${API_BASE}/agents/${conv.agent.id}/send_manual_reply/`
+            : `${API_BASE}/agents/universal_reply/`;
+        res = await fetch(endpoint, {
           method: "POST",
           headers: getAuthHeaders(),
           body: JSON.stringify({
@@ -466,10 +526,21 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
           }),
         });
       }
-      await fetchMessages();
-      await fetchConversations();
-    } catch {
-      /* network failure */
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error("Envoi impossible", {
+          description: data.error || `Erreur ${res.status}`,
+        });
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+        setNewMessage(text);
+      } else {
+        await fetchMessages();
+        await fetchConversations();
+      }
+    } catch (err: any) {
+      toast.error("Envoi impossible", { description: err?.message || "Erreur réseau" });
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setNewMessage(text);
     } finally {
       setSending(false);
     }
@@ -479,12 +550,18 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
 
   let displayConversations: (Conversation | AgentThread)[] = [];
   if (activeTab === "agents") {
-    displayConversations = agents.map((a) => ({ ...a, type: "agent" as const }));
+    // Real chatbot/widget visitors (unique contact) + one test thread per agent
+    const visitorThreads = conversations
+      .filter((c) => c.source === "chat" && c.contact && c.contact !== "Manual")
+      .map((c) => ({ ...c, type: "contact" as const }));
+    const agentThreads = agents.map((a) => ({ ...a, type: "agent" as const }));
+    displayConversations = [...visitorThreads, ...agentThreads];
   } else {
     displayConversations = conversations.filter((c) => {
       if (activeTab === "whatsapp") return c.source === "whatsapp";
       if (activeTab === "email") return c.source === "email";
-      return true;
+      if (activeTab === "facebook") return c.source === "facebook";
+      return c.source !== "chat";
     });
   }
   if (filter === "unread") {
@@ -508,6 +585,20 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
   /* ───────────────────── Render ───────────────────── */
 
   return (
+    <div className="h-full flex flex-col flex-1 min-h-0">
+      {/* Page header */}
+      <div className="mb-4 flex items-end justify-between gap-4 shrink-0">
+        <div>
+          <h1 className="magia-title">Boîte de réception</h1>
+          <p className="magia-description mt-1">
+            Canaux (WhatsApp, Email, Facebook) et chatbots agents - chaque discussion à sa place.
+          </p>
+        </div>
+        <span className="hidden sm:inline-block text-xs font-semibold text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm whitespace-nowrap">
+          {conversations.length} conversation{conversations.length > 1 ? "s" : ""}
+        </span>
+      </div>
+
     <div className="flex flex-1 w-full bg-[#ffffff] rounded-2xl overflow-hidden shadow-2xl min-h-0 border border-[#d1d7db]">
 
       <div
@@ -523,7 +614,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setSelectedThread(null); }}
                 className={cn(
-                  "px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors border",
+                  "px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40",
                   activeTab === tab.id
                     ? "bg-[#218158] text-white border-[#218158]"
                     : "bg-white text-[#54656f] border-[#d1d7db] hover:bg-[#f0f2f5]"
@@ -533,6 +624,19 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
               </button>
             ))}
           </div>
+          {activeTab !== "agents" && (
+            <button
+              type="button"
+              onClick={handleSyncInbox}
+              disabled={syncing}
+              title="Synchroniser les messages Email / WhatsApp / Facebook"
+              aria-label="Synchroniser les messages"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border border-[#d1d7db] bg-white text-[#54656f] hover:bg-[#e9edef] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40"
+            >
+              <RefreshCw size={13} className={cn(syncing && "animate-spin")} />
+              {syncing ? "Sync…" : "Sync"}
+            </button>
+          )}
         </div>
 
         <div className="px-3 py-2 bg-[#ffffff] border-b border-[#f0f2f5]">
@@ -568,7 +672,19 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
 
         {/* Conversation list */}
         <div className="flex-1 overflow-y-auto">
-          {displayConversations.length === 0 && emptyContacts.length === 0 ? (
+          {!initialFetchDone ? (
+            <div className="p-4 space-y-5" aria-label="Chargement des conversations">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="w-12 h-12 rounded-full shrink-0 bg-gray-100" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3 w-2/3 bg-gray-100" />
+                    <Skeleton className="h-3 w-1/2 bg-gray-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : displayConversations.length === 0 && emptyContacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-6 text-center text-[#54656f] mt-10">
               <MessageSquare size={40} className="opacity-20 mb-4" />
               <span className="text-[15px] font-semibold text-[#111b21] mb-2">Aucun résultat trouvé</span>
@@ -608,7 +724,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
                 const name = isAgent ? a.name : (c.contact_name || c.contact || "Inconnu");
                 const letter = name[0]?.toUpperCase() || "?";
                 const preview = isAgent
-                  ? (a.stats?.conversations ? `${a.stats.conversations} conversations` : "Agent IA")
+                  ? "Discussion chatbot · Tester l'agent"
                   : stripHtml(c.lastMsg?.content || "");
                 const time = isAgent ? "" : formatTime(c.last_updated || "");
                 const unread = c.unread || 0;
@@ -661,7 +777,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
 
               {emptyContacts.length > 0 && (
                 <div className="mt-2">
-                  <div className="px-4 py-2 text-[12px] font-semibold text-[#8696a0] uppercase tracking-wider bg-[#f0f2f5]">
+                  <div className="px-4 py-2 text-[12px] font-semibold text-[#8696a0] bg-[#f0f2f5]">
                     Nouveaux Contacts WhatsApp
                   </div>
                   {emptyContacts.map((c, idx) => (
@@ -702,7 +818,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
         </div>
       </div>
 
-      {/* ═══ RIGHT PANEL – Chat ═══ */}
+      {/* ═══ RIGHT PANEL - Chat ═══ */}
       {!selectedThread ? (
         <div className="flex-1 hidden md:flex flex-col items-center justify-center text-center bg-[#f0f2f5] border-l border-[#d1d7db]">
           <div className="w-48 h-48 mb-8 opacity-20">
@@ -713,7 +829,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
           <h3 className="text-[#41525d] text-3xl font-light mb-4">MAGIA Web</h3>
           <p className="text-[#667781] text-[14px] max-w-sm mb-8 leading-relaxed">
             Sélectionnez une discussion pour afficher vos messages.<br />
-            WhatsApp, Email, Agents — tout au même endroit sans besoin de garder votre téléphone connecté.
+            WhatsApp, Email, Agents - tout au même endroit sans besoin de garder votre téléphone connecté.
           </p>
           <div className="flex items-center justify-center gap-2 text-[#8696a0] text-[12px] bg-white px-4 py-2 rounded-full shadow-sm">
             <Check size={14} /> Chiffré de bout en bout
@@ -724,7 +840,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
 
           {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-2.5 bg-[#f0f2f5] border-b border-[#d1d7db] shrink-0 h-[60px]">
-            <button onClick={() => setSelectedThread(null)} className="md:hidden text-[#54656f] p-1">
+            <button onClick={() => setSelectedThread(null)} aria-label="Retour à la liste" className="md:hidden text-[#54656f] p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40 rounded-full">
               <ArrowLeft size={20} />
             </button>
             <div
@@ -746,16 +862,18 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
               <div className="flex items-center gap-1 ml-2">
                 <button
                   onClick={() => handleVideoCall((selectedThread as Conversation).contact)}
-                  className="w-10 h-10 flex items-center justify-center text-[#54656f] hover:bg-white hover:shadow-sm hover:text-[#00a884] rounded-full transition-all shrink-0"
+                  className="w-10 h-10 flex items-center justify-center text-[#54656f] hover:bg-white hover:shadow-sm hover:text-[#00a884] rounded-full transition-all shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40"
                   title="Démarrer un appel vidéo"
+                  aria-label="Démarrer un appel vidéo"
                   disabled={videoCallState === "creating"}
                 >
                   <Video size={20} className={videoCallState === "creating" ? "animate-pulse" : ""} />
                 </button>
                 <button
                   onClick={() => handleAudioCall((selectedThread as Conversation).contact)}
-                  className="w-10 h-10 flex items-center justify-center text-[#54656f] hover:bg-white hover:shadow-sm hover:text-[#00a884] rounded-full transition-all shrink-0"
+                  className="w-10 h-10 flex items-center justify-center text-[#54656f] hover:bg-white hover:shadow-sm hover:text-[#00a884] rounded-full transition-all shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40"
                   title="Passer un appel vocal (Daily WebRTC)"
+                  aria-label="Passer un appel vocal"
                 >
                   <Phone size={20} />
                 </button>
@@ -805,8 +923,9 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
                 <button
                   onClick={toggleMute}
                   disabled={callState !== "active"}
+                  aria-label={isMuted ? "Réactiver le micro" : "Couper le micro"}
                   className={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center transition-colors shadow-sm",
+                    "w-12 h-12 rounded-full flex items-center justify-center transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40",
                     isMuted ? "bg-white text-[#54656f] border border-[#d1d7db]" : "bg-[#f0f2f5] text-[#111b21] hover:bg-[#e9edef]",
                     callState !== "active" && "opacity-50 cursor-not-allowed"
                   )}
@@ -815,7 +934,8 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
                 </button>
                 <button
                   onClick={handleHangup}
-                  className="w-14 h-14 rounded-full bg-[#ea0038] hover:bg-[#d60033] text-white flex items-center justify-center shadow-md transition-transform active:scale-95"
+                  aria-label="Raccrocher"
+                  className="w-14 h-14 rounded-full bg-[#ea0038] hover:bg-[#d60033] text-white flex items-center justify-center shadow-md transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40"
                 >
                   <PhoneOff size={24} />
                 </button>
@@ -900,8 +1020,9 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
             <button
               onClick={handleSend}
               disabled={!newMessage.trim() || sending}
+              aria-label="Envoyer le message"
               className={cn(
-                "w-10 h-10 mb-1 rounded-full flex items-center justify-center shrink-0 transition-colors",
+                "w-10 h-10 mb-1 rounded-full flex items-center justify-center shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40",
                 newMessage.trim() && !sending
                   ? "bg-[#00a884] text-white hover:bg-[#008f6f] shadow-sm"
                   : "bg-transparent text-[#8696a0] hover:bg-[#d1d7db]/30"
@@ -912,6 +1033,7 @@ export function BoiteReceptionView({ setViewingAgent, globalSearchQuery = "", in
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

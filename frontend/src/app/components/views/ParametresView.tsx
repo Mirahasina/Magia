@@ -1,7 +1,11 @@
-import { API_BASE, getAuthHeadersOnly } from "../../../lib/api";
+import { API_BASE, getAuthHeaders, getAuthHeadersOnly } from "../../../lib/api";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "../ui/utils";
 import { useAgents } from "../../hooks/useAgents";
+import { toast } from "sonner";
+import { ModalShell } from "../shared/ModalShell";
+import { confirmDialog } from "../shared/ConfirmDialog";
+import { PageSpinner } from "../shared/PageSpinner";
 
 const SECTIONS = [
     { id: "profile", label: "Administrateur" },
@@ -28,7 +32,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
             if (res.ok) {
                 onLogout();
             } else {
-                alert("Erreur lors de la suppression du compte.");
+                toast.error("Erreur lors de la suppression du compte.");
             }
         } catch (e) {
             console.error("Delete account error", e);
@@ -48,6 +52,45 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [redirectingIds, setRedirectingIds] = useState<number[]>([]);
     const [qrModalConfig, setQrModalConfig] = useState<{ id: number; qr_code: string | null; loading: boolean } | null>(null);
+
+    // Poll while QR modal awaits a code or after scan completes
+    useEffect(() => {
+        if (!qrModalConfig || qrModalConfig.loading) return;
+        let cancelled = false;
+        const tick = async () => {
+            try {
+                const res = await fetch(
+                    `${API_BASE}/whatsapp-config/${qrModalConfig.id}/get_connection_url/`,
+                    { headers: getAuthHeadersOnly() }
+                );
+                const data = await res.json();
+                if (cancelled) return;
+                if (data.status === "connected") {
+                    setQrModalConfig(null);
+                    toast.success("WhatsApp connecté", {
+                        description: data.phone_number
+                            ? `Numéro : ${data.phone_number}`
+                            : "Scan réussi.",
+                    });
+                    refreshWhatsAppConnection(qrModalConfig.id);
+                    return;
+                }
+                if (data.qr_code && !qrModalConfig.qr_code) {
+                    setQrModalConfig((prev) =>
+                        prev ? { ...prev, qr_code: data.qr_code, loading: false } : null
+                    );
+                }
+            } catch {
+                /* ignore poll errors */
+            }
+        };
+        const id = window.setInterval(tick, 2500);
+        tick();
+        return () => {
+            cancelled = true;
+            window.clearInterval(id);
+        };
+    }, [qrModalConfig?.id, qrModalConfig?.loading, qrModalConfig?.qr_code]);
 
     const {
         whatsappConfigs, addWhatsAppConfig, deleteWhatsAppConfig, getWhatsAppConnectionUrl, refreshWhatsAppConnection,
@@ -108,13 +151,17 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
 
                 const exchange = async () => {
                     setIsExchangingCode(true);
-                    const redirectUri = window.location.origin + window.location.pathname + '?facebook_callback=true';
+                    // Must match handleFacebookOAuth redirect_uri exactly
+                    const redirectUri =
+                        window.location.origin +
+                        window.location.pathname +
+                        "?facebook_callback=true&view=integration";
                     const res = await exchangeFacebookCode(configId, code, redirectUri);
                     setIsExchangingCode(false);
                     if (res && res.pages) {
                         setFacebookPages(res.pages);
                         if (res.pages.length === 0) {
-                            alert("Aucune page Facebook trouvée pour ce compte.");
+                            toast.warning("Aucune page Facebook trouvée pour ce compte.");
                         }
                     }
                 };
@@ -129,146 +176,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
     const [configTarget, setConfigTarget] = useState<"whatsapp" | "email" | "linkedin" | "facebook" | null>(null);
     const [activeConfig, setActiveConfig] = useState<any>(null);
 
-    const [emailForm, setEmailForm] = useState({
-        name: "",
-        email: "",
-        password: "",
-        imap_server: "",
-        smtp_server: "",
-    });
-
-    const [fbForm, setFbForm] = useState({
-        name: "",
-        page_id: "",
-        page_access_token: "",
-    });
-
-    const [isTestingEmail, setIsTestingEmail] = useState(false);
-    const [emailTestResult, setEmailTestResult] = useState<any>(null);
     const [isSavingConfig, setIsSavingConfig] = useState(false);
-
-    useEffect(() => {
-        if (activeConfig) {
-            if (configTarget === 'email') {
-                setEmailForm({
-                    name: activeConfig.name || "",
-                    email: activeConfig.email || "",
-                    password: "",
-                    imap_server: activeConfig.imap_server || "",
-                    smtp_server: activeConfig.smtp_server || "",
-                });
-                setEmailTestResult(null);
-            } else if (configTarget === 'facebook') {
-                setFbForm({
-                    name: activeConfig.name || "",
-                    page_id: activeConfig.page_id || "",
-                    page_access_token: activeConfig.page_access_token || "",
-                });
-            }
-        }
-    }, [activeConfig, configTarget]);
-
-    const applyEmailPreset = (provider: 'gmail' | 'outlook' | 'yahoo') => {
-        const presets = {
-            gmail: {
-                imap_server: "imap.gmail.com",
-                smtp_server: "smtp.gmail.com",
-            },
-            outlook: {
-                imap_server: "outlook.office365.com",
-                smtp_server: "smtp-mail.outlook.com",
-            },
-            yahoo: {
-                imap_server: "imap.mail.yahoo.com",
-                smtp_server: "smtp.mail.yahoo.com",
-            }
-        };
-        setEmailForm(prev => ({
-            ...prev,
-            ...presets[provider]
-        }));
-    };
-
-    const handleTestEmailConnection = async () => {
-        if (!activeConfig) return;
-        setIsTestingEmail(true);
-        setEmailTestResult(null);
-        try {
-            // First patch current details (excluding password if blank)
-            const patchData: any = { ...emailForm };
-            if (!patchData.password) delete patchData.password;
-
-            await fetch(`${API_BASE}/email-config/${activeConfig.id}/`, {
-                method: "PATCH",
-                headers: {
-                    ...getAuthHeadersOnly(),
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(patchData)
-            });
-
-            // Run connection test
-            const res = await fetch(`${API_BASE}/email-config/${activeConfig.id}/test_connection/`, {
-                method: "POST",
-                headers: {
-                    ...getAuthHeadersOnly(),
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ password: emailForm.password || undefined })
-            });
-            const data = await res.json();
-            setEmailTestResult(data);
-        } catch (err) {
-            console.error("Test email config failed", err);
-            alert("Erreur lors du test de connexion.");
-        } finally {
-            setIsTestingEmail(false);
-        }
-    };
-
-    const handleSaveEmailConfig = async () => {
-        if (!activeConfig) return;
-        setIsSavingConfig(true);
-        try {
-            const patchData: any = { ...emailForm };
-            if (!patchData.password) delete patchData.password;
-
-            const resSave = await fetch(`${API_BASE}/email-config/${activeConfig.id}/`, {
-                method: "PATCH",
-                headers: {
-                    ...getAuthHeadersOnly(),
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(patchData)
-            });
-            if (!resSave.ok) {
-                alert("Erreur lors de l'enregistrement de la configuration.");
-                return;
-            }
-
-            const resConfig = await fetch(`${API_BASE}/email-config/${activeConfig.id}/configure/`, {
-                method: "POST",
-                headers: {
-                    ...getAuthHeadersOnly(),
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(emailForm)
-            });
-            if (resConfig.ok) {
-                alert("Configuration Email enregistrée et activée avec succès !");
-                refreshEmailConnection(activeConfig.id);
-                setActiveConfig(null);
-            } else {
-                const data = await resConfig.json();
-                alert("Erreur de configuration : " + (data.error || "Vérifiez vos paramètres"));
-            }
-        } catch (err) {
-            console.error("Save email config failed", err);
-            alert("Erreur réseau.");
-        } finally {
-            setIsSavingConfig(false);
-        }
-    };
 
     const handleSaveFacebookConfig = async (page_id: string, page_access_token: string) => {
         if (!activeConfig) return;
@@ -284,17 +192,20 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
             });
             const data = await res.json();
             if (res.ok) {
-                alert(`"message":"Page Facebook "${data.page_name}" connectée avec succès !"}`);
+                toast.success(`Page Facebook "${data.page_name}" connectée avec succès !`);
+                if (data.webhook_warning) {
+                    toast.warning("Webhook Facebook", { description: data.webhook_warning });
+                }
                 refreshFacebookConnection(activeConfig.id);
                 setFacebookPages([]);
                 setSelectedPageId("");
                 setActiveConfig(null);
             } else {
-                alert("Échec de la connexion : " + (data.error || "Token ou ID de page invalide"));
+                toast.error("Échec de la connexion Facebook", { description: data.error || "Token ou ID de page invalide" });
             }
         } catch (err) {
             console.error("Save facebook config failed", err);
-            alert("Erreur réseau.");
+            toast.error("Erreur réseau.");
         } finally {
             setIsSavingConfig(false);
         }
@@ -303,12 +214,14 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
     const handleFacebookOAuth = async () => {
         if (!activeConfig) return;
         const redirectUri = window.location.origin + window.location.pathname + `?facebook_callback=true&view=integration`;
-        const url = await getFacebookConnectionUrl(activeConfig.id, redirectUri);
+        const { url, error } = await getFacebookConnectionUrl(activeConfig.id, redirectUri);
         if (url) {
             window.location.href = url;
-        } else {
-            alert("Impossible d'obtenir l'URL de connexion Facebook. Vérifiez que FACEBOOK_APP_ID est configuré dans le backend.");
+            return;
         }
+        toast.error("Connexion Facebook impossible", {
+            description: error || "Vérifiez que FACEBOOK_APP_ID est configuré dans le backend.",
+        });
     };
 
     useEffect(() => {
@@ -372,15 +285,15 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                 onProfileUpdate?.();
                 await fetchProfile();
                 setSelectedFile(null);
-                alert("Profil mis à jour avec succès !");
+                toast.success("Profil mis à jour avec succès !");
             } else {
                 const errorData = await res.json();
                 console.error("Profile save error", errorData);
-                alert("Erreur lors de la sauvegarde : " + (JSON.stringify(errorData) || res.statusText));
+                toast.error("Erreur lors de la sauvegarde", { description: JSON.stringify(errorData) || res.statusText });
             }
         } catch (err) {
             console.error("Failed to save profile", err);
-            alert("Erreur réseau lors de la sauvegarde.");
+            toast.error("Erreur réseau lors de la sauvegarde.");
         } finally {
             setIsSaving(false);
         }
@@ -406,15 +319,18 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
     };
 
     if (isLoading) {
-        return <div className="p-8 text-gray-500">Chargement des paramètres...</div>;
+        return <PageSpinner label="Chargement des paramètres…" />;
     }
 
     return (
         <>
-        <div className="h-full flex flex-col space-y-6 animate-page-fade overflow-hidden">
+        <div className="h-full flex flex-col magia-page animate-page-fade overflow-hidden">
             <div className="flex items-start justify-between">
                 <div className="space-y-1">
-                    <h2 className="magia-h1 uppercase text-2xl">Paramètres</h2>
+                    <h1 className="magia-title">Paramètres</h1>
+                    <p className="magia-subtitle">
+                        Identité, unité, plugins et protocoles
+                    </p>
                 </div>
             </div>
 
@@ -425,7 +341,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                             key={s.id}
                             onClick={() => setActiveSection(s.id)}
                             className={cn(
-                                "w-full flex items-center gap-3 px-4 py-3 rounded-md text-[11px] font-black uppercase tracking-widest transition-all",
+                                "w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-all",
                                 activeSection === s.id
                                     ? "bg-gray-900 text-white shadow-lg shadow-gray-200"
                                     : "text-gray-400 hover:bg-gray-100 hover:text-gray-900 rounded-xl"
@@ -436,16 +352,16 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                     ))}
                 </div>
 
-                <div className="flex-1 bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden flex flex-col h-full">
-                    <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+                    <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
                         {activeSection === "profile" && (
-                            <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
                                     <h3 className="magia-label mb-6 text-blue-900">IDENTITÉ DU SYSTÈME</h3>
                                     <div className="flex items-center gap-8">
                                         <div className="relative group">
                                             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-                                            <div onClick={handleAvatarClick} className="w-24 h-24 bg-gray-900 rounded-2xl flex items-center justify-center text-white text-3xl font-serif font-bold shadow-xl overflow-hidden relative cursor-pointer">
+                                            <div onClick={handleAvatarClick} className="w-24 h-24 bg-gray-900 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-xl overflow-hidden relative cursor-pointer">
                                                 {formData.avatar_url ? (
                                                     <img src={formData.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                                                 ) : (
@@ -460,11 +376,11 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
                                             <div className="space-y-1">
                                                 <label className="magia-label">Prénom</label>
-                                                <input name="first_name" value={formData.first_name} onChange={handleChange} type="text" placeholder="Prénom" className="w-full px-0 py-2 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-black transition-colors font-serif" />
+                                                <input name="first_name" value={formData.first_name} onChange={handleChange} type="text" placeholder="Prénom" className="w-full px-0 py-2 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-semibold transition-colors" />
                                             </div>
                                             <div className="space-y-1">
                                                 <label className="magia-label">Nom</label>
-                                                <input name="last_name" value={formData.last_name} onChange={handleChange} type="text" placeholder="Nom" className="w-full px-0 py-2 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-black transition-colors font-serif" />
+                                                <input name="last_name" value={formData.last_name} onChange={handleChange} type="text" placeholder="Nom" className="w-full px-0 py-2 bg-transparent border-b border-gray-100 focus:border-blue-900 outline-none text-sm font-semibold transition-colors" />
                                             </div>
                                         </div>
                                     </div>
@@ -473,17 +389,17 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                         )}
 
                         {activeSection === "workspace" && (
-                            <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-900 mb-6">UNITÉ OPÉRATIONNELLE</h3>
+                                    <h3 className="text-xs font-medium text-blue-900 mb-6">UNITÉ OPÉRATIONNELLE</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                         <div className="space-y-4">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Label du Workspace</label>
-                                            <input name="workspace_label" value={formData.workspace_label} onChange={handleChange} type="text" className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm font-black font-serif outline-none focus:border-blue-900 transition-colors" />
+                                            <label className="text-[9px] font-semibold text-gray-400">Label du Workspace</label>
+                                            <input name="workspace_label" value={formData.workspace_label} onChange={handleChange} type="text" className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:border-blue-900 transition-colors" />
                                         </div>
                                         <div className="space-y-4">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Localisation Temporelle</label>
-                                            <select name="timezone" value={formData.timezone} onChange={handleChange} className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm font-black font-serif outline-none focus:border-blue-900 transition-colors cursor-pointer">
+                                            <label className="text-[9px] font-semibold text-gray-400">Localisation Temporelle</label>
+                                            <select name="timezone" value={formData.timezone} onChange={handleChange} className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:border-blue-900 transition-colors cursor-pointer">
                                                 <option value="Indian/Antananarivo">Antananarivo (GMT+3)</option>
                                                 <option value="Europe/Paris">Paris (GMT+1)</option>
                                                 <option value="UTC">UTC</option>
@@ -495,10 +411,10 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                         )}
 
                         {activeSection === "integrations" && (
-                            <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-900 mb-2">PLUGIN HUB</h3>
-                                    <p className="text-[11px] text-gray-400 italic mb-8">Connexions neurales avec outils tiers</p>
+                                    <h3 className="text-xs font-medium text-blue-900 mb-2">PLUGIN HUB</h3>
+                                    <p className="text-sm text-gray-500 mb-8">Connexions neurales avec outils tiers</p>
 
                                     {configTarget === null ? (
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -517,13 +433,13 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                             "p-5 bg-white border border-gray-100 rounded-2xl flex flex-col items-center gap-4 hover:border-blue-200 hover:shadow-md transition-all group cursor-pointer relative overflow-hidden text-center"
                                                         )}
                                                     >
-                                                        <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-lg font-black italic text-gray-300 group-hover:text-blue-900 transition-colors">
+                                                        <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-lg font-semibold italic text-gray-300 group-hover:text-blue-900 transition-colors">
                                                             {app.charAt(0)}
                                                         </div>
                                                         <div>
-                                                            <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest block mb-1">{app}</span>
+                                                            <span className="text-[10px] font-semibold text-gray-900 block mb-1">{app}</span>
                                                             <span className={cn(
-                                                                "text-[8px] font-black uppercase px-2 py-1 rounded-md",
+                                                                "text-xs font-medium px-2 py-1 rounded-md",
                                                                 isConnected ? "text-emerald-600 bg-emerald-50 border border-emerald-100" : "text-gray-400 bg-gray-50"
                                                             )}>{isConnected ? "Connecté" : "Prêt"}</span>
                                                         </div>
@@ -532,12 +448,12 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                 );
                                             })}
                                             <div className="p-5 bg-gray-50 border border-dashed border-gray-200 rounded-2xl flex flex-col items-center gap-4 text-center opacity-70 cursor-not-allowed">
-                                                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-lg font-black italic text-gray-300">
+                                                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-lg font-semibold italic text-gray-300">
                                                     L
                                                 </div>
                                                 <div>
-                                                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">LinkedIn</span>
-                                                    <span className="text-[8px] font-black uppercase px-2 py-1 rounded-md text-amber-700 bg-amber-50 border border-amber-100">Indisponible</span>
+                                                    <span className="text-[10px] font-semibold text-gray-500 block mb-1">LinkedIn</span>
+                                                    <span className="text-[8px] font-semibold px-2 py-1 rounded-md text-amber-700 bg-amber-50 border border-amber-100">Indisponible</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -548,142 +464,61 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                 configTarget === 'email' ? (
                                                     <div className="space-y-6">
                                                         <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
-                                                            <button onClick={() => setActiveConfig(null)} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
+                                                            <button onClick={() => setActiveConfig(null)} className="flex items-center gap-2 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors">
                                                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
                                                                 Retour aux comptes
                                                             </button>
-                                                            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Configuration SMTP / IMAP</h4>
+                                                            <h4 className="text-sm font-bold text-gray-800">Connexion Gmail</h4>
                                                         </div>
 
-                                                        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-4 text-xs text-blue-900 flex flex-col gap-2">
-                                                            <p className="font-bold">💡 Configuration rapide & Presets</p>
-                                                            <p className="opacity-90">Cliquez sur un bouton ci-dessous pour pré-remplir les serveurs d'envoi et de réception :</p>
-                                                            <div className="flex gap-2 mt-2">
-                                                                {['Gmail', 'Outlook', 'Yahoo'].map(provider => (
-                                                                    <button
-                                                                        key={provider}
-                                                                        type="button"
-                                                                        onClick={() => applyEmailPreset(provider.toLowerCase() as any)}
-                                                                        className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm text-[10px] uppercase tracking-wider transition-all"
-                                                                    >
-                                                                        {provider}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                            <p className="mt-3 text-[10px] opacity-80 leading-relaxed">
-                                                                * Pour <strong>Gmail</strong> et d'autres fournisseurs sécurisés, vous devez impérativement générer et utiliser un <strong>Mot de passe d'application</strong> (App Password) dans les options de sécurité de votre compte, et non votre mot de passe habituel.
-                                                            </p>
-                                                        </div>
-
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                            <div className="space-y-2">
-                                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Nom de la configuration</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={emailForm.name}
-                                                                    onChange={e => setEmailForm(prev => ({ ...prev, name: e.target.value }))}
-                                                                    placeholder="Ex: Mon adresse Gmail"
-                                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-900 transition"
-                                                                />
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Adresse Email</label>
-                                                                <input
-                                                                    type="email"
-                                                                    value={emailForm.email}
-                                                                    onChange={e => setEmailForm(prev => ({ ...prev, email: e.target.value }))}
-                                                                    placeholder="adresse@domaine.com"
-                                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-900 transition"
-                                                                />
-                                                            </div>
-                                                            <div className="space-y-2 md:col-span-2">
-                                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Mot de passe / Mot de passe d'application</label>
-                                                                <input
-                                                                    type="password"
-                                                                    value={emailForm.password}
-                                                                    onChange={e => setEmailForm(prev => ({ ...prev, password: e.target.value }))}
-                                                                    placeholder="••••••••••••••••"
-                                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-900 transition font-mono"
-                                                                />
-                                                                <span className="text-[9px] text-gray-400 italic">Laissez vide pour conserver le mot de passe enregistré.</span>
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Serveur IMAP (Réception)</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={emailForm.imap_server}
-                                                                    onChange={e => setEmailForm(prev => ({ ...prev, imap_server: e.target.value }))}
-                                                                    placeholder="imap.gmail.com"
-                                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-900 transition"
-                                                                />
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Serveur SMTP (Envoi)</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={emailForm.smtp_server}
-                                                                    onChange={e => setEmailForm(prev => ({ ...prev, smtp_server: e.target.value }))}
-                                                                    placeholder="smtp.gmail.com"
-                                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-900 transition"
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        {emailTestResult && (
-                                                            <div className={cn(
-                                                                "p-4 border rounded-xl text-xs flex flex-col gap-2 mt-4",
-                                                                emailTestResult.success ? "bg-emerald-50 border-emerald-200 text-emerald-950" : "bg-red-50 border-red-200 text-red-950"
-                                                            )}>
-                                                                <p className="font-bold flex items-center gap-1.5">
-                                                                    {emailTestResult.success ? "✓ Connexion réussie !" : "✗ Échec de connexion"}
+                                                        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+                                                            <div>
+                                                                <p className="text-sm font-bold text-gray-900">Se connecter avec Google</p>
+                                                                <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                                                                    Seule méthode autorisée : connexion sécurisée via votre compte Google.
+                                                                    Aucune configuration SMTP / mot de passe d&apos;application.
                                                                 </p>
-                                                                <div className="grid grid-cols-2 gap-4 mt-1">
-                                                                    <div>
-                                                                        <span className="font-semibold block">IMAP (Réception) :</span>
-                                                                        <span className="capitalize">{emailTestResult.imap?.status === 'success' ? 'OK' : `Échec (${emailTestResult.imap?.message || 'Inconnu'})`}</span>
-                                                                    </div>
-                                                                    <div>
-                                                                        <span className="font-semibold block">SMTP (Envoi) :</span>
-                                                                        <span className="capitalize">{emailTestResult.smtp?.status === 'success' ? 'OK' : `Échec (${emailTestResult.smtp?.message || 'Inconnu'})`}</span>
-                                                                    </div>
-                                                                </div>
                                                             </div>
-                                                        )}
-
-                                                        <div className="flex gap-3 mt-6 justify-end">
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    if (!activeConfig?.id) return;
+                                                                    const { url, error } = await getEmailConnectionUrl(activeConfig.id);
+                                                                    if (url) {
+                                                                        window.location.href = url;
+                                                                        return;
+                                                                    }
+                                                                    toast.error("Connexion Google impossible", {
+                                                                        description: error || "Vérifiez GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI dans le .env du backend.",
+                                                                    });
+                                                                }}
+                                                                className="w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-800 rounded-xl text-sm font-semibold transition shadow-sm"
+                                                            >
+                                                                <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+                                                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                                                </svg>
+                                                                Continuer avec Google
+                                                            </button>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setActiveConfig(null)}
-                                                                className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition"
+                                                                className="w-full py-2.5 text-xs font-medium text-gray-500 hover:text-gray-800"
                                                             >
                                                                 Annuler
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleTestEmailConnection}
-                                                                disabled={isTestingEmail}
-                                                                className="px-6 py-2.5 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition disabled:opacity-50"
-                                                            >
-                                                                {isTestingEmail ? "Test en cours..." : "Tester la connexion"}
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleSaveEmailConfig}
-                                                                disabled={isSavingConfig}
-                                                                className="px-8 py-2.5 bg-gray-900 hover:bg-blue-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition disabled:opacity-50"
-                                                            >
-                                                                {isSavingConfig ? "Sauvegarde..." : "Enregistrer & Activer"}
                                                             </button>
                                                         </div>
                                                     </div>
                                                 ) : (
                                                     <div className="space-y-6">
                                                         <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
-                                                            <button onClick={() => { setActiveConfig(null); setFacebookPages([]); setSelectedPageId(""); }} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
+                                                            <button onClick={() => { setActiveConfig(null); setFacebookPages([]); setSelectedPageId(""); }} className="flex items-center gap-2 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors">
                                                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
                                                                 Retour aux pages
                                                             </button>
-                                                            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Connexion Facebook Messenger</h4>
+                                                            <h4 className="text-sm font-bold text-gray-800">Connexion Facebook Messenger</h4>
                                                         </div>
 
                                                         {isExchangingCode ? (
@@ -698,7 +533,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                     <p>Sélectionnez la page à associer à MAGIA pour la messagerie.</p>
                                                                 </div>
                                                                 <div className="space-y-2">
-                                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Votre Page Facebook</label>
+                                                                    <label className="text-[10px] font-semibold text-gray-400 block">Votre Page Facebook</label>
                                                                     <select
                                                                         value={selectedPageId}
                                                                         onChange={e => setSelectedPageId(e.target.value)}
@@ -714,7 +549,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => { setFacebookPages([]); setSelectedPageId(""); }}
-                                                                        className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition"
+                                                                        className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-medium transition"
                                                                     >
                                                                         Changer de compte
                                                                     </button>
@@ -723,10 +558,10 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                         onClick={() => {
                                                                             const page = facebookPages.find(p => p.id === selectedPageId);
                                                                             if (page) handleSaveFacebookConfig(page.id, page.access_token);
-                                                                            else alert("Veuillez sélectionner une page.");
+                                                                            else toast.warning("Veuillez sélectionner une page.");
                                                                         }}
                                                                         disabled={isSavingConfig || !selectedPageId}
-                                                                        className="px-8 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition disabled:opacity-50"
+                                                                        className="px-8 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-medium transition disabled:opacity-50"
                                                                     >
                                                                         {isSavingConfig ? "Connexion..." : "Confirmer la connexion"}
                                                                     </button>
@@ -735,9 +570,17 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                         ) : (
                                                             <div className="space-y-6">
                                                                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 text-xs text-blue-900 space-y-2">
-                                                                    <p className="font-bold">📘 Connexion en un clic via Facebook</p>
-                                                                    <p className="opacity-90 leading-relaxed">Cliquez sur le bouton ci-dessous pour vous connecter à votre compte Facebook. Vous serez redirigé vers Facebook pour autoriser l'accès à vos pages, puis MAGIA récupérera automatiquement la liste de vos pages disponibles.</p>
-                                                                    <p className="opacity-75">⚠️ Assurez-vous que <strong>FACEBOOK_APP_ID</strong> et <strong>FACEBOOK_APP_SECRET</strong> sont bien configurés dans le fichier <code className="bg-blue-100 px-1 rounded">.env</code> du backend.</p>
+                                                                    <p className="font-bold">Connexion en un clic via Facebook</p>
+                                                                    <p className="opacity-90 leading-relaxed">
+                                                                        Connectez votre compte, choisissez une Page, puis MAGIA s&apos;abonne au webhook Messenger.
+                                                                        En local, exposez le backend (ngrok) et configurez dans Meta Developers :
+                                                                    </p>
+                                                                    <p className="font-mono text-[10px] bg-white/70 border border-blue-100 rounded-lg px-2 py-1.5 break-all">
+                                                                        Callback URL : {window.location.protocol}//{window.location.hostname === 'localhost' ? 'VOTRE_URL_PUBLIQUE' : window.location.host}/api/webhooks/facebook/
+                                                                    </p>
+                                                                    <p className="opacity-80 text-[10px]">
+                                                                        Verify Token : valeur de <code className="bg-white/80 px-1 rounded">FACEBOOK_VERIFY_TOKEN</code> dans le .env backend (défaut : magia_fb_webhook_2024). Champs : messages.
+                                                                    </p>
                                                                 </div>
 
                                                                 <div className="flex flex-col items-center gap-4 py-6">
@@ -766,7 +609,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                             ) : (
                                                 <>
                                                     <div className="flex items-center justify-between mb-4">
-                                                        <button onClick={() => { setConfigTarget(null); setActiveConfig(null); }} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
+                                                        <button onClick={() => { setConfigTarget(null); setActiveConfig(null); }} className="flex items-center gap-2 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors">
                                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
                                                             Retour au Hub
                                                         </button>
@@ -777,7 +620,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                 else if (configTarget === 'linkedin') await addLinkedInConfig({ name: 'Nouveau LinkedIn' });
                                                                 else if (configTarget === 'facebook') await addFacebookConfig({ name: 'Nouveau Facebook' });
                                                             }}
-                                                            className="px-4 py-2 bg-gray-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-900 transition-colors"
+                                                            className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-medium hover:bg-blue-900 transition-colors"
                                                         >
                                                             + Nouveau {configTarget === 'whatsapp' ? 'Numéro' : (configTarget === 'email' ? 'Compte' : (configTarget === 'linkedin' ? 'Accès' : 'Compte'))}
                                                         </button>
@@ -805,7 +648,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                     isConnected ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
                                                                                 )} />
                                                                                 <div>
-                                                                                    <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">{c.name}</p>
+                                                                                    <p className="text-[10px] font-semibold text-gray-900">{c.name}</p>
                                                                                     <p className="text-[9px] text-gray-400 font-medium italic">{c.phone_number || c.email || (isConnected ? 'Compte lié' : 'Non configuré')}</p>
                                                                                 </div>
                                                                             </div>
@@ -813,23 +656,58 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                             <div className="flex items-center gap-3">
                                                                                 {isDirectConfig ? (
                                                                                     <div className="flex items-center gap-3">
-                                                                                        <button
-                                                                                            onClick={() => setActiveConfig(c)}
-                                                                                            className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-sm"
-                                                                                        >
-                                                                                            Configurer
-                                                                                        </button>
+                                                                                        {configTarget === 'email' && !isConnected && (
+                                                                                            <button
+                                                                                                onClick={async () => {
+                                                                                                    const { url, error } = await getEmailConnectionUrl(c.id);
+                                                                                                    if (url) {
+                                                                                                        window.location.href = url;
+                                                                                                        return;
+                                                                                                    }
+                                                                                                    toast.error("Connexion Google impossible", {
+                                                                                                        description: error || "Vérifiez les variables Google dans le .env backend.",
+                                                                                                    });
+                                                                                                }}
+                                                                                                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm"
+                                                                                            >
+                                                                                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
+                                                                                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                                                                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                                                                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                                                                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                                                                                </svg>
+                                                                                                Se connecter avec Google
+                                                                                            </button>
+                                                                                        )}
+                                                                                        {configTarget === 'facebook' && (
+                                                                                            <button
+                                                                                                onClick={() => setActiveConfig(c)}
+                                                                                                className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium hover:bg-gray-900 hover:text-white transition-all shadow-sm"
+                                                                                            >
+                                                                                                Configurer
+                                                                                            </button>
+                                                                                        )}
                                                                                         {isConnected && (
-                                                                                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
+                                                                                            <span className="text-xs font-medium text-emerald-500 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
                                                                                                 Actif
                                                                                             </span>
                                                                                         )}
                                                                                         <button
-                                                                                            onClick={() => {
-                                                                                                if (configTarget === 'email') deleteEmailConfig(c.id);
-                                                                                                else deleteFacebookConfig(c.id);
+                                                                                            onClick={async () => {
+                                                                                                if (configTarget === 'email') {
+                                                                                                    const ok = await confirmDialog({
+                                                                                                        title: "Déconnecter ce compte email ?",
+                                                                                                        description: "MAGIA ne pourra plus lire ni envoyer d'emails via ce compte.",
+                                                                                                        confirmLabel: "Déconnecter",
+                                                                                                        danger: true,
+                                                                                                    });
+                                                                                                    if (!ok) return;
+                                                                                                    deleteEmailConfig(c.id);
+                                                                                                } else {
+                                                                                                    deleteFacebookConfig(c.id);
+                                                                                                }
                                                                                             }}
-                                                                                            className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all shadow-sm"
+                                                                                            className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-medium hover:bg-red-50 hover:text-red-500 transition-all shadow-sm"
                                                                                         >
                                                                                             Supprimer
                                                                                         </button>
@@ -844,12 +722,30 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                                         onClick={async () => {
                                                                                                             setQrModalConfig({ id: c.id, qr_code: null, loading: true });
                                                                                                             try {
-                                                                                                                const res = await fetch(`${(await import('../../../lib/api')).API_BASE}/whatsapp-config/${c.id}/get_connection_url/`, { headers: (await import('../../../lib/api')).getAuthHeadersOnly() });
+                                                                                                                // start_session force-restarts Node and waits for QR / reconnect
+                                                                                                                const res = await fetch(`${API_BASE}/whatsapp-config/${c.id}/start_session/`, {
+                                                                                                                    method: "POST",
+                                                                                                                    headers: getAuthHeaders(),
+                                                                                                                });
                                                                                                                 const data = await res.json();
-                                                                                                                setQrModalConfig({ id: c.id, qr_code: data.qr_code || null, loading: false });
+                                                                                                                if (data.status === "connected") {
+                                                                                                                    setQrModalConfig(null);
+                                                                                                                    toast.success("WhatsApp déjà connecté", {
+                                                                                                                        description: data.phone_number
+                                                                                                                            ? `Numéro : ${data.phone_number}`
+                                                                                                                            : undefined,
+                                                                                                                    });
+                                                                                                                    refreshWhatsAppConnection(c.id);
+                                                                                                                    return;
+                                                                                                                }
+                                                                                                                if (data.qr_code || data.status === "qr_ready") {
+                                                                                                                    setQrModalConfig({ id: c.id, qr_code: data.qr_code || null, loading: false });
+                                                                                                                    return;
+                                                                                                                }
+                                                                                                                setQrModalConfig({ id: c.id, qr_code: null, loading: false });
                                                                                                             } catch {
                                                                                                                 setQrModalConfig(null);
-                                                                                                                alert("Impossible de récupérer le QR code WhatsApp.");
+                                                                                                                toast.error("Impossible de récupérer le QR code WhatsApp.");
                                                                                                             }
                                                                                                         }}
                                                                                                         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-green-300 transition-all group min-w-[180px] justify-center disabled:opacity-50"
@@ -861,7 +757,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                                             </div>
                                                                                                         ) : (
                                                                                                             <>
-                                                                                                                <div className="w-4 h-4 flex items-center justify-center rounded-sm font-black text-[10px] text-white" style={{ backgroundColor: '#25D366' }}>
+                                                                                                                <div className="w-4 h-4 flex items-center justify-center rounded-sm font-semibold text-[10px] text-white" style={{ backgroundColor: '#25D366' }}>
                                                                                                                     W
                                                                                                                 </div>
                                                                                                                 <span className="text-[10px] font-bold text-gray-700">Scanner le QR Code</span>
@@ -869,7 +765,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                                         )}
                                                                                                     </button>
                                                                                                 ) : configTarget === 'linkedin' ? (
-                                                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
+                                                                                                    <span className="text-xs font-medium text-gray-400 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
                                                                                                         Non disponible
                                                                                                     </span>
                                                                                                 ) : (
@@ -878,12 +774,14 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                                         onClick={async () => {
                                                                                                             setRedirectingIds(prev => [...prev, c.id]);
                                                                                                             try {
-                                                                                                                const url = await providerInfo.getUrl(c.id);
+                                                                                                                const result = await providerInfo.getUrl(c.id);
+                                                                                                                const url = typeof result === 'string' ? result : result?.url;
+                                                                                                                const error = typeof result === 'object' && result ? result.error : undefined;
                                                                                                                 if (url) window.location.assign(url);
-                                                                                                                else throw new Error("No URL");
-                                                                                                            } catch {
+                                                                                                                else throw new Error(error || "No URL");
+                                                                                                            } catch (err: any) {
                                                                                                                 setRedirectingIds(prev => prev.filter(id => id !== c.id));
-                                                                                                                alert("Impossible d'obtenir l'URL de connexion.");
+                                                                                                                toast.error("Impossible d'obtenir l'URL de connexion", { description: err?.message });
                                                                                                             }
                                                                                                         }}
                                                                                                         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all group min-w-[180px] justify-center disabled:opacity-50"
@@ -895,7 +793,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                                             </div>
                                                                                                         ) : (
                                                                                                             <>
-                                                                                                                <div className="w-4 h-4 flex items-center justify-center rounded-sm font-black text-[10px] text-white" style={{ backgroundColor: providerInfo.color }}>
+                                                                                                                <div className="w-4 h-4 flex items-center justify-center rounded-sm font-semibold text-[10px] text-white" style={{ backgroundColor: providerInfo.color }}>
                                                                                                                     {providerInfo.icon}
                                                                                                                 </div>
                                                                                                                 <span className="text-[10px] font-bold text-gray-700">Connecter</span>
@@ -906,7 +804,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                             </div>
                                                                                         ) : (
                                                                                             <div className="flex items-center gap-3">
-                                                                                                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
+                                                                                                <span className="text-xs font-medium text-emerald-500 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
                                                                                                     Connecté
                                                                                                 </span>
                                                                                                 <button
@@ -914,7 +812,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                                                                                         if (configTarget === 'whatsapp') deleteWhatsAppConfig(c.id);
                                                                                                         else deleteLinkedInConfig(c.id);
                                                                                                     }}
-                                                                                                    className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all shadow-sm"
+                                                                                                    className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-medium hover:bg-red-50 hover:text-red-500 transition-all shadow-sm"
                                                                                                 >
                                                                                                     Déconnecter
                                                                                                 </button>
@@ -945,20 +843,20 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                         )}
 
                         {activeSection === "security" && (
-                            <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div>
                                     <h3 className="magia-label mb-6 text-blue-900">PROTOCOLES DE SÉCURITÉ</h3>
                                     <div className="space-y-4">
                                         <div className="p-6 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between group">
                                             <div>
                                                 <p className="magia-label text-gray-900 mb-1">Master API Key</p>
-                                                <p className="text-[10px] font-mono text-gray-300 group-hover:text-blue-900 transition-colors uppercase">
+                                                <p className="text-[10px] font-mono text-gray-300 group-hover:text-blue-900 transition-colors">
                                                     {security?.master_api_key || '••••••••••••••••'}
                                                 </p>
                                             </div>
                                             <button
                                                 onClick={regenerateMasterKey}
-                                                className="px-5 py-2.5 bg-white border border-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-sm"
+                                                className="px-5 py-2.5 bg-white border border-gray-100 rounded-xl text-xs font-medium hover:bg-gray-900 hover:text-white transition-all shadow-sm"
                                             >
                                                 RÉGÉNÉRER
                                             </button>
@@ -982,18 +880,22 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                     <div className="pt-8 mt-8 border-t border-gray-100">
                                         <div className="p-6 bg-red-50 rounded-none border border-red-100 flex items-center justify-between">
                                             <div className="space-y-1">
-                                                <h3 className="text-sm font-bold text-red-900 uppercase tracking-wider">Zone Danger</h3>
+                                                <h3 className="text-sm font-bold text-red-900">Zone Danger</h3>
                                                 <p className="text-[11px] text-red-600 font-medium italic">
                                                     La suppression du compte est irréversible. Toutes vos données seront effacées.
                                                 </p>
                                             </div>
                                             <button
-                                                onClick={() => {
-                                                    if (window.confirm("Êtes-vous certain de vouloir supprimer votre compte MAGIA ? Cette action est définitive.")) {
-                                                        handleDeleteAccount();
-                                                    }
+                                                onClick={async () => {
+                                                    const ok = await confirmDialog({
+                                                        title: "Supprimer votre compte MAGIA ?",
+                                                        description: "Cette action est définitive. Toutes vos données (agents, conversations, connaissances) seront effacées.",
+                                                        confirmLabel: "Supprimer définitivement",
+                                                        danger: true,
+                                                    });
+                                                    if (ok) handleDeleteAccount();
                                                 }}
-                                                className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-200"
+                                                className="px-6 py-3 bg-red-600 text-white rounded-xl text-xs font-medium hover:bg-red-700 transition-all shadow-lg shadow-red-200"
                                             >
                                                 SUPPRIMER MON COMPTE
                                             </button>
@@ -1005,9 +907,9 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                     </div>
 
                     <div className="px-8 py-6 bg-gray-50/50 border-t border-gray-50 flex justify-end gap-3 flex-shrink-0">
-                        <button className="px-8 py-2.5 rounded-xl text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-gray-900 transition-all" onClick={fetchProfile}>ANNULER</button>
+                        <button className="px-8 py-2.5 rounded-xl text-gray-400 magia-button hover:text-gray-900 transition-all" onClick={fetchProfile}>ANNULER</button>
                         <button
-                            className="px-10 py-2.5 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all disabled:opacity-50"
+                            className="px-10 py-2.5 bg-gray-900 text-white rounded-xl magia-button shadow-xl shadow-gray-200 hover:bg-blue-900 transition-all disabled:opacity-50"
                             onClick={handleSave}
                             disabled={isSaving}
                         >
@@ -1020,14 +922,31 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
         </div>
 
         {qrModalConfig && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full mx-4 flex flex-col items-center gap-6">
+            <ModalShell
+                title="Connecter WhatsApp"
+                onClose={() => {
+                    const id = qrModalConfig.id;
+                    setQrModalConfig(null);
+                    // Session may finish connecting in background after close
+                    refreshWhatsAppConnection(id);
+                }}
+                className="max-w-sm"
+            >
+                <div className="bg-white rounded-3xl shadow-2xl p-8 w-full flex flex-col items-center gap-6">
                     <div className="flex items-center justify-between w-full">
                         <div>
-                            <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">Connecter WhatsApp</h3>
+                            <h3 className="text-sm font-medium text-gray-900">Connecter WhatsApp</h3>
                             <p className="text-[10px] text-gray-400 mt-1">Scannez avec l'application WhatsApp</p>
                         </div>
-                        <button onClick={() => setQrModalConfig(null)} className="p-2 hover:bg-gray-100 rounded-xl transition">
+                        <button
+                            onClick={() => {
+                                const id = qrModalConfig.id;
+                                setQrModalConfig(null);
+                                refreshWhatsAppConnection(id);
+                            }}
+                            aria-label="Fermer"
+                            className="p-2 hover:bg-gray-100 rounded-xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-900/40"
+                        >
                             <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
@@ -1042,7 +961,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                 <img src={qrModalConfig.qr_code} alt="QR Code WhatsApp" className="w-56 h-56 object-contain" />
                             </div>
                             <div className="bg-green-50 border border-green-100 rounded-2xl p-4 text-center">
-                                <p className="text-[10px] font-bold text-green-800 uppercase tracking-widest mb-1">Instructions</p>
+                                <p className="text-[10px] font-bold text-green-800 mb-1">Instructions</p>
                                 <p className="text-[11px] text-green-700 leading-relaxed">
                                     Ouvrez WhatsApp → <strong>Appareils liés</strong> → <strong>Lier un appareil</strong> → Scannez ce code
                                 </p>
@@ -1051,11 +970,11 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                 onClick={async () => {
                                     setQrModalConfig(prev => prev ? { ...prev, loading: true } : null);
                                     try {
-                                        const { API_BASE, getAuthHeadersOnly } = await import('../../../lib/api');
                                         const res = await fetch(`${API_BASE}/whatsapp-config/${qrModalConfig.id}/get_connection_url/`, { headers: getAuthHeadersOnly() });
                                         const data = await res.json();
                                         if (data.status === 'connected') {
                                             setQrModalConfig(null);
+                                            toast.success("WhatsApp connecté");
                                             refreshWhatsAppConnection(qrModalConfig.id);
                                         } else {
                                             setQrModalConfig(prev => prev ? { ...prev, qr_code: data.qr_code || prev.qr_code, loading: false } : null);
@@ -1064,7 +983,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                         setQrModalConfig(prev => prev ? { ...prev, loading: false } : null);
                                     }
                                 }}
-                                className="w-full px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition"
+                                className="w-full px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-medium transition"
                             >
                                 Vérifier la connexion
                             </button>
@@ -1075,27 +994,43 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                 <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                             </div>
                             <p className="text-sm font-bold text-gray-800">QR code en cours de génération</p>
-                            <p className="text-[11px] text-gray-500 leading-relaxed">Le service WhatsApp génère votre QR code. Veuillez patienter quelques secondes puis réessayer.</p>
+                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                Aucune connexion automatique. Attendez le QR puis scannez-le avec WhatsApp
+                                (Appareils liés → Lier un appareil).
+                            </p>
                             <button
                                 onClick={async () => {
                                     setQrModalConfig(prev => prev ? { ...prev, loading: true } : null);
                                     try {
-                                        const { API_BASE, getAuthHeadersOnly } = await import('../../../lib/api');
                                         const res = await fetch(`${API_BASE}/whatsapp-config/${qrModalConfig.id}/get_connection_url/`, { headers: getAuthHeadersOnly() });
                                         const data = await res.json();
-                                        setQrModalConfig(prev => prev ? { ...prev, qr_code: data.qr_code || null, loading: false } : null);
+                                        if (data.status === "connected") {
+                                            setQrModalConfig(null);
+                                            toast.success("WhatsApp connecté", {
+                                                description: data.phone_number
+                                                    ? `Numéro : ${data.phone_number}`
+                                                    : "Scan réussi.",
+                                            });
+                                            refreshWhatsAppConnection(qrModalConfig.id);
+                                            return;
+                                        }
+                                        setQrModalConfig(prev => prev ? {
+                                            ...prev,
+                                            qr_code: data.qr_code || null,
+                                            loading: false,
+                                        } : null);
                                     } catch {
                                         setQrModalConfig(prev => prev ? { ...prev, loading: false } : null);
                                     }
                                 }}
-                                className="px-6 py-2.5 bg-gray-900 hover:bg-blue-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition"
+                                className="px-6 py-2.5 bg-gray-900 hover:bg-blue-900 text-white rounded-xl text-xs font-medium transition"
                             >
                                 Actualiser
                             </button>
                         </div>
                     )}
                 </div>
-            </div>
+            </ModalShell>
         )}
     </>
     );

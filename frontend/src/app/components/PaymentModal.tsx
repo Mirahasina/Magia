@@ -316,7 +316,7 @@ function CardSetupForm({
                             <Lock className="w-3 h-3" /> Informations de carte bancaire
                         </p>
 
-                        {/* Card number — 16 digits, auto-formatted XXXX XXXX XXXX XXXX */}
+                        {/* Card number - 16 digits, auto-formatted XXXX XXXX XXXX XXXX */}
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                                 Numéro de carte
@@ -385,7 +385,7 @@ function CardSetupForm({
                             <ShieldCheck className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
                             <p className="text-[9px] text-green-700 font-medium leading-relaxed">
                                 Vos données de carte sont chiffrées par <strong>Stripe</strong>.
-                                MAGIA ne stocke jamais votre numéro complet — seuls les 4 derniers chiffres sont conservés.
+                                MAGIA ne stocke jamais votre numéro complet - seuls les 4 derniers chiffres sont conservés.
                             </p>
                         </div>
                     </div>
@@ -413,7 +413,7 @@ function CardSetupForm({
                             Traitement en cours...
                         </span>
                     ) : storedCard
-                        ? `Confirmer — ${priceAriary} Ar`
+                        ? `Confirmer - ${priceAriary} Ar`
                         : `Payer ${priceAriary} Ar`
                     }
                 </Button>

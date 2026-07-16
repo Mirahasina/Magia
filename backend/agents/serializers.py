@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, Contact
+from .models import Agent, KnowledgeBase, Template, WhatsAppConfig, ChatMessage, EmailConfig, LinkedInConfig, FacebookConfig, AgentTeam, AgentLink, ContactAssignment, AuditLog, Contact, ProspectSearchJob, ProspectLead
 
 class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
@@ -57,6 +57,28 @@ class ContactSerializer(serializers.ModelSerializer):
         read_only_fields = ['user']
 
 
+class ProspectLeadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProspectLead
+        fields = '__all__'
+
+
+class ProspectSearchJobSerializer(serializers.ModelSerializer):
+    leads = ProspectLeadSerializer(many=True, read_only=True)
+    agent_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProspectSearchJob
+        fields = '__all__'
+        read_only_fields = [
+            'user', 'status', 'found_count', 'enriched_count', 'sent_count',
+            'failed_count', 'error', 'started_at', 'finished_at', 'created_at', 'updated_at',
+        ]
+
+    def get_agent_name(self, obj):
+        return obj.agent.name if obj.agent else None
+
+
 class ChatMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatMessage
@@ -81,29 +103,35 @@ class ContactAssignmentSerializer(serializers.ModelSerializer):
 
 class AgentSerializer(serializers.ModelSerializer):
     knowledge_bases = KnowledgeBaseSerializer(many=True, read_only=True)
-    messages = ChatMessageSerializer(many=True, read_only=True)
+    messages = serializers.SerializerMethodField()
     owner_name = serializers.ReadOnlyField(source='user.full_name')
     owner_email = serializers.ReadOnlyField(source='user.email')
     team_name = serializers.ReadOnlyField(source='team.name')
     team_color = serializers.ReadOnlyField(source='team.color')
     stats = serializers.SerializerMethodField()
 
+    def get_messages(self, obj):
+        # Chatbot history only - channel messages stay in inbox channels
+        msgs = ChatMessage.objects.filter(agent=obj, source='chat').order_by('-created_at')[:40]
+        return ChatMessageSerializer(msgs, many=True).data
+
     def get_stats(self, obj):
-        
-        convs = ChatMessage.objects.filter(agent=obj).values('contact_info').distinct().count() or 0
-        
-        user_msgs_count = ChatMessage.objects.filter(agent=obj, sender='user').count()
-        ai_msgs_count = ChatMessage.objects.filter(agent=obj, sender='ai').count()
-        
+        # Chatbot threads only - channel (WhatsApp/Email/FB) traffic stays in inbox channels
+        chat_qs = ChatMessage.objects.filter(agent=obj, source='chat')
+        convs = chat_qs.values('contact_info').distinct().count() or 0
+
+        user_msgs_count = chat_qs.filter(sender='user').count()
+        ai_msgs_count = chat_qs.filter(sender='ai').count()
+
         resolution = "0%"
         if user_msgs_count > 0:
             rate = min(100, int((ai_msgs_count / user_msgs_count) * 100))
             resolution = f"{rate}%"
-            
+
         responseTime = "0s"
-        
-        leads = ChatMessage.objects.filter(agent=obj, status='pertinent').values('contact_info').distinct().count() or 0
-        
+
+        leads = chat_qs.filter(status='pertinent').values('contact_info').distinct().count() or 0
+
         return {
             "conversations": str(convs),
             "resolution": resolution,

@@ -324,3 +324,77 @@ class TestProspectionFollowups:
         response = api_client.post('/api/linkedin-config/', {'name': 'Test'}, format='json')
         assert response.status_code == 400
         assert 'LinkedIn' in response.data.get('error', '')
+
+
+@pytest.mark.django_db
+class TestGmailOAuth:
+    def test_get_connection_url_requires_google_env(self, api_client, test_user, monkeypatch):
+        monkeypatch.setenv('GOOGLE_CLIENT_ID', '')
+        monkeypatch.setenv('GOOGLE_CLIENT_SECRET', '')
+        monkeypatch.setenv('GOOGLE_REDIRECT_URI', '')
+        config = EmailConfig.objects.create(user=test_user, name='Gmail')
+        api_client.force_authenticate(user=test_user)
+        response = api_client.get(f'/api/email-config/{config.id}/get_connection_url/')
+        assert response.status_code == 400
+        assert 'GOOGLE_CLIENT_ID' in response.data.get('error', '')
+
+    def test_get_connection_url_returns_google_url(self, api_client, test_user, monkeypatch):
+        monkeypatch.setenv('GOOGLE_CLIENT_ID', 'client-id.apps.googleusercontent.com')
+        monkeypatch.setenv('GOOGLE_CLIENT_SECRET', 'secret')
+        monkeypatch.setenv('GOOGLE_REDIRECT_URI', 'http://localhost:8000/api/email-config/oauth2_callback/')
+        config = EmailConfig.objects.create(user=test_user, name='Gmail')
+        api_client.force_authenticate(user=test_user)
+        response = api_client.get(f'/api/email-config/{config.id}/get_connection_url/')
+        assert response.status_code == 200
+        assert 'accounts.google.com' in response.data['url']
+        assert 'mail.google.com' in response.data['url']
+        assert f'state={config.id}' in response.data['url']
+
+    @patch('agents.views.requests.post')
+    @patch('agents.views.requests.get')
+    @patch('agents.views.sync_email_history')
+    def test_oauth2_callback_activates_gmail(
+        self, mock_sync, mock_get, mock_post, api_client, test_user, monkeypatch
+    ):
+        monkeypatch.setenv('GOOGLE_CLIENT_ID', 'client-id.apps.googleusercontent.com')
+        monkeypatch.setenv('GOOGLE_CLIENT_SECRET', 'secret')
+        monkeypatch.setenv('GOOGLE_REDIRECT_URI', 'http://localhost:8000/api/email-config/oauth2_callback/')
+        config = EmailConfig.objects.create(user=test_user, name='Nouveau Email')
+
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {
+            'access_token': 'access-token',
+            'refresh_token': 'refresh-token',
+        }
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {'email': 'user@gmail.com'}
+
+        response = api_client.get(
+            f'/api/email-config/oauth2_callback/?code=abc&state={config.id}',
+            follow=False,
+        )
+        assert response.status_code in (301, 302)
+        assert 'gmail_connected=1' in response.url
+
+        config.refresh_from_db()
+        assert config.is_active is True
+        assert config.email == 'user@gmail.com'
+        assert config.oauth_token == 'access-token'
+        assert config.refresh_token == 'refresh-token'
+        assert config.imap_server == 'imap.gmail.com'
+        mock_sync.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestFacebookOAuthConfig:
+    def test_get_connection_url_requires_app_id(self, api_client, test_user, monkeypatch):
+        monkeypatch.setenv('FACEBOOK_APP_ID', '')
+        from agents.models import FacebookConfig
+        config = FacebookConfig.objects.create(user=test_user, name='FB')
+        api_client.force_authenticate(user=test_user)
+        response = api_client.get(
+            f'/api/facebook-config/{config.id}/get_connection_url/',
+            {'redirect_uri': 'http://localhost:5173/?facebook_callback=true&view=integration'},
+        )
+        assert response.status_code == 400
+        assert 'FACEBOOK_APP_ID' in response.data.get('error', '')

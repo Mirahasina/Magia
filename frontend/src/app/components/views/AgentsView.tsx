@@ -106,16 +106,16 @@ export function AgentsView({
     );
 
     return (
-        <div className="h-full flex flex-col space-y-8 animate-page-fade overflow-hidden">
+        <div className="h-full flex flex-col magia-page animate-page-fade overflow-hidden">
             <div className="flex items-start justify-between">
                 <div className="space-y-1">
-                    <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900 italic">Unités IA</h1>
+                    <h1 className="magia-title">Unités IA</h1>
                     <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <span className="magia-subtitle">
                             Capture : {usage.agents} / {limits.max_agents === null ? '∞' : limits.max_agents}
                         </span>
                         <div className="w-px h-3 bg-gray-200" />
-                        <span className={cn("px-2 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-lg border",
+                        <span className={cn("px-2 py-0.5 text-[8px] font-medium rounded-lg border",
                             plan === 'gratuit' ? 'bg-gray-100 text-gray-500 border-gray-200' :
                                 plan === 'pro' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         )}>{plan}</span>
@@ -125,7 +125,7 @@ export function AgentsView({
                     onClick={() => canCreateAgent && setIsCreatingAgent(true)}
                     disabled={!canCreateAgent}
                     className={cn(
-                        "px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl transition-all flex items-center gap-2",
+                        "px-6 py-3 rounded-xl magia-button shadow-xl transition-all flex items-center gap-2",
                         canCreateAgent
                             ? "bg-blue-950 text-white hover:bg-black active:scale-95"
                             : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
@@ -141,17 +141,17 @@ export function AgentsView({
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3">
                             <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                            <span className="text-[11px] font-black text-gray-950 uppercase tracking-widest">{actifsCount} ACTIFS</span>
+                            <span className="text-sm font-medium text-gray-900">{actifsCount} ACTIFS</span>
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="w-2.5 h-2.5 rounded-sm bg-gray-200" />
-                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{brouillonsCount} ARCHIVÉS</span>
+                            <span className="text-sm font-medium text-gray-400">{brouillonsCount} ARCHIVÉS</span>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 p-1 bg-gray-100/50 rounded-xl border border-gray-100">
-                        <button onClick={() => setViewMode("grid")} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all", viewMode === "grid" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600")}>HUD</button>
-                        <button onClick={() => setViewMode("list")} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all", viewMode === "list" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600")}>LISTE</button>
+                        <button onClick={() => setViewMode("grid")} className={cn("px-4 py-1.5 rounded-lg text-xs font-medium transition-all", viewMode === "grid" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600")}>HUD</button>
+                        <button onClick={() => setViewMode("list")} className={cn("px-4 py-1.5 rounded-lg text-xs font-medium transition-all", viewMode === "list" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600")}>LISTE</button>
                     </div>
                 </div>
 
@@ -162,14 +162,14 @@ export function AgentsView({
                             value={searchQuery}
                             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPageTeam(1); setCurrentPageSolo(1); }}
                             placeholder="INITIALISATION SYSTÈME / RECHERCHE..."
-                            className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-black focus:outline-none focus:bg-white focus:border-blue-900 transition-all placeholder:text-gray-300 uppercase tracking-widest"
+                            className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:bg-white focus:border-blue-900 transition-all placeholder:text-gray-400"
                         />
                     </div>
 
                     <select
                         value={filterState}
                         onChange={(e) => { setFilterState(e.target.value as any); setCurrentPageTeam(1); setCurrentPageSolo(1); }}
-                        className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black uppercase focus:outline-none transition-all hover:border-gray-300"
+                        className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-semibold focus:outline-none transition-all hover:border-gray-300"
                     >
                         <option value="ALL">STATUT : GLOBAL</option>
                         <option value="ACTIVE">FILTRE : DÉPLOYÉ</option>
@@ -179,7 +179,7 @@ export function AgentsView({
                     <select
                         value={channelFilter}
                         onChange={(e) => { setChannelFilter(e.target.value); setCurrentPageTeam(1); setCurrentPageSolo(1); }}
-                        className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black uppercase focus:outline-none transition-all hover:border-gray-300"
+                        className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-semibold focus:outline-none transition-all hover:border-gray-300"
                     >
                         <option value="ALL">CANAL : TOUS</option>
                         <option value="email">INTERFACE : EMAIL</option>
@@ -191,7 +191,7 @@ export function AgentsView({
                     <button
                         onClick={() => setActiveCategory("EQUIPE")}
                         className={cn(
-                            "flex-1 py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all border-b-2",
+                            "flex-1 py-3 text-sm font-medium transition-all border-b-2",
                             activeCategory === "EQUIPE" ? "text-blue-950 border-blue-950 bg-blue-50/30" : "text-gray-400 border-transparent hover:text-gray-600"
                         )}
                     >
@@ -200,7 +200,7 @@ export function AgentsView({
                     <button
                         onClick={() => setActiveCategory("SOLO")}
                         className={cn(
-                            "flex-1 py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all border-b-2",
+                            "flex-1 py-3 text-sm font-medium transition-all border-b-2",
                             activeCategory === "SOLO" ? "text-blue-950 border-blue-950 bg-blue-50/30" : "text-gray-400 border-transparent hover:text-gray-600"
                         )}
                     >
@@ -211,8 +211,8 @@ export function AgentsView({
 
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-12">
                 {paginatedAgents.length === 0 ? (
-                    <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-3xl">
-                        <p className="text-[11px] font-black text-gray-300 uppercase tracking-widest">Séquence vide - Aucun agent détecté</p>
+                    <div className="py-16 text-center border-2 border-dashed border-gray-100 rounded-2xl">
+                        <p className="text-sm text-gray-400">Séquence vide - Aucun agent détecté</p>
                     </div>
                 ) : activeCategory === "EQUIPE" ? (() => {
                     const groupedByTeam: Record<string, { name: string, color?: string, agents: any[] }> = {};
@@ -226,13 +226,13 @@ export function AgentsView({
                     });
 
                     return (
-                        <div className="space-y-12">
+                        <div className="space-y-6">
                             {Object.values(groupedByTeam).map(group => (
-                                <div key={group.name} className="space-y-6">
+                                <div key={group.name} className="space-y-4">
                                     <div className="flex items-center gap-4">
                                         <div className="w-2.5 h-2.5 rounded-full bg-blue-950" style={{ backgroundColor: group.color }} />
-                                        <h3 className="text-[13px] font-black uppercase tracking-widest text-gray-800">
-                                            UNITÉ {group.name} — {group.agents.length} AGENTS
+                                        <h3 className="text-[13px] font-medium text-gray-800">
+                                            {group.name} - {group.agents.length} agent{group.agents.length > 1 ? 's' : ''}
                                         </h3>
                                         <div className="h-px bg-gray-100 flex-1" />
                                     </div>
@@ -244,7 +244,7 @@ export function AgentsView({
                 })() : (
                     <div className="space-y-6">
                         <div className="flex items-center gap-4">
-                            <h3 className="text-[13px] font-black uppercase tracking-widest text-gray-400">UNITÉS AUTONOMES</h3>
+                            <h3 className="text-sm font-medium text-gray-500">UNITÉS AUTONOMES</h3>
                             <div className="h-px bg-gray-100 flex-1" />
                         </div>
                         {renderAgentList(paginatedAgents)}
@@ -253,8 +253,8 @@ export function AgentsView({
             </div>
 
             {filteredAgents.length === 0 && combinedSearchQuery && (
-                <div className="py-24 text-center">
-                    <p className="text-[11px] font-black text-gray-300 uppercase tracking-widest">Aucun agent ne correspond à "{combinedSearchQuery}"</p>
+                <div className="py-16 text-center">
+                    <p className="text-[11px] font-semibold text-gray-300">Aucun agent ne correspond à "{combinedSearchQuery}"</p>
                 </div>
             )}
 
@@ -273,7 +273,7 @@ export function AgentsView({
                                     <PaginationLink
                                         isActive={activePage === i + 1}
                                         onClick={() => setActivePage(i + 1)}
-                                        className="cursor-pointer font-black text-[10px]"
+                                        className="cursor-pointer font-semibold text-[10px]"
                                     >
                                         {i + 1}
                                     </PaginationLink>

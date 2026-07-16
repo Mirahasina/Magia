@@ -1,10 +1,12 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from rest_framework.permissions import AllowAny
 from .views import (
     AgentViewSet, KnowledgeBaseViewSet, TemplateViewSet, 
     WhatsAppConfigViewSet, ChatMessageViewSet, EmailConfigViewSet,
     AgentTeamViewSet, AgentLinkViewSet, ContactAssignmentViewSet, AuditLogViewSet,
-    LinkedInConfigViewSet, FacebookConfigViewSet, ContactViewSet
+    LinkedInConfigViewSet, FacebookConfigViewSet, ContactViewSet,
+    ProspectSearchJobViewSet, ApolloPhoneWebhookView,
 )
 
 from .daily_views import DailyCallViewSet
@@ -24,8 +26,22 @@ router.register(r'audit-logs', AuditLogViewSet, basename='auditlog')
 router.register(r'linkedin-config', LinkedInConfigViewSet, basename='linkedinconfig')
 router.register(r'facebook-config', FacebookConfigViewSet, basename='facebookconfig')
 router.register(r'video-rooms', DailyCallViewSet, basename='video-rooms')
+router.register(r'prospect-searches', ProspectSearchJobViewSet, basename='prospectsearch')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('webhooks/facebook/', FacebookConfigViewSet.as_view({'get': 'webhook', 'post': 'webhook'}), name='facebook-webhook'),
+    path(
+        'webhooks/facebook/',
+        FacebookConfigViewSet.as_view(
+            {'get': 'webhook', 'post': 'webhook'},
+            permission_classes=[AllowAny],
+            authentication_classes=[],
+        ),
+        name='facebook-webhook',
+    ),
+    path(
+        'webhooks/apollo/phone/',
+        ApolloPhoneWebhookView.as_view({'post': 'create'}),
+        name='apollo-phone-webhook',
+    ),
 ]

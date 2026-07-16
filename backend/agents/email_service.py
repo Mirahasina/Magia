@@ -39,6 +39,20 @@ def decode_mime_words(s):
             decoded_parts.append(part)
     return "".join(decoded_parts)
 
+
+def normalize_email_address(raw: str) -> str:
+    from email.utils import parseaddr
+    _name, addr = parseaddr(raw or "")
+    addr = (addr or raw or "").strip().lower()
+    return addr
+
+
+def display_name_from_header(raw: str) -> str:
+    from email.utils import parseaddr
+    name, addr = parseaddr(raw or "")
+    return (name or addr or raw or "").strip()
+
+
 def extract_email_body(msg):
     """
     Extracts the body of an email message, prioritizing HTML if available.
@@ -79,15 +93,22 @@ def extract_email_body(msg):
 
     if body_html is not None and len(body_html) > 50:
         return body_html
-    return body_html if body_html else (body_text if body_text else "")
+    body = body_html if body_html else (body_text if body_text else "")
+    if body:
+        return body
+    # Keep attachment-only / empty-body mails visible in the inbox
+    subject = decode_mime_words(msg.get('Subject'))
+    if subject:
+        return f"[Sans corps de message] {subject}"
+    return "[Message sans contenu texte]"
 
 def get_google_auth_string(user, token):
     return f"user={user}\x01auth=Bearer {token}\x01\x01"
 
 def refresh_google_token(config):
-    client_id = os.getenv('GOOGLE_CLIENT_ID')
-    client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
-    
+    client_id = (os.getenv('GOOGLE_CLIENT_ID') or '').strip().strip('"').strip("'")
+    client_secret = (os.getenv('GOOGLE_CLIENT_SECRET') or '').strip().strip('"').strip("'")
+
     if not config.refresh_token:
         return None
         
@@ -116,20 +137,24 @@ def process_emails_for_agent(agent_id):
 
         mail = imaplib.IMAP4_SSL(config.imap_server or "imap.gmail.com")
         
-        if config.oauth_token:
-            try:
-                auth_string = get_google_auth_string(config.email, config.oauth_token)
+        if not config.oauth_token and not config.refresh_token:
+            logger.warning(
+                "Email %s: SMTP/mot de passe interdit - Google OAuth requis.",
+                config.email,
+            )
+            return
+
+        try:
+            auth_string = get_google_auth_string(config.email, config.oauth_token)
+            mail.authenticate('XOAUTH2', lambda x: auth_string)
+        except imaplib.IMAP4.error:
+            token = refresh_google_token(config)
+            if token:
+                auth_string = get_google_auth_string(config.email, token)
                 mail.authenticate('XOAUTH2', lambda x: auth_string)
-            except imaplib.IMAP4.error:
-                token = refresh_google_token(config)
-                if token:
-                    auth_string = get_google_auth_string(config.email, token)
-                    mail.authenticate('XOAUTH2', lambda x: auth_string)
-                else:
-                    raise
-        else:
-            mail.login(config.email, config.password)
-            
+            else:
+                raise
+
         mail.select("inbox")
         logger.info(f"Recherche d'emails pour l'agent {agent.name} (Canal Email actif)...")
 
@@ -328,26 +353,25 @@ def send_email_reply(config, recipient, subject, body):
         server = smtplib.SMTP_SSL(config.smtp_server or "smtp.gmail.com", 465, timeout=10)
         server.ehlo()
         
-        if config.oauth_token:
-            auth_str = get_google_auth_string(config.email, config.oauth_token)
-            auth_b64 = base64.b64encode(auth_str.encode()).decode()
-            code, resp = server.docmd('AUTH', 'XOAUTH2 ' + auth_b64)
-            
-            if code != 235:
-                token = refresh_google_token(config)
-                if token:
-                    auth_str = get_google_auth_string(config.email, token)
-                    auth_b64 = base64.b64encode(auth_str.encode()).decode()
-                    code, resp = server.docmd('AUTH', 'XOAUTH2 ' + auth_b64)
-                    if code != 235:
-                        return False
-                else:
+        if not config.oauth_token and not config.refresh_token:
+            logger.warning("Envoi email refusé: Google OAuth requis (SMTP password désactivé).")
+            return False
+
+        auth_str = get_google_auth_string(config.email, config.oauth_token)
+        auth_b64 = base64.b64encode(auth_str.encode()).decode()
+        code, resp = server.docmd('AUTH', 'XOAUTH2 ' + auth_b64)
+
+        if code != 235:
+            token = refresh_google_token(config)
+            if token:
+                auth_str = get_google_auth_string(config.email, token)
+                auth_b64 = base64.b64encode(auth_str.encode()).decode()
+                code, resp = server.docmd('AUTH', 'XOAUTH2 ' + auth_b64)
+                if code != 235:
                     return False
-        else:
-            if not config.password:
+            else:
                 return False
-            server.login(config.email, config.password)
-            
+
         server.send_message(msg)
         server.quit()
         return True
@@ -393,49 +417,70 @@ def get_sent_folder_name(mail):
         pass
     return None
 
-def sync_email_history(config):
+def sync_email_history(config, max_messages_per_folder: int = 2500):
+    """
+    Import IMAP history into ChatMessage for the inbox.
+    Returns a stats dict: {imported, skipped, folders, error}.
+    Does not create CRM Contact rows (prospection is intentional only).
+    """
+    stats = {'imported': 0, 'skipped': 0, 'folders': [], 'error': None}
     try:
-        if not config or not config.is_active or not config.email:
-            return
-            
+        if not config or not config.email:
+            stats['error'] = 'Configuration email inactive ou incomplete.'
+            return stats
+
+        # Prefer a fresh OAuth token before long IMAP sync
+        if config.refresh_token:
+            refresh_google_token(config)
+            config.refresh_from_db()
+
+        if not config.oauth_token and not config.refresh_token:
+            stats['error'] = 'Google OAuth requis (SMTP / mot de passe désactivé).'
+            return stats
+
         mail = imaplib.IMAP4_SSL(config.imap_server or "imap.gmail.com")
-        if config.oauth_token:
-            try:
-                auth_string = get_google_auth_string(config.email, config.oauth_token)
+        try:
+            auth_string = get_google_auth_string(config.email, config.oauth_token)
+            mail.authenticate('XOAUTH2', lambda x: auth_string)
+        except imaplib.IMAP4.error:
+            token = refresh_google_token(config)
+            if token:
+                auth_string = get_google_auth_string(config.email, token)
                 mail.authenticate('XOAUTH2', lambda x: auth_string)
-            except imaplib.IMAP4.error:
-                token = refresh_google_token(config)
-                if token:
-                    auth_string = get_google_auth_string(config.email, token)
-                    mail.authenticate('XOAUTH2', lambda x: auth_string)
-                else:
-                    return
-        else:
-            mail.login(config.email, config.password)
-            
+            else:
+                stats['error'] = 'Token Google expiré - reconnectez Gmail.'
+                return stats
+
         folders_to_sync = ["INBOX"]
         sent_folder = get_sent_folder_name(mail)
         if sent_folder:
             folders_to_sync.append(sent_folder)
-            
+
+        my_email = (config.email or '').lower()
+
         for folder in folders_to_sync:
             try:
-                status, data = mail.select(folder if '"' in folder else f'"{folder}"')
+                select_arg = folder if '"' in folder else f'"{folder}"'
+                status, data = mail.select(select_arg, readonly=True)
                 if status != 'OK':
+                    logger.warning('Cannot select folder %s: %s', folder, data)
                     continue
-                    
+
                 status, messages = mail.search(None, 'ALL')
                 if status != 'OK' or not messages[0]:
                     continue
 
                 all_msg_ids = messages[0].split()
-                msg_ids = list(reversed(all_msg_ids))
+                # Most recent first, capped for performance
+                msg_ids = list(reversed(all_msg_ids))[:max_messages_per_folder]
+                stats['folders'].append({'folder': folder, 'candidates': len(msg_ids)})
 
                 for num in msg_ids:
                     try:
                         status, data = mail.fetch(num, '(FLAGS BODY.PEEK[])')
-                        if status != 'OK': continue
-                        
+                        if status != 'OK':
+                            continue
+
                         flags = b''
                         raw_email = b''
                         if len(data) > 0 and isinstance(data[0], tuple):
@@ -445,28 +490,37 @@ def sync_email_history(config):
                         msg = email.message_from_bytes(raw_email)
                         is_read = b'\\Seen' in flags
                         sender_raw = decode_mime_words(msg['From'])
-                        
-                        # Détection si c'est un message envoyé par l'utilisateur
-                        is_sent_by_me = False
-                        if config.email and config.email.lower() in sender_raw.lower():
-                            is_sent_by_me = True
-                            
-                        # Pour les messages envoyés, le "contact" est le destinataire
+                        to_raw = decode_mime_words(msg['To'])
+                        message_id = (msg.get('Message-ID') or '').strip()
+
+                        sender_addr = normalize_email_address(sender_raw)
+                        is_sent_by_me = bool(my_email and my_email in sender_addr)
+
                         if is_sent_by_me:
-                            contact_info = decode_mime_words(msg['To'])
+                            contact_info = normalize_email_address(to_raw)
+                            contact_name = display_name_from_header(to_raw)
                         else:
-                            contact_info = sender_raw
-                        
+                            contact_info = sender_addr
+                            contact_name = display_name_from_header(sender_raw)
+
+                        if not contact_info:
+                            stats['skipped'] += 1
+                            continue
+
                         body = extract_email_body(msg)
 
-                        if not body:
+                        # Dedup by Message-ID when available, else content+contact
+                        if message_id and ChatMessage.objects.filter(
+                            user=config.user, source='email', whatsapp_message_id=message_id
+                        ).exists():
+                            stats['skipped'] += 1
+                            continue
+                        if not message_id and ChatMessage.objects.filter(
+                            user=config.user, content=body, contact_info=contact_info, source='email'
+                        ).exists():
+                            stats['skipped'] += 1
                             continue
 
-                        # Vérification de doublon
-                        if ChatMessage.objects.filter(user=config.user, content=body, contact_info=contact_info, source='email').exists():
-                            continue
-
-                        # Trouver l'agent lié cet email config
                         agent = Agent.objects.filter(email_config=config).first()
 
                         ChatMessage.objects.create(
@@ -475,47 +529,59 @@ def sync_email_history(config):
                             sender='ai' if is_sent_by_me else 'user',
                             content=body,
                             contact_info=contact_info,
+                            contact_name=contact_name or contact_info,
                             source='email',
                             is_read=is_read,
                             status='archived',
-                            email_config=config
+                            email_config=config,
+                            whatsapp_message_id=message_id or None,
                         )
+                        # Do not auto-create CRM prospects from mailbox history -
+                        # inbox shows ChatMessage threads; CRM is for intentional prospection.
+                        stats['imported'] += 1
                     except Exception as e:
                         logger.error(f"Erreur sync email individuel ({folder}): {e}")
+                        stats['skipped'] += 1
             except Exception as e:
                 logger.error(f"Erreur dossier {folder}: {e}")
-                
+
         mail.logout()
+        logger.info(
+            'Email sync done for %s: imported=%s skipped=%s folders=%s',
+            config.email, stats['imported'], stats['skipped'], stats['folders'],
+        )
     except Exception as e:
         logger.error(f"Erreur globale sync_email_history: {e}")
+        stats['error'] = str(e)
+    return stats
+
 
 def test_email_connection(config):
-# ... existing code ...
+    """Google OAuth only - password/SMTP login is disabled."""
+    if not config.oauth_token and not config.refresh_token:
+        return {
+            'imap': {'status': 'error', 'message': 'Google OAuth requis'},
+            'smtp': {'status': 'error', 'message': 'SMTP password désactivé'},
+        }
     results = {}
     try:
         mail = imaplib.IMAP4_SSL(config.imap_server or "imap.gmail.com")
-        if config.oauth_token:
-            auth_string = get_google_auth_string(config.email, config.oauth_token)
-            mail.authenticate('XOAUTH2', lambda x: auth_string)
-        else:
-            mail.login(config.email, config.password)
+        auth_string = get_google_auth_string(config.email, config.oauth_token)
+        mail.authenticate('XOAUTH2', lambda x: auth_string)
         mail.logout()
         results['imap'] = {'status': 'success'}
     except Exception as e:
         results['imap'] = {'status': 'error', 'message': str(e)}
-        
+
     try:
         msg = MIMEText("Ceci est un test de connexion pour MAGIA AI.")
         msg['Subject'] = "Test de connexion MAGIA"
         msg['From'] = config.email
         msg['To'] = config.email
-        
+
         server = smtplib.SMTP_SSL(config.smtp_server or "smtp.gmail.com", 465)
-        if config.oauth_token:
-            auth_str = get_google_auth_string(config.email, config.oauth_token)
-            server.docmd('AUTH', 'XOAUTH2 ' + base64.b64encode(auth_str.encode()).decode())
-        else:
-            server.login(config.email, config.password)
+        auth_str = get_google_auth_string(config.email, config.oauth_token)
+        server.docmd('AUTH', 'XOAUTH2 ' + base64.b64encode(auth_str.encode()).decode())
         server.send_message(msg)
         server.quit()
         results['smtp'] = {'status': 'success'}

@@ -67,7 +67,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
         setUsage(data.usage);
       }
     } catch {
-      /* network failure — limits stay at defaults */
+      /* network failure - limits stay at defaults */
     }
   };
 

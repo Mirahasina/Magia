@@ -2,6 +2,7 @@
 CRM prospection helpers: follow-up scheduling and conversation → pipeline sync.
 """
 import logging
+from django.db.models import Q
 from django.utils import timezone
 from .models import Contact, ContactAssignment, Agent, ChatMessage
 
@@ -16,6 +17,57 @@ def _find_contacts(user, contact_info, source=None):
     if source:
         qs = qs.filter(source=source)
     return list(qs)
+
+
+def purge_passive_crm_contacts(user) -> int:
+    from django.db.models import Exists, OuterRef
+
+    chat_deleted, _ = Contact.objects.filter(user=user, source='chat').delete()
+
+    has_live_outbound = ChatMessage.objects.filter(
+        user=OuterRef('user'),
+        contact_info=OuterRef('contact_info'),
+        source=OuterRef('source'),
+        sender='ai',
+    ).exclude(status='archived')
+
+    has_any_msg = ChatMessage.objects.filter(
+        user=OuterRef('user'),
+        contact_info=OuterRef('contact_info'),
+        source=OuterRef('source'),
+    )
+
+    base = Contact.objects.filter(
+        user=user,
+        status='new',
+        followup_count=0,
+    ).filter(Q(apollo_id__isnull=True) | Q(apollo_id='')).filter(
+        Q(notes__isnull=True) | Q(notes='')
+    )
+
+    history_ids = list(
+        base.annotate(
+            has_live=Exists(has_live_outbound),
+            has_msg=Exists(has_any_msg),
+        ).filter(has_msg=True, has_live=False).values_list('id', flat=True)
+    )
+
+    # Address-book sync junk (no inbox messages at all)
+    addr_ids = list(
+        base.annotate(has_msg=Exists(has_any_msg)).filter(
+            has_msg=False
+        ).values_list('id', flat=True)
+    )
+
+    ids = list({*history_ids, *addr_ids})
+    deleted = 0
+    if ids:
+        deleted, _ = Contact.objects.filter(id__in=ids).delete()
+
+    total = (chat_deleted or 0) + (deleted or 0)
+    if total:
+        logger.info("Purged %s passive CRM contacts for user %s", total, getattr(user, 'id', user))
+    return total
 
 
 def mark_prospect_replied(user, contact_info, source=None):
@@ -43,16 +95,11 @@ def schedule_followup_after_ai(
     """
     After an AI (or manual outbound) message: arm the follow-up clock.
     Optionally analyse conversation to update CRM status + delay.
+
+    Does NOT create CRM contacts - only updates prospects already in the pipeline
+    (manual add, Apollo, CSV import, or agent outreach that created them first).
     """
     contacts = _find_contacts(user, contact_info, source)
-    if not contacts and source:
-        contact, _ = Contact.objects.get_or_create(
-            user=user,
-            source=source,
-            contact_info=contact_info,
-            defaults={'status': 'contacted'},
-        )
-        contacts = [contact]
     if not contacts:
         return
 

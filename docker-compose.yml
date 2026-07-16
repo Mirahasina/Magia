@@ -106,7 +106,7 @@ services:
       - whatsapp_auth:/app/auth_info_global
 
   # ─── React Frontend (dev mode only) ────────────────────────────────────────
-  # In production, the frontend is deployed to Vercel — this service is for local dev.
+  # In production, the frontend is deployed to Vercel - this service is for local dev.
   frontend:
     image: node:20-slim
     container_name: magia_frontend

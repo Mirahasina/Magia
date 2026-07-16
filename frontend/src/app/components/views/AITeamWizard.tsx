@@ -160,8 +160,8 @@ export function AITeamWizard({ onClose }: Props) {
                             <Sparkles className="w-5 h-5 text-primary animate-pulse" />
                         </div>
                         <div>
-                            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-tight">Magia Team Architect</h2>
-                            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Conception d'équipe par IA</p>
+                            <h2 className="text-sm font-bold text-gray-900">Magia Team Architect</h2>
+                            <p className="text-[10px] text-gray-400 font-medium">Conception d'équipe par IA</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
@@ -191,7 +191,7 @@ export function AITeamWizard({ onClose }: Props) {
                                                 onClick={() => m.allow_multiple ? toggleOption(opt) : sendMessage(opt)}
                                                 disabled={loading}
                                                 className={cn(
-                                                    "px-4 py-2 border rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 disabled:opacity-50",
+                                                    "px-4 py-2 border rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 disabled:opacity-50",
                                                     isSelected 
                                                         ? "bg-blue-950 text-white border-blue-950" 
                                                         : "bg-white border-gray-200 hover:border-blue-900 hover:text-blue-900 text-gray-600"
@@ -204,7 +204,7 @@ export function AITeamWizard({ onClose }: Props) {
                                     {m.allow_multiple && selectedOptions.length > 0 && (
                                         <button 
                                             onClick={() => sendMessage()}
-                                            className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 animate-in fade-in zoom-in-95"
+                                            className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-xs font-medium shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 animate-in fade-in zoom-in-95"
                                         >
                                             <CheckCircle2 className="w-3.5 h-3.5" />
                                             Valider la sélection
@@ -217,7 +217,7 @@ export function AITeamWizard({ onClose }: Props) {
                     {loading && (
                         <div className="flex items-center gap-2 text-primary font-bold animate-pulse">
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-[10px] uppercase tracking-widest">Analyse en cours...</span>
+                            <span className="text-[10px]">Analyse en cours...</span>
                         </div>
                     )}
 
@@ -226,7 +226,7 @@ export function AITeamWizard({ onClose }: Props) {
                         <div className="mt-8 animate-in slide-in-from-bottom-4 duration-500">
                             <div className="bg-white border-2 border-primary/20 rounded-none overflow-hidden shadow-xl">
                                 <div className="p-1 px-4 text-center" style={{ backgroundColor: plan.color }}>
-                                    <span className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Structure Proposée</span>
+                                    <span className="text-[10px] font-semibold text-white tracking-[0.3em]">Structure Proposée</span>
                                 </div>
                                 <div className="p-6">
                                     <div className="flex items-center gap-4 mb-6">
@@ -234,13 +234,13 @@ export function AITeamWizard({ onClose }: Props) {
                                             <Bot className="w-8 h-8" />
                                         </div>
                                         <div>
-                                            <h3 className="text-xl font-black text-gray-900">{plan.name}</h3>
+                                            <h3 className="text-xl font-semibold text-gray-900">{plan.name}</h3>
                                             <p className="text-sm text-gray-500">{plan.description}</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Membres de l'équipe ({plan.agents.length})</p>
+                                        <p className="text-[10px] font-semibold text-gray-400">Membres de l'équipe ({plan.agents.length})</p>
                                         <div className="grid grid-cols-1 gap-3">
                                             {plan.agents.map((a, idx) => (
                                                 <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-none border border-gray-100">
@@ -257,14 +257,14 @@ export function AITeamWizard({ onClose }: Props) {
                                     </div>
 
                                     <div className="mt-6 pt-6 border-t border-gray-100">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Flux de travail</p>
+                                        <p className="text-[10px] font-semibold text-gray-400 mb-4">Flux de travail</p>
                                         <div className="space-y-2">
                                             {plan.links.map((l, idx) => (
                                                 <div key={idx} className="flex items-center gap-2 text-[11px] font-medium text-gray-600">
                                                     <span className="font-bold text-primary">{plan.agents[l.from].name}</span>
                                                     <ArrowRight className="w-3 h-3 text-gray-300" />
                                                     <span className="font-bold text-primary">{plan.agents[l.to].name}</span>
-                                                    <span className="ml-auto px-2 py-0.5 bg-gray-100 rounded-full text-[9px] font-black uppercase text-gray-400">
+                                                    <span className="ml-auto px-2 py-0.5 bg-gray-100 rounded-full text-[9px] font-semibold text-gray-400">
                                                         {TRIGGER_LABELS[l.trigger] || l.trigger}
                                                     </span>
                                                 </div>
@@ -275,7 +275,7 @@ export function AITeamWizard({ onClose }: Props) {
                                     <Button 
                                         onClick={handleConfirm}
                                         disabled={creating}
-                                        className="w-full mt-8 h-14 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-50"
+                                        className="w-full mt-8 h-14 rounded-2xl bg-primary hover:bg-primary/90 text-white font-semibold text-sm flex items-center justify-center gap-3 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-50"
                                     >
                                         {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
                                         Déployer l'équipe maintenant
@@ -311,7 +311,7 @@ export function AITeamWizard({ onClose }: Props) {
                                 <Send className="w-5 h-5 -rotate-45" />
                             </button>
                         </div>
-                        <p className="mt-3 text-[10px] text-center text-gray-300 font-bold uppercase tracking-widest">
+                        <p className="mt-3 text-[10px] text-center text-gray-300 font-bold">
                             Shift + Entrée pour un saut de ligne
                         </p>
                     </div>

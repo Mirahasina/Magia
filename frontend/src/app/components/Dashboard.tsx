@@ -95,6 +95,18 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard, o
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (
+      params.get("view") === "integration" ||
+      params.get("facebook_callback") ||
+      params.get("gmail_connected") ||
+      params.get("gmail_error")
+    ) {
+      setActiveTab("Paramètres");
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isBackOfficeMode) {
       localStorage.setItem(StorageKeys.ACTIVE_TAB, activeTab);
     } else {

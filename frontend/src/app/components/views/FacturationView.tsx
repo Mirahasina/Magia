@@ -149,32 +149,32 @@ export function FacturationView({
         : "Sans engagement";
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 overflow-y-auto max-h-[calc(100vh-120px)] pr-2">
-            <div className="flex items-center justify-between shrink-0">
+        <div className="magia-page animate-in fade-in duration-500 overflow-y-auto max-h-[calc(100vh-120px)] pr-2">
+            <div className="magia-page-header shrink-0">
                 <div className="space-y-0.5">
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Facturation</h2>
-                    <p className="text-gray-500 text-xs font-medium">Gérez votre abonnement, vos moyens de paiement et vos factures.</p>
+                    <h1 className="magia-title">Facturation</h1>
+                    <p className="magia-subtitle">Gérez votre abonnement, vos moyens de paiement et vos factures.</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 shrink-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 magia-grid shrink-0">
                 {/* Card 1: Mon Abonnement */}
-                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[180px] hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div className="magia-card shadow-sm flex flex-col justify-between min-h-[140px] hover:shadow-md transition-all duration-300 relative overflow-hidden group">
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-indigo-600" />
 
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1.5">
                                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-400">PLAN ACTUEL</h3>
+                                <h3 className="magia-label">Plan actuel</h3>
                             </div>
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-black text-[9px] uppercase tracking-wider">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-semibold text-[9px]">
                                 {sub?.status === 'active' ? 'ACTIF' : sub?.status || 'ACTIF'}
                             </span>
                         </div>
 
                         <div>
-                            <div className="text-2xl font-black text-gray-900 tracking-tight uppercase font-serif">
+                            <div className="text-2xl font-semibold text-gray-900 tracking-tight">
                                 {planDisplay}
                             </div>
                             <p className="text-base font-bold text-blue-900 mt-1">
@@ -186,7 +186,7 @@ export function FacturationView({
                     <div className="mt-4 pt-3 border-t border-gray-50 space-y-2">
                         <div className="flex justify-between items-center text-[10px] font-medium text-gray-600">
                             <span>{sub?.plan_name === 'entreprise' ? 'Agents Illimités' : `${sub?.num_agents} Agents configurés`}</span>
-                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                            <span className="text-[9px] text-gray-400 font-bold">
                                 {isGratuit ? "Gratuit" : `Renouvellement`}
                             </span>
                         </div>
@@ -200,22 +200,22 @@ export function FacturationView({
                 </div>
 
                 {/* Card 2: Moyen de Paiement */}
-                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[180px] hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div className="magia-card shadow-sm flex flex-col justify-between min-h-[140px] hover:shadow-md transition-all duration-300 relative overflow-hidden group">
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
 
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-400">MOYEN DE PAIEMENT</h3>
+                            <h3 className="text-[10px] font-medium text-gray-400">MOYEN DE PAIEMENT</h3>
                             <CreditCard className="w-3.5 h-3.5 text-gray-400" />
                         </div>
 
                         <div className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-xl border border-gray-100/50">
-                            <div className="w-10 h-6 bg-slate-900 rounded flex items-center justify-center text-[8px] font-black italic text-white shadow-sm tracking-wider">
+                            <div className="w-10 h-6 bg-slate-900 rounded flex items-center justify-center text-[8px] font-semibold italic text-white shadow-sm tracking-wider">
                                 {sub?.card_brand?.toUpperCase() || "VISA"}
                             </div>
                             <div className="flex-1">
-                                <p className="text-xs font-black text-gray-800 tracking-tighter">•••• •••• •••• {sub?.card_last4 || "4242"}</p>
-                                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                                <p className="text-xs font-semibold text-gray-800 tracking-tighter">•••• •••• •••• {sub?.card_last4 || "4242"}</p>
+                                <p className="text-[8px] text-gray-400 font-bold mt-0.5">
                                     Expire le {sub?.card_exp_month || "12"}/{sub?.card_exp_year || "26"}
                                 </p>
                             </div>
@@ -223,11 +223,11 @@ export function FacturationView({
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
-                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Auto-débit</span>
+                        <span className="text-[9px] text-gray-400 font-bold">Auto-débit</span>
                         <Button
                             onClick={onUpdateCard}
                             variant="outline"
-                            className="h-7 px-3 border border-gray-200 hover:bg-gray-50 text-gray-800 font-black text-[9px] uppercase tracking-wider rounded-xl transition-all"
+                            className="h-7 px-3 border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold text-[9px] rounded-xl transition-all"
                         >
                             Modifier
                         </Button>
@@ -238,7 +238,7 @@ export function FacturationView({
                 <div
                     onClick={transactions.length > 0 ? handleDownloadFull : undefined}
                     className={cn(
-                        "bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[180px] hover:shadow-md transition-all duration-300 relative overflow-hidden group",
+                        "magia-card shadow-sm flex flex-col justify-between min-h-[140px] hover:shadow-md transition-all duration-300 relative overflow-hidden group",
                         transactions.length > 0 ? "cursor-pointer hover:border-blue-200" : "opacity-90"
                     )}
                 >
@@ -246,7 +246,7 @@ export function FacturationView({
 
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-[10px] font-black uppercase tracking-wider text-gray-400">FACTURES & EXPORTS</h3>
+                            <h3 className="text-[10px] font-medium text-gray-400">FACTURES & EXPORTS</h3>
                             <FileText className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600 transition-colors" />
                         </div>
 
@@ -261,11 +261,11 @@ export function FacturationView({
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
-                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider">
+                        <span className="text-[8px] text-gray-400 font-bold">
                             {transactions.length} TRANSACTION{transactions.length > 1 ? 'S' : ''}
                         </span>
                         {transactions.length > 0 && (
-                            <span className="text-[9px] text-blue-600 font-black uppercase tracking-wider group-hover:underline flex items-center gap-0.5">
+                            <span className="text-[9px] text-blue-600 font-medium group-hover:underline flex items-center gap-0.5">
                                 Télécharger <ArrowUpRight className="w-2.5 h-2.5" />
                             </span>
                         )}
@@ -277,25 +277,25 @@ export function FacturationView({
             {(isGratuit || isPro) && (
                 <div className="space-y-3 shrink-0">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <h3 className="text-xs font-medium text-gray-400">
                             Faire évoluer votre offre
                         </h3>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Pro Plan Card */}
-                        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[220px]">
+                        <div className="magia-card shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[160px]">
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-800 text-[9px] font-black uppercase tracking-wider rounded-md">
+                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-800 text-[9px] font-medium rounded-md">
                                         PLAN PRO
                                     </span>
                                     <Zap className="w-3.5 h-3.5 text-blue-600" />
                                 </div>
 
                                 <div className="flex items-baseline gap-1.5">
-                                    <span className="text-2xl font-serif font-black text-gray-900">145 000</span>
-                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Ar / mois</span>
+                                    <span className="text-2xl font-semibold text-gray-900">145 000</span>
+                                    <span className="text-[9px] font-bold text-gray-400">Ar / mois</span>
                                 </div>
 
                                 <div className="text-[10px] text-gray-500 font-medium space-y-1.5 border-t border-gray-50 pt-3">
@@ -317,7 +317,7 @@ export function FacturationView({
                             <div className="mt-4">
                                 <Button
                                     onClick={() => onUpgrade?.({ numAgents: 1, isAnnual: sub?.is_annual || false, totalPrice: 29, currentPlan: sub?.plan_name || 'gratuit', targetPlan: 'pro' })}
-                                    className="w-full h-9 bg-blue-900 hover:bg-blue-950 text-white font-black text-[9px] uppercase tracking-[0.2em] rounded-xl shadow-md border-none transition-all duration-300"
+                                    className="w-full h-9 bg-blue-900 hover:bg-blue-950 text-white font-semibold text-[9px] rounded-xl shadow-md border-none transition-all duration-300"
                                 >
                                     {isPro ? "Renouveler mon Plan Pro" : "Passer au Plan Pro"}
                                 </Button>
@@ -325,10 +325,10 @@ export function FacturationView({
                         </div>
 
                         {/* Enterprise Plan Card */}
-                        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[220px]">
+                        <div className="magia-card shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[160px]">
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="px-2 py-0.5 bg-purple-50 text-purple-800 text-[9px] font-black uppercase tracking-wider rounded-md">
+                                    <span className="px-2 py-0.5 bg-purple-50 text-purple-800 text-[9px] font-medium rounded-md">
                                         PLAN ENTREPRISE
                                     </span>
                                     <Zap className="w-3.5 h-3.5 text-purple-600 animate-pulse" />
@@ -336,11 +336,11 @@ export function FacturationView({
 
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-baseline gap-1.5">
-                                        <span className="text-2xl font-serif font-black text-gray-900">{agentsToBuy}</span>
-                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Agent{agentsToBuy > 1 ? 's' : ''}</span>
+                                        <span className="text-2xl font-semibold text-gray-900">{agentsToBuy}</span>
+                                        <span className="text-[9px] font-bold text-gray-400">Agent{agentsToBuy > 1 ? 's' : ''}</span>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-xs font-black text-blue-900 tracking-tight">
+                                        <p className="text-xs font-semibold text-blue-900 tracking-tight">
                                             {((99 + (agentsToBuy - 1) * 20) * 5000).toLocaleString('fr-FR')} Ar <span className="text-[8px] text-gray-400 font-normal">/m</span>
                                         </p>
                                         <p className="text-[8px] text-gray-400 font-medium">
@@ -384,7 +384,7 @@ export function FacturationView({
                             <div className="mt-4">
                                 <Button
                                     onClick={() => onUpgrade?.({ numAgents: agentsToBuy, isAnnual: sub?.is_annual || false, totalPrice: 99 + (agentsToBuy - 1) * 20, currentPlan: sub?.plan_name || 'gratuit', targetPlan: 'entreprise' })}
-                                    className="w-full h-9 bg-white border border-blue-900 text-blue-900 hover:bg-blue-50 font-black text-[9px] uppercase tracking-[0.2em] rounded-xl shadow-sm transition-all duration-300"
+                                    className="w-full h-9 bg-white border border-blue-900 text-blue-900 hover:bg-blue-50 font-semibold text-[9px] rounded-xl shadow-sm transition-all duration-300"
                                 >
                                     Passer au Plan Entreprise
                                 </Button>
@@ -397,24 +397,24 @@ export function FacturationView({
             {/* Transactions Section */}
             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm flex flex-col shrink-0">
                 <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Transactions Effectuées</h3>
+                    <h3 className="text-xs font-medium text-gray-400">Transactions Effectuées</h3>
                     <Receipt className="w-3.5 h-3.5 text-gray-300" />
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-gray-100 bg-gray-50/30">
-                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">N° Facture</th>
-                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Description</th>
-                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Statut</th>
-                                <th className="px-6 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Montant</th>
+                                <th className="px-6 py-3 text-[9px] font-semibold text-gray-400">Date</th>
+                                <th className="px-6 py-3 text-[9px] font-semibold text-gray-400">N° Facture</th>
+                                <th className="px-6 py-3 text-[9px] font-semibold text-gray-400">Description</th>
+                                <th className="px-6 py-3 text-[9px] font-semibold text-gray-400">Statut</th>
+                                <th className="px-6 py-3 text-[9px] font-semibold text-gray-400 text-right">Montant</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {transactions.length > 0 ? transactions.map(tx => (
                                 <tr key={tx.id} className="hover:bg-gray-50/50 transition-colors group">
-                                    <td className="px-6 py-4 text-[10px] font-bold text-gray-900 uppercase">
+                                    <td className="px-6 py-4 text-[10px] font-bold text-gray-900">
                                         {new Date(tx.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </td>
                                     <td className="px-6 py-4 text-[10px] text-gray-400 font-mono font-bold">
@@ -422,17 +422,17 @@ export function FacturationView({
                                     </td>
                                     <td className="px-6 py-4 text-[10px] text-gray-900 font-medium">
                                         Abonnement MAGIA {sub?.plan_name?.toUpperCase() || ''}
-                                        <span className="block text-[8px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Via {tx.gateway.toUpperCase()}</span>
+                                        <span className="block text-[8px] text-gray-400 font-bold mt-0.5">Via {tx.gateway.toUpperCase()}</span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className={cn(
-                                            "inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter",
+                                            "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
                                             tx.status === 'completed' ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
                                         )}>
                                             {tx.status === 'completed' ? 'Payé' : tx.status}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-[10px] text-gray-900 font-black text-right">
+                                    <td className="px-6 py-4 text-[10px] text-gray-900 font-semibold text-right">
                                         <div className="flex items-center justify-end gap-3">
                                             <span>{parseFloat(tx.amount).toLocaleString('fr-FR')} {tx.currency === 'EUR' ? '€' : tx.currency}</span>
                                             <button
@@ -446,7 +446,7 @@ export function FacturationView({
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                    <td colSpan={5} className="px-6 py-8 text-center text-[10px] text-gray-400 font-bold">
                                         Aucune transaction pour le moment
                                     </td>
                                 </tr>

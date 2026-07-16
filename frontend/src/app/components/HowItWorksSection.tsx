@@ -4,7 +4,7 @@ const steps = [
   {
     number: "01",
     title: "Créez votre compte",
-    description: "Email ou Google OAuth. Sélectionnez votre vertical principal — MAGIA Sales pour commencer.",
+    description: "Email ou Google OAuth. Sélectionnez votre vertical principal - MAGIA Sales pour commencer.",
     time: "30 secondes"
   },
   {

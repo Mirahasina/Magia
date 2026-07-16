@@ -507,7 +507,7 @@ class NotificationListView(APIView):
 
 
 class PlanLimitsView(APIView):
-    """GET /api/auth/plan-limits/ — retourne les limites du plan actuel et l'usage."""
+    """GET /api/auth/plan-limits/ - retourne les limites du plan actuel et l'usage."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -550,7 +550,7 @@ class PlanLimitsView(APIView):
 
 
 class InviteMemberView(APIView):
-    """POST /api/auth/invite/ — envoyer une invitation."""
+    """POST /api/auth/invite/ - envoyer une invitation."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -685,7 +685,7 @@ class AcceptInvitationView(APIView):
 
 
 class WorkspaceMembersView(APIView):
-    """GET/DELETE /api/auth/members/ — gérer les membres du workspace."""
+    """GET/DELETE /api/auth/members/ - gérer les membres du workspace."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -741,7 +741,7 @@ class WorkspaceMembersView(APIView):
 
 
 class UserSurveyView(APIView):
-    """POST /api/auth/survey/ — soumettre un score NPS."""
+    """POST /api/auth/survey/ - soumettre un score NPS."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

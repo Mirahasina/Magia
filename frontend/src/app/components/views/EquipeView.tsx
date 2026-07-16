@@ -4,6 +4,8 @@ import { useAgents } from "../../hooks/useAgents";
 import { Users, Link as LinkIcon, Plus, Trash2, ArrowRight, Info, Sparkles, ChevronRight, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { AITeamWizard } from "./AITeamWizard";
+import { ModalShell } from "../shared/ModalShell";
+import { EmptyState } from "../shared/EmptyState";
 
 // ── Predefined team templates ─────────────────────────────────────────────────
 const TEAM_TEMPLATES = [
@@ -178,13 +180,13 @@ export function EquipeView() {
     };
 
     return (
-        <div className="h-full flex flex-col space-y-8 animate-page-fade overflow-hidden">
+        <div className="h-full flex flex-col magia-page animate-page-fade overflow-hidden">
             {showWizard && <AITeamWizard onClose={() => { setShowWizard(false); fetchAgents(); }} />}
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-shrink-0">
                 <div className="space-y-1">
-                    <h1 className="magia-h1 text-2xl sm:text-3xl">Gestion d'équipe</h1>
-                    <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-gray-400 max-w-md">
+                    <h1 className="magia-title">Gestion d'équipe</h1>
+                    <p className="magia-subtitle max-w-md">
                         Organisez vos agents et créez des flux de travail automatisés
                     </p>
                 </div>
@@ -192,13 +194,13 @@ export function EquipeView() {
                     <Button
                         onClick={() => setShowWizard(true)}
                         variant="outline"
-                        className="flex-1 sm:flex-none border-blue-200 text-blue-900 hover:bg-blue-50 text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-4 sm:px-5 py-2.5 h-auto flex items-center justify-center gap-2 rounded-xl"
+                        className="flex-1 sm:flex-none border-blue-200 text-blue-900 hover:bg-blue-50 magia-button px-4 sm:px-5 py-2.5 h-auto flex items-center justify-center gap-2 rounded-xl"
                     >
                         <Sparkles className="w-3.5 h-3.5" /> CRÉER AVEC IA
                     </Button>
                     <Button
                         onClick={() => setIsCreatingTeam(true)}
-                        className="flex-1 sm:flex-none bg-blue-900 text-white hover:bg-blue-800 text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-4 sm:px-6 py-2.5 h-auto flex items-center justify-center whitespace-nowrap rounded-xl"
+                        className="flex-1 sm:flex-none bg-blue-900 text-white hover:bg-blue-800 magia-button px-4 sm:px-6 py-2.5 h-auto flex items-center justify-center whitespace-nowrap rounded-xl"
                     >
                         <Plus className="w-4 h-4 mr-2" /> CRÉER ÉQUIPE
                     </Button>
@@ -207,12 +209,35 @@ export function EquipeView() {
 
             {/* Teams Grid - Scrollable area for content */}
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-12">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
+                {teams.length === 0 && (
+                    <div className="bg-white border border-gray-100 rounded-2xl">
+                        <EmptyState
+                            icon={Users}
+                            title="Aucune équipe pour le moment"
+                            description="Créez votre première équipe d'agents IA : à la main, depuis un modèle prédéfini ou avec l'assistant IA."
+                        >
+                            <Button
+                                onClick={() => setIsCreatingTeam(true)}
+                                className="bg-blue-900 text-white hover:bg-blue-800 text-xs font-medium px-6 py-2.5 h-auto rounded-xl"
+                            >
+                                <Plus className="w-4 h-4 mr-2" /> CRÉER ÉQUIPE
+                            </Button>
+                            <Button
+                                onClick={() => setShowWizard(true)}
+                                variant="outline"
+                                className="border-blue-200 text-blue-900 hover:bg-blue-50 text-xs font-medium px-5 py-2.5 h-auto rounded-xl"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 mr-2" /> CRÉER AVEC IA
+                            </Button>
+                        </EmptyState>
+                    </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 magia-grid auto-rows-min">
                 {teams.map(team => (
                     <div
                         key={team.id}
                         onClick={() => setSelectedTeamForDetails(team)}
-                        className="bg-white p-6 rounded-2xl border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all relative group overflow-hidden cursor-pointer"
+                        className="magia-card shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all relative group overflow-hidden cursor-pointer"
                         style={{ borderLeft: `6px solid ${team.color || '#1e3a8a'}` }}
                     >
                         <div className="flex items-center gap-4 mb-4">
@@ -226,7 +251,7 @@ export function EquipeView() {
                                     <Users className="w-5 h-5" />
                                 )}
                             </div>
-                            <h3 className="text-[13px] font-black uppercase tracking-widest text-gray-900">{team.name}</h3>
+                            <h3 className="text-[13px] font-medium text-gray-900">{team.name}</h3>
                         </div>
                         <div className="flex flex-col gap-4">
                             {team.description && (
@@ -236,13 +261,13 @@ export function EquipeView() {
                             )}
                             <div className="space-y-2 border-t border-gray-50 pt-4">
                                 <div className="flex items-center justify-between mb-2">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Composition de l'unité :</p>
+                                    <p className="text-[9px] font-semibold text-gray-400">Composition de l'unité :</p>
                                     <div className="flex items-center gap-1.5">
                                         {agents.some(a => a.team === team.id && (a.channels || []).some((c: string) => String(c).toLowerCase() === 'email')) && (
-                                            <span className="w-3.5 h-3.5 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-[7px] font-black border border-blue-100" title="Email actif">E</span>
+                                            <span className="w-3.5 h-3.5 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-[7px] font-semibold border border-blue-100" title="Email actif">E</span>
                                         )}
                                         {agents.some(a => a.team === team.id && (a.channels || []).some((c: string) => String(c).toLowerCase() === 'whatsapp')) && (
-                                            <span className="w-3.5 h-3.5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-[7px] font-black border border-green-100" title="WhatsApp actif">W</span>
+                                            <span className="w-3.5 h-3.5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-[7px] font-semibold border border-green-100" title="WhatsApp actif">W</span>
                                         )}
                                     </div>
                                 </div>
@@ -250,17 +275,17 @@ export function EquipeView() {
                                     <div key={agent.id} className="flex items-start gap-2 group/item">
                                         <div className="w-1 h-4 mt-0.5 rounded-none" style={{ backgroundColor: team.color || '#1e3a8a' }} />
                                         <div className="flex-1">
-                                            <p className="text-[11px] font-black text-gray-900 uppercase tracking-tight">{agent.name}</p>
-                                            <p className="text-[9px] text-gray-400 font-bold uppercase">{agent.role}</p>
+                                            <p className="text-[11px] font-semibold text-gray-900">{agent.name}</p>
+                                            <p className="text-[9px] text-gray-400 font-bold">{agent.role}</p>
                                         </div>
                                     </div>
                                 ))}
                                 {agents.filter(a => a.team === team.id).length === 0 && (
-                                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest italic">Aucun agent assigné</span>
+                                    <span className="text-[9px] font-semibold text-gray-300 italic">Aucun agent assigné</span>
                                 )}
                             </div>
                             <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                <p className="text-[10px] font-bold text-gray-400">
                                     {agents.filter(a => a.team === team.id).length} AGENT{agents.filter(a => a.team === team.id).length > 1 ? 'S' : ''}
                                 </p>
                                 <button
@@ -269,7 +294,7 @@ export function EquipeView() {
                                         setSelectedTeamForNewAgent(team.id);
                                         setIsCreatingAgent(true);
                                     }}
-                                    className="text-[9px] font-black uppercase tracking-widest text-blue-900 hover:underline flex items-center gap-1"
+                                    className="text-xs font-medium text-blue-900 hover:underline flex items-center gap-1"
                                 >
                                     <Plus className="w-3 h-3" /> AJOUTER AGENT
                                 </button>
@@ -280,7 +305,8 @@ export function EquipeView() {
                                 e.stopPropagation();
                                 deleteTeam(team.id);
                             }}
-                            className="absolute top-4 right-4 p-2 text-gray-200 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                            aria-label={`Supprimer l'équipe ${team.name}`}
+                            className="absolute top-4 right-4 p-2 text-gray-200 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 rounded-lg"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -292,12 +318,12 @@ export function EquipeView() {
                 <div className="flex items-center justify-between border-b border-gray-50 pb-4">
                     <div className="flex items-center gap-3">
                         <LinkIcon className="w-5 h-5 text-blue-900" />
-                        <h2 className="text-[14px] font-black uppercase tracking-widest text-gray-900">Liaisons & Passages de témoin</h2>
+                        <h2 className="text-[14px] font-medium text-gray-900">Liaisons & Passages de témoin</h2>
                     </div>
                     <Button
                         onClick={() => setIsCreatingLink(true)}
                         variant="outline"
-                        className="text-[9px] font-black uppercase tracking-widest border-gray-200"
+                        className="text-xs font-medium border-gray-200"
                     >
                         <Plus className="w-3 h-3 mr-2" /> AJOUTER LIAISON
                     </Button>
@@ -308,13 +334,13 @@ export function EquipeView() {
                         <div key={link.id} className="bg-gray-50/50 p-6 rounded-none border border-gray-100 flex items-center justify-between group">
                             <div className="flex items-center gap-8">
                                 <div className="flex flex-col">
-                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">DE :</span>
-                                    <span className="text-[12px] font-black text-gray-900 uppercase tracking-widest">{link.source_agent_name}</span>
-                                    <span className="text-[8px] font-bold text-blue-600 uppercase tracking-widest">{agents.find(a => a.id === link.source_agent)?.role}</span>
+                                    <span className="text-[9px] font-semibold text-gray-400 mb-1">DE :</span>
+                                    <span className="text-[12px] font-semibold text-gray-900">{link.source_agent_name}</span>
+                                    <span className="text-[8px] font-bold text-blue-600">{agents.find(a => a.id === link.source_agent)?.role}</span>
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <div className={cn(
-                                        "px-3 py-1 rounded-none text-[9px] font-black uppercase tracking-widest mb-2 border",
+                                        "px-3 py-1 rounded-lg text-xs font-medium mb-2 border",
                                         link.trigger_type === 'manual'
                                             ? "bg-amber-100 text-amber-700 border-amber-200 ring-4 ring-amber-50"
                                             : "bg-blue-100 text-blue-700 border-blue-200"
@@ -324,9 +350,9 @@ export function EquipeView() {
                                     <ArrowRight className="w-4 h-4 text-gray-300 transition-transform group-hover:translate-x-1" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">VERS :</span>
-                                    <span className="text-[12px] font-black text-gray-900 uppercase tracking-widest">{link.target_agent_name}</span>
-                                    <span className="text-[8px] font-bold text-blue-600 uppercase tracking-widest">{agents.find(a => a.id === link.target_agent)?.role}</span>
+                                    <span className="text-[9px] font-semibold text-gray-400 mb-1">VERS :</span>
+                                    <span className="text-[12px] font-semibold text-gray-900">{link.target_agent_name}</span>
+                                    <span className="text-[8px] font-bold text-blue-600">{agents.find(a => a.id === link.target_agent)?.role}</span>
                                 </div>
                                 {link.description && (
                                     <div className="max-w-[200px] border-l border-gray-200 pl-4 py-1">
@@ -345,7 +371,7 @@ export function EquipeView() {
                     {links.length === 0 && (
                         <div className="py-12 text-center bg-gray-50/30 rounded-none border border-dashed border-gray-100">
                             <Info className="w-8 h-8 text-gray-200 mx-auto mb-4" />
-                            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Aucune liaison configurée</p>
+                            <p className="text-[11px] font-semibold text-gray-400">Aucune liaison configurée</p>
                         </div>
                     )}
                 </div>
@@ -355,12 +381,13 @@ export function EquipeView() {
 
             {/* ── Modal: Team Details ────────────────────────────────────────────── */}
             {selectedTeamForDetails && (
-                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 flex flex-col max-h-[90vh]">
+                <ModalShell title={`Détails de l'équipe ${selectedTeamForDetails.name}`} onClose={() => setSelectedTeamForDetails(null)} className="max-w-2xl">
+                    <div className="bg-white w-full rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="relative h-32 flex-shrink-0" style={{ backgroundColor: selectedTeamForDetails.color || '#1e3a8a' }}>
                             <button 
                                 onClick={() => setSelectedTeamForDetails(null)}
-                                className="absolute top-6 right-6 p-2 bg-white/20 hover:bg-white/40 rounded-full transition-colors text-white"
+                                aria-label="Fermer"
+                                className="absolute top-6 right-6 p-2 bg-white/20 hover:bg-white/40 rounded-full transition-colors text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -378,11 +405,11 @@ export function EquipeView() {
                         <div className="pt-12 px-10 pb-10 overflow-y-auto custom-scrollbar">
                             <div className="flex items-center justify-between mb-6">
                                 <div>
-                                    <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">{selectedTeamForDetails.name}</h2>
-                                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Unité Opérationnelle</p>
+                                    <h2 className="text-2xl font-semibold text-gray-900">{selectedTeamForDetails.name}</h2>
+                                    <p className="text-sm text-gray-500 mt-1">Unité Opérationnelle</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="px-4 py-1.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-gray-200">
+                                    <span className="px-4 py-1.5 bg-gray-100 text-gray-500 rounded-full text-xs font-medium border border-gray-200">
                                         {agents.filter(a => a.team === selectedTeamForDetails.id).length} AGENTS
                                     </span>
                                 </div>
@@ -390,7 +417,7 @@ export function EquipeView() {
 
                             <div className="space-y-8">
                                 <div className="space-y-3">
-                                    <h4 className="text-[10px] font-black text-blue-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <h4 className="text-[10px] font-semibold text-blue-900 flex items-center gap-2">
                                         <Info className="w-3.5 h-3.5" /> Mission & Objectifs
                                     </h4>
                                     <p className="text-sm text-gray-600 leading-relaxed bg-gray-50/50 p-5 rounded-2xl border border-gray-100 italic">
@@ -399,23 +426,23 @@ export function EquipeView() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <h4 className="text-[10px] font-black text-blue-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <h4 className="text-[10px] font-semibold text-blue-900 flex items-center gap-2">
                                         <Sparkles className="w-3.5 h-3.5" /> Membres de l'unité
                                     </h4>
                                     <div className="grid grid-cols-1 gap-3">
                                         {agents.filter(a => a.team === selectedTeamForDetails.id).map(agent => (
                                             <div key={agent.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 transition-all group">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center font-black text-gray-400">
+                                                    <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center font-semibold text-gray-400">
                                                         {agent.name.charAt(0)}
                                                     </div>
                                                     <div>
-                                                        <p className="text-[12px] font-black text-gray-900 uppercase tracking-tight">{agent.name}</p>
-                                                        <p className="text-[10px] text-gray-400 font-bold uppercase">{agent.role}</p>
+                                                        <p className="text-[12px] font-semibold text-gray-900">{agent.name}</p>
+                                                        <p className="text-[10px] text-gray-400 font-bold">{agent.role}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button className="text-[10px] font-black text-blue-900 uppercase tracking-widest px-3 py-1 hover:bg-blue-50 rounded-lg">Gérer</button>
+                                                    <button className="text-[10px] font-semibold text-blue-900 px-3 py-1 hover:bg-blue-50 rounded-lg">Gérer</button>
                                                 </div>
                                             </div>
                                         ))}
@@ -428,12 +455,12 @@ export function EquipeView() {
                             <Button 
                                 onClick={() => setSelectedTeamForDetails(null)}
                                 variant="outline" 
-                                className="flex-1 rounded-xl h-12 text-[11px] font-black uppercase tracking-widest"
+                                className="flex-1 rounded-xl h-12 text-sm font-medium"
                             >
                                 Fermer
                             </Button>
                             <Button 
-                                className="flex-1 bg-blue-950 hover:bg-black rounded-xl h-12 text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20"
+                                className="flex-1 bg-blue-950 hover:bg-black rounded-xl h-12 text-sm font-medium shadow-lg shadow-blue-900/20"
                                 onClick={() => {
                                     setSelectedTeamForNewAgent(selectedTeamForDetails.id);
                                     setIsCreatingAgent(true);
@@ -444,18 +471,18 @@ export function EquipeView() {
                             </Button>
                         </div>
                     </div>
-                </div>
+                </ModalShell>
             )}
 
             {isCreatingTeam && (
-                <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl p-8 space-y-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <ModalShell title="Nouvelle équipe" onClose={resetTeamModal} className="max-w-xl">
+                    <div className="bg-white w-full rounded-[2.5rem] shadow-2xl p-8 space-y-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-[16px] font-black uppercase tracking-widest text-gray-900">Nouvelle Équipe</h2>
+                            <h2 className="text-[16px] font-medium text-gray-900">Nouvelle Équipe</h2>
                             {selectedTemplate && (
                                 <button
                                     onClick={() => { setSelectedTemplate(null); setTemplateAgents([]); setTemplateLinks([]); }}
-                                    className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-700"
+                                    className="text-[9px] font-semibold text-gray-400 hover:text-gray-700"
                                 >
                                     ← Changer de modèle
                                 </button>
@@ -464,7 +491,7 @@ export function EquipeView() {
 
                         {!selectedTemplate && (
                             <div className="space-y-3">
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <p className="text-[10px] font-semibold text-gray-400 flex items-center gap-2">
                                     <Sparkles className="w-3 h-3" /> Démarrer depuis un modèle prédéfini
                                 </p>
                                 <div className="grid grid-cols-1 gap-3">
@@ -475,11 +502,11 @@ export function EquipeView() {
                                             className="w-full text-left p-4 rounded-none border border-gray-100 bg-gray-50 hover:border-blue-900/30 hover:bg-blue-50/30 transition-all group flex items-start gap-4"
                                         >
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-[12px] font-black text-gray-900 uppercase tracking-widest">{tpl.label}</p>
+                                                <p className="text-[12px] font-semibold text-gray-900">{tpl.label}</p>
                                                 <p className="text-[10px] text-gray-500 mt-1 leading-snug">{tpl.description}</p>
                                                 <div className="flex flex-wrap gap-1 mt-2">
                                                     {tpl.agents.map(a => (
-                                                        <span key={a.name} className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-[9px] font-black text-gray-500 uppercase tracking-widest">{a.name}</span>
+                                                        <span key={a.name} className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-[9px] font-semibold text-gray-500">{a.name}</span>
                                                     ))}
                                                 </div>
                                             </div>
@@ -491,7 +518,7 @@ export function EquipeView() {
                                         className="w-full text-left p-4 rounded-none border border-dashed border-gray-200 hover:border-gray-400 transition-all flex items-center gap-4 text-gray-400 hover:text-gray-700"
                                     >
                                         <Plus className="w-5 h-5" />
-                                        <span className="text-[11px] font-black uppercase tracking-widest">Créer depuis zéro</span>
+                                        <span className="text-sm font-medium">Créer depuis zéro</span>
                                     </button>
                                 </div>
                             </div>
@@ -501,13 +528,13 @@ export function EquipeView() {
                             <>
                                 {selectedTemplate !== "blank" && templateAgents.length > 0 && (
                                     <div className="bg-blue-50 rounded-none p-4 space-y-3 border border-blue-100">
-                                        <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
+                                        <p className="text-[9px] font-semibold text-blue-700 flex items-center gap-1.5">
                                             <Sparkles className="w-3 h-3" /> Ce modèle créera automatiquement :
                                         </p>
                                         <div className="space-y-1.5">
                                             {templateAgents.map((a, i) => (
                                                 <div key={i} className="flex items-center gap-3 bg-white/50 p-2 rounded-xl border border-blue-100/50">
-                                                    <span className="w-6 h-6 rounded-lg bg-blue-900 text-white text-[9px] font-black flex items-center justify-center shadow-md">{i + 1}</span>
+                                                    <span className="w-6 h-6 rounded-lg bg-blue-900 text-white text-[9px] font-semibold flex items-center justify-center shadow-md">{i + 1}</span>
                                                     <div className="flex-1">
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-[11px] font-bold text-gray-700">{a.name}</span>
@@ -517,13 +544,13 @@ export function EquipeView() {
                                                                 className="px-2 py-1 bg-white border border-blue-200 rounded-lg text-[10px] font-bold outline-none w-24 focus:border-blue-900"
                                                             />
                                                         </div>
-                                                        <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">{a.role}</p>
+                                                        <p className="text-[9px] text-gray-400 font-bold mt-0.5">{a.role}</p>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
                                         <div className="pt-2 border-t border-blue-100 space-y-1">
-                                            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">
+                                            <p className="text-[9px] font-semibold text-blue-600">
                                                 {templateLinks.length} liaison{templateLinks.length > 1 ? "s" : ""} automatique{templateLinks.length > 1 ? "s" : ""}
                                             </p>
                                             {templateLinks.map((l, i) => (
@@ -545,7 +572,7 @@ export function EquipeView() {
                                     placeholder="NOM DE L'ÉQUIPE..."
                                     value={newTeamName}
                                     onChange={e => setNewTeamName(e.target.value)}
-                                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-xl text-[12px] font-bold focus:outline-none focus:border-blue-900/50 placeholder:text-gray-300 uppercase tracking-[0.2em] transition-all"
+                                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-xl text-[12px] font-bold focus:outline-none focus:border-blue-900/50 placeholder:text-gray-300 transition-all"
                                     onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
                                 />
                                 <input
@@ -553,7 +580,7 @@ export function EquipeView() {
                                     placeholder="URL DE L'AVATAR (OPTIONNEL)..."
                                     value={newTeamAvatar}
                                     onChange={e => setNewTeamAvatar(e.target.value)}
-                                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-xl text-[12px] font-bold focus:outline-none focus:border-blue-900/50 placeholder:text-gray-300 uppercase tracking-[0.2em] transition-all"
+                                    className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-xl text-[12px] font-bold focus:outline-none focus:border-blue-900/50 placeholder:text-gray-300 transition-all"
                                 />
                                 <textarea
                                     placeholder="OBJECTIFS ET TÂCHES DE L'ÉQUIPE (QUI FAIT QUOI ?)..."
@@ -562,7 +589,7 @@ export function EquipeView() {
                                     className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-xl text-[12px] font-medium focus:outline-none focus:border-blue-900/50 placeholder:text-gray-300 min-h-[100px] transition-all"
                                 />
                                 <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Couleur d'identité</label>
+                                    <label className="text-[10px] font-semibold text-gray-400">Couleur d'identité</label>
                                     <div className="flex flex-wrap gap-2">
                                         {colors.map(c => (
                                             <button
@@ -579,22 +606,22 @@ export function EquipeView() {
                                     </div>
                                 </div>
                                 <div className="flex gap-3 pt-2">
-                                    <Button variant="ghost" onClick={resetTeamModal} className="flex-1 text-[10px] font-black uppercase tracking-widest">Annuler</Button>
-                                    <Button onClick={handleCreateTeam} className="flex-1 bg-blue-900 text-white text-[10px] font-black uppercase tracking-widest py-3 h-auto">
+                                    <Button variant="ghost" onClick={resetTeamModal} className="flex-1 text-xs font-medium">Annuler</Button>
+                                    <Button onClick={handleCreateTeam} className="flex-1 bg-blue-900 text-white text-xs font-medium py-3 h-auto">
                                         {templateAgents.length > 0 ? `Créer l'équipe + ${templateAgents.length} agents` : "Valider l'Équipe"}
                                     </Button>
                                 </div>
                             </>
                         )}
                     </div>
-                </div>
+                </ModalShell>
             )}
 
             {/* ── Modal: New Agent ────────────────────────────────────────────── */}
             {isCreatingAgent && (
-                <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 space-y-6 animate-in zoom-in-95 duration-200">
-                        <h2 className="text-[16px] font-black uppercase tracking-[0.2em] text-blue-900 text-center">Nouveau Spécialiste</h2>
+                <ModalShell title="Nouveau Spécialiste" onClose={() => setIsCreatingAgent(false)}>
+                    <div className="bg-white w-full rounded-[2.5rem] shadow-2xl p-8 space-y-6">
+                        <h2 className="text-base font-semibold text-blue-900 text-center">Nouveau Spécialiste</h2>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -640,24 +667,24 @@ export function EquipeView() {
                         </div>
 
                         <div className="flex gap-3 pt-4">
-                            <Button variant="ghost" onClick={() => setIsCreatingAgent(false)} className="flex-1 text-[10px] font-black uppercase tracking-widest">Annuler</Button>
-                            <Button onClick={handleCreateAgent} className="flex-1 bg-blue-900 text-white text-[10px] font-black uppercase tracking-widest py-3 h-auto">Créer l'unité</Button>
+                            <Button variant="ghost" onClick={() => setIsCreatingAgent(false)} className="flex-1 text-xs font-medium">Annuler</Button>
+                            <Button onClick={handleCreateAgent} className="flex-1 bg-blue-900 text-white text-xs font-medium py-3 h-auto">Créer l'unité</Button>
                         </div>
                     </div>
-                </div>
+                </ModalShell>
             )}
 
             {/* ── Modal: New Link ─────────────────────────────────────────────── */}
             {isCreatingLink && (
-                <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 space-y-6 animate-in zoom-in-95 duration-200">
-                        <h2 className="text-[16px] font-black uppercase tracking-[0.2em] text-blue-950 text-center">Créer une liaison</h2>
+                <ModalShell title="Créer une liaison" onClose={() => setIsCreatingLink(false)}>
+                    <div className="bg-white w-full rounded-[2.5rem] shadow-2xl p-8 space-y-6">
+                        <h2 className="text-[16px] font-medium text-blue-950 text-center">Créer une liaison</h2>
 
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <label className="magia-label">Agent Source</label>
                                 <select
-                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-blue-900"
+                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:outline-none focus:border-blue-900"
                                     value={newLink.source_agent}
                                     onChange={e => {
                                         const agentId = e.target.value;
@@ -677,7 +704,7 @@ export function EquipeView() {
                                 <label className="magia-label">Agent Cible</label>
                                 <select
                                     disabled={!newLink.source_agent}
-                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-blue-900 disabled:opacity-50"
+                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:outline-none focus:border-blue-900 disabled:opacity-50"
                                     value={newLink.target_agent}
                                     onChange={e => setNewLink({ ...newLink, target_agent: e.target.value })}
                                 >
@@ -695,7 +722,7 @@ export function EquipeView() {
                             <div className="space-y-2">
                                 <label className="magia-label">Déclencheur (Trigger)</label>
                                 <select
-                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-blue-900"
+                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:outline-none focus:border-blue-900"
                                     value={newLink.trigger_type}
                                     onChange={e => setNewLink({ ...newLink, trigger_type: e.target.value })}
                                 >
@@ -717,17 +744,17 @@ export function EquipeView() {
                         </div>
 
                         <div className="flex gap-3 pt-4">
-                            <Button variant="ghost" onClick={() => setIsCreatingLink(false)} className="flex-1 text-[10px] font-black uppercase tracking-widest">Annuler</Button>
+                            <Button variant="ghost" onClick={() => setIsCreatingLink(false)} className="flex-1 text-xs font-medium">Annuler</Button>
                             <Button
                                 onClick={handleCreateLink}
                                 disabled={!newLink.source_agent || !newLink.target_agent}
-                                className="flex-1 bg-blue-900 text-white text-[10px] font-black uppercase tracking-widest py-3 h-auto"
+                                className="flex-1 bg-blue-900 text-white text-xs font-medium py-3 h-auto"
                             >
                                 Finaliser la liaison
                             </Button>
                         </div>
                     </div>
-                </div>
+                </ModalShell>
             )}
         </div>
     );
