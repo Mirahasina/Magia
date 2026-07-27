@@ -34,17 +34,27 @@ def create_admin(email, password, first_name="Admin"):
     user.save()
     print(f"Admin user {email} created successfully (and email verified).")
 
+def auto_from_env():
+    email = os.environ.get('ADMIN_INITIAL_EMAIL') or os.environ.get('ADMIN_PROMOTE_EMAIL')
+    password = os.environ.get('ADMIN_INITIAL_PASSWORD', 'Admin123!')
+    if email:
+        if User.objects.filter(email=email).exists():
+            promote_to_staff(email)
+        else:
+            create_admin(email, password)
+    else:
+        print("No ADMIN_INITIAL_EMAIL or ADMIN_PROMOTE_EMAIL env var found. Skipping auto admin creation.")
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage:")
-        print("  python manage_admins.py promote <email>")
-        print("  python manage_admins.py create <email> <password>")
-        sys.exit(1)
-    
-    command = sys.argv[1]
-    if command == "promote" and len(sys.argv) == 3:
-        promote_to_staff(sys.argv[2])
-    elif command == "create" and len(sys.argv) == 4:
-        create_admin(sys.argv[2], sys.argv[3])
+        auto_from_env()
     else:
-        print("Invalid arguments.")
+        command = sys.argv[1]
+        if command == "auto":
+            auto_from_env()
+        elif command == "promote" and len(sys.argv) == 3:
+            promote_to_staff(sys.argv[2])
+        elif command == "create" and len(sys.argv) == 4:
+            create_admin(sys.argv[2], sys.argv[3])
+        else:
+            print("Invalid arguments.")
