@@ -23,13 +23,15 @@ STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 
 
-# ALLOWED_HOSTS - Railway domains are included by default so no env var is needed
+# ALLOWED_HOSTS - Railway & Render domains are included by default so no env var is needed
 _default_hosts = [
     'localhost',
     '127.0.0.1',
     '.up.railway.app',
     '.railway.app',
     'healthcheck.railway.app',
+    '.onrender.com',
+    '.render.com',
     # Local tunnels for Meta/Google webhook callbacks
     '.ngrok-free.dev',
     '.ngrok-free.app',
@@ -131,20 +133,31 @@ SIMPLE_JWT = {
 }
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
+_default_cors = [
+    'https://app.magia.ai',
+    'https://magia-ruddy.vercel.app',
+]
 if DJANGO_ENV == 'production':
-    CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['https://app.magia.ai'])
+    CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=_default_cors)
     CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=CORS_ALLOWED_ORIGINS)
 else:
     CORS_ALLOWED_ORIGINS = [
         'http://localhost:5173',
         'http://localhost:3000',
         'http://127.0.0.1:5173',
+        'https://magia-ruddy.vercel.app',
     ]
     CSRF_TRUSTED_ORIGINS = [
         'http://localhost:5173',
         'http://localhost:3000',
         'http://127.0.0.1:5173',
+        'https://magia-ruddy.vercel.app',
     ]
+
+# Permit all Vercel deployment origins matching .vercel.app
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https:\/\/.*\.vercel\.app$",
+]
 
 # Strip trailing slashes from origins (common misconfiguration)
 CORS_ALLOWED_ORIGINS = [o.rstrip('/') for o in CORS_ALLOWED_ORIGINS]
