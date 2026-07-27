@@ -1758,14 +1758,13 @@ class AgentViewSet(viewsets.ModelViewSet):
                     f"Limite atteinte : votre abonnement {plan} personnalisé permet {max_agents} agent(s) maximum. "
                     f"Veuillez passer au niveau supérieur pour créer davantage d'agents."
                 )
-        agent = serializer.save(user=self.request.user)
-        if agent.is_team_agent:
-            if not agent.channels:
-                agent.channels = infer_channels_for_team_agent(
-                    agent.name, agent.role, agent.system_prompt
-                )
-                agent.save(update_fields=['channels'])
-            attach_user_channel_configs(agent, self.request.user)
+        agent = serializer.save(user=self.request.user, is_deployed=True, is_active=True)
+        if not agent.channels:
+            agent.channels = infer_channels_for_team_agent(
+                agent.name, agent.role, agent.system_prompt
+            )
+            agent.save(update_fields=['channels'])
+        attach_user_channel_configs(agent, self.request.user)
 
     @action(detail=False, methods=['get'])
     def dashboard_stats(self, request):
@@ -1789,7 +1788,7 @@ class AgentViewSet(viewsets.ModelViewSet):
         time_saved_str = f"{hours_saved}h" if hours_saved > 0 else f"{total_minutes_saved}m"
 
         economy = hours_saved * 15
-        active_agents_count = agents.filter(is_deployed=True).count()
+        active_agents_count = agents.filter(Q(is_deployed=True) | Q(is_active=True)).count()
 
         # Contacts & pipeline calculations
         contacts = Contact.objects.filter(user_id__in=user_ids).exclude(source='chat')

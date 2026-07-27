@@ -174,8 +174,8 @@ def infer_channels_for_team_agent(name='', role='', system_prompt=''):
 
 
 def attach_user_channel_configs(agent, user):
-    """Bind the user's WhatsApp/Email accounts when the agent lists those channels."""
-    from .models import WhatsAppConfig, EmailConfig
+    """Bind the user's WhatsApp/Email/Facebook/LinkedIn accounts when the agent lists those channels."""
+    from .models import WhatsAppConfig, EmailConfig, FacebookConfig, LinkedInConfig
 
     channels = [str(c).lower() for c in (agent.channels or [])]
     updated = False
@@ -196,6 +196,24 @@ def attach_user_channel_configs(agent, user):
         )
         if email:
             agent.email_config = email
+            updated = True
+
+    if 'facebook' in channels and not getattr(agent, 'facebook_config_id', None):
+        fb = (
+            FacebookConfig.objects.filter(user=user, is_connected=True).first()
+            or FacebookConfig.objects.filter(user=user).first()
+        )
+        if fb:
+            agent.facebook_config = fb
+            updated = True
+
+    if 'linkedin' in channels and not getattr(agent, 'linkedin_config_id', None):
+        li = (
+            LinkedInConfig.objects.filter(user=user, is_connected=True).first()
+            or LinkedInConfig.objects.filter(user=user).first()
+        )
+        if li:
+            agent.linkedin_config = li
             updated = True
 
     if updated:

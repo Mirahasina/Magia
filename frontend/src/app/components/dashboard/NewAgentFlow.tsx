@@ -390,7 +390,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                     <div className="absolute top-0 right-0 w-1 h-full bg-blue-900 scale-y-0 group-hover:scale-y-100 transition-transform origin-top" />
                                 </div>
 
-                                {config.channels.includes(c.id) && c.configs && c.configKey && (
+                                {config.channels.includes(c.id) && c.configs && c.configs.length > 0 && c.configKey && (
                                     <div className="px-2 animate-in slide-in-from-top-2 duration-300">
                                         <select
                                             value={(config as any)[c.configKey] || ''}
@@ -406,7 +406,17 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                         </select>
                                     </div>
                                 )}
-                                {config.channels.includes(c.id) && c.id === 'facebook' && (
+                                {config.channels.includes(c.id) && c.configs && c.configs.length === 0 && (
+                                    <p className="px-2 text-[11px] text-amber-600 font-medium animate-pulse flex items-center gap-1">
+                                        ⚠️ Aucun compte connecté pour ce canal. Connectez-le dans <strong>Paramètres</strong>.
+                                    </p>
+                                )}
+                                {config.channels.includes(c.id) && c.id === 'facebook' && (!facebookConfigs || facebookConfigs.length === 0) && (
+                                    <p className="px-2 text-[11px] text-amber-600 font-medium animate-pulse flex items-center gap-1">
+                                        ⚠️ Aucune page Facebook connectée. Connectez-la dans <strong>Paramètres</strong>.
+                                    </p>
+                                )}
+                                {config.channels.includes(c.id) && c.id === 'facebook' && facebookConfigs && facebookConfigs.length > 0 && (
                                     <p className="px-2 text-[10px] text-gray-400">
                                         Utilise la Page Facebook connectée dans Paramètres.
                                     </p>
