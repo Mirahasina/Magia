@@ -17,7 +17,8 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
         templates,
         createAgent,
         uploadKnowledge,
-        deployAgent
+        deployAgent,
+        uploadAvatar
     } = useAgents();
 
     const [step, setStep] = useState(1);
@@ -25,6 +26,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
     const [progress, setProgress] = useState(0);
     const [deploymentMessage, setDeploymentMessage] = useState("Initialisation du moteur d'exécution...");
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
     const [config, setConfig] = useState({
         name: "",
         role: "",
@@ -35,12 +37,44 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
         kb: [] as any[],
         mode: "Auto (seuil)",
         confidence: 85,
-        avatar: "/avatars/avatar_1.png",
+        avatar: "",
         whatsapp_config: null as number | null,
         email_config: null as number | null,
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const avatarInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (step === 3 && config.channels.length === 0) {
+            const autoChannels: string[] = [];
+            if (whatsappConfigs && whatsappConfigs.length > 0) autoChannels.push("whatsapp");
+            if (emailConfigs && emailConfigs.length > 0) autoChannels.push("email");
+            if (facebookConfigs && facebookConfigs.length > 0) autoChannels.push("facebook");
+            if (autoChannels.length > 0) {
+                const firstWA = whatsappConfigs?.[0]?.id ?? null;
+                const firstEmail = emailConfigs?.[0]?.id ?? null;
+                setConfig(prev => ({
+                    ...prev,
+                    channels: autoChannels,
+                    whatsapp_config: firstWA,
+                    email_config: firstEmail,
+                }));
+            }
+        }
+    }, [step]);
+
+    const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setIsUploadingAvatar(true);
+            const url = await uploadAvatar(file);
+            setIsUploadingAvatar(false);
+            if (url) {
+                setConfig(prev => ({ ...prev, avatar: url }));
+            }
+        }
+    };
 
     const handleDeploy = async () => {
         setIsDeploying(true);
@@ -56,15 +90,15 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
         }
 
         const agent = await createAgent({
-            name: config.name,
-            role: config.role,
-            system_prompt: config.systemPrompt || config.role,
-            llm_model: config.llm,
+            name: config.name || "Nouvel Agent",
+            role: config.role || "Assistant Commercial",
+            system_prompt: config.systemPrompt || config.role || "Vous êtes un agent IA assistant.",
+            llm_model: config.llm || "gemini-1.5-flash",
             channels: config.channels,
             execution_mode,
             confidence_threshold,
             email_config: config.email_config,
-            avatar: config.avatar,
+            avatar: config.avatar || undefined,
             is_deployed: false
         });
 
@@ -239,7 +273,7 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                                         const plan = user?.subscription?.plan_name || 'gratuit';
                                         const isProModel = config.llm === 'gemini-1.5-pro' || config.llm === 'gpt-4o' || config.llm === 'claude-3-5-sonnet-20240620';
                                         const isEnterpriseModel = config.llm === 'o1-preview';
-                                        
+
                                         if (plan === 'gratuit' && (isProModel || isEnterpriseModel)) {
                                             return <p className="text-[10px] text-orange-500 font-bold mt-2 animate-pulse flex items-center gap-1">
                                                 <Zap className="w-3 h-3" /> Note: Ce modèle sera dégradé en version "Flash" pour votre plan gratuit.
@@ -261,28 +295,40 @@ export function NewAgentFlow({ user, onComplete, onCancel }: NewAgentFlowProps) 
                             </div>
 
                             <div className="space-y-4 pt-4">
-                                <label className="magia-label">Avatar de l'unité</label>
-                                <div className="flex flex-wrap gap-4">
-                                    {[1, 2, 3, 4, 5, 6].map(num => (
+                                <label className="magia-label">Avatar de l'agent</label>
+                                <input
+                                    type="file"
+                                    ref={avatarInputRef}
+                                    onChange={handleAvatarFileChange}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
+                                <div className="flex items-center gap-6 p-4 bg-gray-50/50 border border-gray-100 rounded-xl">
+                                    <div className="w-20 h-20 rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden flex items-center justify-center relative group shrink-0">
+                                        {config.avatar ? (
+                                            <img src={config.avatar} alt="Avatar Agent" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="text-xl font-bold text-gray-300">
+                                                {config.name ? config.name.charAt(0).toUpperCase() : "A"}
+                                            </div>
+                                        )}
+                                        {isUploadingAvatar && (
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                <Loader2 className="w-6 h-6 text-white animate-spin" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 space-y-2">
                                         <button
-                                            key={num}
-                                            onClick={() => setConfig({ ...config, avatar: `/avatars/avatar_${num}.png` })}
-                                            className={cn(
-                                                "w-12 h-12 rounded-xl border-2 transition-all p-1 overflow-hidden",
-                                                config.avatar === `/avatars/avatar_${num}.png` ? "border-blue-900 bg-blue-50" : "border-gray-100 hover:border-blue-200"
-                                            )}
+                                            type="button"
+                                            onClick={() => avatarInputRef.current?.click()}
+                                            disabled={isUploadingAvatar}
+                                            className="px-4 py-2.5 bg-white border border-gray-200 text-xs font-semibold text-gray-700 rounded-xl hover:bg-gray-50 shadow-sm transition-all flex items-center gap-2 cursor-pointer"
                                         >
-                                            <img src={`/avatars/avatar_${num}.png`} alt={`Avatar ${num}`} className="w-full h-full object-cover rounded-lg" />
+                                            <Plus className="w-4 h-4 text-blue-900" />
+                                            {config.avatar ? "Changer la photo" : "Téléverser une photo d'avatar"}
                                         </button>
-                                    ))}
-                                    <div className="flex-1">
-                                        <input
-                                            type="text"
-                                            value={config.avatar.startsWith('/avatars/') ? "" : config.avatar}
-                                            onChange={(e) => setConfig({ ...config, avatar: e.target.value })}
-                                            placeholder="OU URL PERSONNALISÉE..."
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-semibold outline-none focus:border-blue-900 transition-all"
-                                        />
+                                        <p className="text-[10px] text-gray-400">Formats supportés : PNG, JPG, WEBP, GIF (Max 5MB)</p>
                                     </div>
                                 </div>
                             </div>

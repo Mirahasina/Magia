@@ -7,15 +7,38 @@ import { ModalShell } from "../shared/ModalShell";
 import { confirmDialog } from "../shared/ConfirmDialog";
 import { PageSpinner } from "../shared/PageSpinner";
 
+import { MembresView } from "./MembresView";
+import { FacturationView } from "./FacturationView";
+
 const SECTIONS = [
     { id: "profile", label: "Administrateur" },
     { id: "workspace", label: "Espace de travail" },
+    { id: "members", label: "Membres" },
+    { id: "billing", label: "Facturation" },
     { id: "integrations", label: "Intégrations" },
     { id: "security", label: "Sécurité" },
 ];
 
-export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?: () => void, onLogout: () => void }) {
-    const [activeSection, setActiveSection] = useState("profile");
+interface ParametresViewProps {
+    onProfileUpdate?: () => void;
+    onLogout: () => void;
+    refreshKey?: number;
+    onUpgrade?: (details: any) => void;
+    onUpdateCard?: () => void;
+    onRequestEnterprise?: () => void;
+    initialSection?: string;
+}
+
+export function ParametresView({
+    onProfileUpdate,
+    onLogout,
+    refreshKey,
+    onUpgrade,
+    onUpdateCard,
+    onRequestEnterprise,
+    initialSection = "profile"
+}: ParametresViewProps) {
+    const [activeSection, setActiveSection] = useState(initialSection);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('profil');
@@ -904,8 +927,25 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                                 </div>
                             </div>
                         )}
+                        {activeSection === "members" && (
+                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <MembresView />
+                            </div>
+                        )}
+
+                        {activeSection === "billing" && (
+                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <FacturationView
+                                    refreshKey={refreshKey}
+                                    onUpgrade={onUpgrade || (() => {})}
+                                    onUpdateCard={onUpdateCard || (() => {})}
+                                    onRequestEnterprise={onRequestEnterprise || (() => {})}
+                                />
+                            </div>
+                        )}
                     </div>
 
+                    {(activeSection === "profile" || activeSection === "workspace" || activeSection === "integrations" || activeSection === "security") && (
                     <div className="px-8 py-6 bg-gray-50/50 border-t border-gray-50 flex justify-end gap-3 flex-shrink-0">
                         <button className="px-8 py-2.5 rounded-xl text-gray-400 magia-button hover:text-gray-900 transition-all" onClick={fetchProfile}>ANNULER</button>
                         <button
@@ -916,6 +956,7 @@ export function ParametresView({ onProfileUpdate, onLogout }: { onProfileUpdate?
                             {isSaving ? "SAUVEGARDE..." : "SAUVEGARDER"}
                         </button>
                     </div>
+                    )}
                 </div>
             </div>
 

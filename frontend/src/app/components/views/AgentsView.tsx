@@ -2,7 +2,7 @@ import { cn } from "../ui/utils";
 import { AgentCard } from "../AgentCard";
 import { useAgents } from "../../hooks/useAgents";
 import { Trash2, Lock, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { usePlan } from "../../context/PlanContext";
 import {
     Pagination,
@@ -68,6 +68,12 @@ export function AgentsView({
 
     const teamAgents = filteredAgents.filter(a => a.team_name);
     const soloAgents = filteredAgents.filter(a => !a.team_name);
+
+    useEffect(() => {
+        if (teamAgents.length === 0 && soloAgents.length > 0 && activeCategory === "EQUIPE") {
+            setActiveCategory("SOLO");
+        }
+    }, [teamAgents.length, soloAgents.length]);
 
     const activeList = activeCategory === "EQUIPE" ? teamAgents : soloAgents;
     const activePage = activeCategory === "EQUIPE" ? currentPageTeam : currentPageSolo;

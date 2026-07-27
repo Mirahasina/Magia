@@ -130,11 +130,13 @@ interface AgentsContextType {
   fetchTeams: () => Promise<void>;
   fetchLinks: () => Promise<void>;
   createTeam: (data: Partial<AgentTeam>) => Promise<AgentTeam | null>;
+  updateTeam: (id: number, data: Partial<AgentTeam>) => Promise<boolean>;
   deleteTeam: (id: number) => Promise<void>;
   createLink: (data: Partial<AgentLink>) => Promise<AgentLink | null>;
   deleteLink: (id: number) => Promise<void>;
   syncLinkedInMessages: (id: number) => Promise<void>;
   startLinkedInProspecting: (id: number, query: string, message: string) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<string | null>;
 }
 
 
@@ -293,6 +295,25 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         const newAgent: Agent = await res.json();
         setAgents((prev) => [...prev, newAgent]);
         return newAgent;
+      }
+    } catch {
+      /* network failure */
+    }
+    return null;
+  };
+
+  const uploadAvatar = async (file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch(`${API_BASE}/agents/upload_avatar/`, {
+        method: "POST",
+        headers: getAuthHeadersOnly(),
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.url;
       }
     } catch {
       /* network failure */
@@ -720,6 +741,23 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
+  const updateTeam = async (id: number, data: Partial<AgentTeam>): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/agent-teams/${id}/`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        fetchTeams();
+        return true;
+      }
+    } catch {
+      /* network failure */
+    }
+    return false;
+  };
+
   const deleteTeam = async (id: number): Promise<void> => {
     try {
       const res = await fetch(`${API_BASE}/agent-teams/${id}/`, {
@@ -840,9 +878,11 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         fetchTeams,
         fetchLinks,
         createTeam,
+        updateTeam,
         deleteTeam,
         createLink,
         deleteLink,
+        uploadAvatar,
       }}
     >
       {children}

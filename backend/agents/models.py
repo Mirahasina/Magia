@@ -22,7 +22,7 @@ class Agent(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
-    avatar = models.URLField(blank=True, null=True)
+    avatar = models.CharField(max_length=500, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     role = models.CharField(max_length=255)
     system_prompt = models.TextField()
@@ -176,7 +176,7 @@ class AgentTeam(models.Model):
     description = models.TextField(blank=True, null=True)
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='agent_teams')
     color = models.CharField(max_length=20, default="#1e3a8a")
-    avatar = models.URLField(null=True, blank=True)
+    avatar = models.CharField(max_length=500, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -222,7 +222,7 @@ class Contact(models.Model):
     source = models.CharField(max_length=50)
     contact_info = models.CharField(max_length=255) 
     name = models.CharField(max_length=255, null=True, blank=True)
-    avatar = models.URLField(null=True, blank=True)
+    avatar = models.CharField(max_length=500, null=True, blank=True)
     last_message_at = models.DateTimeField(null=True, blank=True)
     is_blocked = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=PROSPECTION_STATUS_CHOICES, default='new')

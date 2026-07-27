@@ -67,6 +67,7 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard, o
   const [activeTab, setActiveTab] = useState<ActiveTab>(
     (localStorage.getItem(StorageKeys.ACTIVE_TAB) as ActiveTab) || "Tableau de bord"
   );
+  const [parametresSection, setParametresSection] = useState("profile");
   const [isBackOfficeMode, setIsBackOfficeMode] = useState(
     localStorage.getItem(StorageKeys.BACKOFFICE_MODE) === "true"
   );
@@ -190,8 +191,6 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard, o
             onInitialContactConsumed={() => setInitialInboxContact(null)}
           />
         );
-      case "Membres":
-        return <MembresView />;
       case "Prospection (CRM)":
         return (
           <ProspectionView
@@ -204,11 +203,20 @@ export function Dashboard({ onLogout, refreshKey = 0, onUpgrade, onUpdateCard, o
       case "Journaux d'audit":
         return <JournauxAuditView />;
       case "Paramètres":
-        return <ParametresView onProfileUpdate={fetchProfile} onLogout={onLogout || noop} />;
-      case "Facturation":
-        return <FacturationView refreshKey={refreshKey} onUpgrade={onUpgrade} onUpdateCard={onUpdateCard} onRequestEnterprise={onRequestEnterprise} />;
+        return (
+          <ParametresView
+            onProfileUpdate={fetchProfile}
+            onLogout={onLogout || noop}
+            refreshKey={refreshKey}
+            onUpgrade={onUpgrade}
+            onUpdateCard={onUpdateCard}
+            onRequestEnterprise={onRequestEnterprise}
+            initialSection={parametresSection}
+            key={parametresSection}
+          />
+        );
       case "Équipe":
-        return <EquipeView />;
+        return <EquipeView setViewingAgent={setViewingAgent} />;
       default:
         return <PlaceholderView title={activeTab} />;
     }

@@ -18,8 +18,6 @@ const mainTools = [
 
 const systemItems = [
     { label: "Paramètres", icon: Settings },
-    { label: "Membres", icon: Users },
-    { label: "Facturation", icon: CreditCard },
 ];
 
 interface SidebarProps {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { API_BASE, getAuthHeaders, getAuthHeadersOnly } from "../../../lib/api";
@@ -1148,16 +1148,42 @@ function SearchProspectsModal({
   channels: ChannelStatus;
   onJobFinished: () => void;
 }) {
-  const deployedAgents = agents.filter((a) => a.is_deployed);
   const [form, setForm] = useState({
     person_titles: "",
     person_locations: "",
     q_organization_keyword_tags: "",
     person_seniorities: "",
-    agent_id: deployedAgents[0]?.id || "",
-    channels: "both" as "email" | "whatsapp" | "facebook" | "both" | "all",
+    agent_id: "",
+    channels: "email" as "email" | "whatsapp" | "facebook" | "all",
     max_results: 10,
   });
+
+  const eligibleAgents = useMemo(() => {
+    return agents.filter((a) => {
+      if (!a.is_deployed) return false;
+      // If agent has no channels specified, it works on all channels
+      if (!a.channels || a.channels.length === 0) return true;
+      const lower = a.channels.map((c) => c.toLowerCase());
+      if (form.channels === "email") return lower.includes("email");
+      if (form.channels === "whatsapp") return lower.includes("whatsapp");
+      if (form.channels === "facebook") return lower.includes("facebook");
+      if (form.channels === "all") return lower.includes("email") || lower.includes("whatsapp") || lower.includes("facebook");
+      return true;
+    });
+  }, [agents, form.channels]);
+
+  // Auto-select first eligible agent when channel changes (avoid infinite loop with ref)
+  const prevChannel = useRef(form.channels);
+  useEffect(() => {
+    if (prevChannel.current !== form.channels) {
+      prevChannel.current = form.channels;
+      const first = eligibleAgents[0];
+      setForm(prev => ({ ...prev, agent_id: first ? String(first.id) : "" }));
+    } else if (!form.agent_id && eligibleAgents.length > 0) {
+      setForm(prev => ({ ...prev, agent_id: String(eligibleAgents[0].id) }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eligibleAgents]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [job, setJob] = useState<ProspectSearchJob | null>(null);
@@ -1200,10 +1226,6 @@ function SearchProspectsModal({
     }
     if (form.channels === "facebook" && !channels.facebook) {
       setError("Facebook n'est pas connecté. Activez-le dans Paramètres.");
-      return;
-    }
-    if (form.channels === "both" && !channels.email && !channels.whatsapp) {
-      setError("Connectez au moins Email ou WhatsApp dans Paramètres.");
       return;
     }
     if (form.channels === "all" && !channels.email && !channels.whatsapp && !channels.facebook) {
@@ -1328,12 +1350,12 @@ function SearchProspectsModal({
                   onChange={(e) => setForm({ ...form, agent_id: e.target.value })}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-white"
                 >
-                  {deployedAgents.length === 0 ? (
-                    <option value="">Aucun agent déployé</option>
+                  {eligibleAgents.length === 0 ? (
+                    <option value="">Aucun agent configuré pour ce canal</option>
                   ) : (
-                    deployedAgents.map((a) => (
+                    eligibleAgents.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name} - {a.role}
+                        {a.name} - {a.role} ({a.channels?.join(", ") || "Tous canaux"})
                       </option>
                     ))
                   )}
@@ -1342,12 +1364,11 @@ function SearchProspectsModal({
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Canaux</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {([
                     ["email", "Email", channels.email],
                     ["whatsapp", "WhatsApp", channels.whatsapp],
                     ["facebook", "Facebook", channels.facebook],
-                    ["both", "Email + WA", channels.email || channels.whatsapp],
                     ["all", "Tous", channels.email || channels.whatsapp || channels.facebook],
                   ] as const).map(([value, label, ok]) => (
                     <button
@@ -1405,7 +1426,7 @@ function SearchProspectsModal({
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting || deployedAgents.length === 0}
+                  disabled={submitting || eligibleAgents.length === 0}
                   className="flex-1 py-2.5 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {submitting ? (

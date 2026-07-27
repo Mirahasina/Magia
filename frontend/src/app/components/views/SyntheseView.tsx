@@ -95,8 +95,8 @@ export function SyntheseView({ setIsCreatingAgent }: SyntheseViewProps) {
 
             <div className="grid grid-cols-3 magia-grid">
                 {[
-                    { label: "CONVERSATIONS", value: (displayStats?.conversations ?? 0).toString(), change: "TOTAL", color: "text-blue-900", spark: "M0 15 Q10 5, 20 15 T40 10 T60 18 T80 5" },
-                    { label: "RÉPONSES IA", value: (displayStats?.ai_responses ?? 0).toString(), change: "GÉRÉES", color: "text-blue-600", spark: "M0 18 Q10 15, 20 18 T40 12 T60 15 T80 18" },
+                    { label: "CHIFFRE D'AFFAIRES", value: displayStats?.chiffre_affaires || "0 €", change: "RÉALISÉ", color: "text-emerald-600", spark: "M0 15 Q10 5, 20 15 T40 10 T60 18 T80 5" },
+                    { label: "VALEUR DU PIPELINE", value: displayStats?.pipeline_valeur || "0 €", change: "EN COURS", color: "text-blue-900", spark: "M0 18 Q10 15, 20 18 T40 12 T60 15 T80 18" },
                     { label: "AGENTS ACTIFS", value: (displayStats?.active_agents ?? 0).toString(), change: "EN LIGNE", color: "text-amber-600", spark: "M0 12 Q10 8, 20 12 T40 10 T60 14 T80 12" },
                 ].map((stat, i) => (
                     <div key={i} className="magia-card flex flex-col justify-between shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer">
@@ -189,21 +189,6 @@ export function SyntheseView({ setIsCreatingAgent }: SyntheseViewProps) {
                             </div>
                         )}
                     </div>
-                </div>
-
-                <div className="col-span-12 grid grid-cols-4 magia-grid">
-                    {[
-                        { label: "ÉCONOMIE", val: displayStats?.economy_eur || "0 €" },
-                        { label: "AUTOMATISATION", val: displayStats?.automation_rate || "0%" },
-                        { label: "RÉPONSES", val: (displayStats?.ai_responses ?? 0).toString() },
-                        { label: "GAIN TEMPS", val: displayStats?.time_saved || "0h" }
-                    ].map((s, i) => (
-                        <div key={s.label} className="magia-card hover:border-blue-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group cursor-pointer animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: `${i * 100}ms` }}>
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            <div className="text-[10px] font-semibold text-gray-400 mb-1 relative z-10 group-hover:text-blue-900 transition-colors">{s.label}</div>
-                            <div className="text-2xl font-bold text-gray-900 tracking-tight relative z-10">{s.val}</div>
-                        </div>
-                    ))}
                 </div>
             </div>
 

@@ -102,6 +102,7 @@ class ContactAssignmentSerializer(serializers.ModelSerializer):
         read_only_fields = ['user', 'last_interaction']
 
 class AgentSerializer(serializers.ModelSerializer):
+    avatar = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     knowledge_bases = KnowledgeBaseSerializer(many=True, read_only=True)
     messages = serializers.SerializerMethodField()
     owner_name = serializers.ReadOnlyField(source='user.full_name')
@@ -151,6 +152,7 @@ class AgentSerializer(serializers.ModelSerializer):
         read_only_fields = ['user']
 
 class AgentTeamSerializer(serializers.ModelSerializer):
+    avatar = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     agents = AgentSerializer(source='members', many=True, read_only=True)
     links = AgentLinkSerializer(many=True, read_only=True)
     knowledge_bases = KnowledgeBaseSerializer(many=True, read_only=True)

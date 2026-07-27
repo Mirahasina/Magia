@@ -1,6 +1,7 @@
 from .messaging_service import MessagingService
 import logging
 import os
+import uuid
 import re
 import datetime
 import json
@@ -17,7 +18,9 @@ logger = logging.getLogger(__name__)
 import pandas as pd
 import PyPDF2
 import docx
+from .prospect_search_service import send_agent_intro
 from accounts.models import User, PLAN_LIMITS, WorkspaceMember
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import viewsets, status, parsers, permissions
 from rest_framework.permissions import AllowAny
@@ -59,12 +62,25 @@ from .prospection_service import (
     attach_user_channel_configs,
     build_handoff_intro,
 )
-
+from .whatsapp_process import (
+    start_for_user, wait_for_qr, is_running, clear_auth_for_user, stop_for_user,
+)
 
 
 env = environ.Env()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
+
+def get_workspace_user_ids(user):
+    if not user or not user.is_authenticated:
+        return []
+    ids = {user.id}
+    for owner_id in WorkspaceMember.objects.filter(member_user=user).values_list('workspace_owner_id', flat=True):
+        ids.add(owner_id)
+    for member_id in WorkspaceMember.objects.filter(workspace_owner=user).values_list('member_user_id', flat=True):
+        ids.add(member_id)
+    return list(ids)
 
 
 
@@ -227,7 +243,7 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
     serializer_class = WhatsAppConfigSerializer
 
     def get_queryset(self):
-        return WhatsAppConfig.objects.filter(user=self.request.user)
+        return WhatsAppConfig.objects.filter(user_id__in=get_workspace_user_ids(self.request.user))
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -248,9 +264,6 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
         If the account is not currently connected, credentials are wiped first so
         a fresh QR scan is always required (no silent auto-reconnect).
         """
-        from .whatsapp_process import (
-            start_for_user, wait_for_qr, is_running, clear_auth_for_user, stop_for_user,
-        )
 
         config = self.get_object()
 
@@ -635,7 +648,7 @@ class EmailConfigViewSet(viewsets.ModelViewSet):
         # oauth2_callback is AllowAny and has no authenticated user
         if getattr(self, 'action', None) == 'oauth2_callback':
             return EmailConfig.objects.all()
-        return EmailConfig.objects.filter(user=self.request.user)
+        return EmailConfig.objects.filter(user_id__in=get_workspace_user_ids(self.request.user))
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -1195,7 +1208,7 @@ class FacebookConfigViewSet(viewsets.ModelViewSet):
 class AgentTeamViewSet(viewsets.ModelViewSet):
     serializer_class = AgentTeamSerializer
     def get_queryset(self):
-        return AgentTeam.objects.filter(user=self.request.user)
+        return AgentTeam.objects.filter(user_id__in=get_workspace_user_ids(self.request.user))
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
         AuditLog.objects.create(
@@ -1419,7 +1432,7 @@ Pour chaque agent, inclus "channels" parmi chat, whatsapp, email selon son rôle
 class AgentLinkViewSet(viewsets.ModelViewSet):
     serializer_class = AgentLinkSerializer
     def get_queryset(self):
-        return AgentLink.objects.filter(user=self.request.user)
+        return AgentLink.objects.filter(user_id__in=get_workspace_user_ids(self.request.user))
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -1428,7 +1441,7 @@ class LinkedInConfigViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return LinkedInConfig.objects.filter(user=self.request.user)
+        return LinkedInConfig.objects.filter(user_id__in=get_workspace_user_ids(self.request.user))
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -1467,7 +1480,7 @@ class LinkedInConfigViewSet(viewsets.ModelViewSet):
 class ContactAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = ContactAssignmentSerializer
     def get_queryset(self):
-        return ContactAssignment.objects.filter(user=self.request.user)
+        return ContactAssignment.objects.filter(user_id__in=get_workspace_user_ids(self.request.user))
 
 class ContactViewSet(viewsets.ModelViewSet):
     from .serializers import ContactSerializer
@@ -1477,7 +1490,8 @@ class ContactViewSet(viewsets.ModelViewSet):
         # One-shot cleanup of auto-imported CRM junk (sync carnet / chat Manual)
         if self.action == 'list':
             purge_passive_crm_contacts(self.request.user)
-        return Contact.objects.filter(user=self.request.user).exclude(source='chat')
+        user_ids = get_workspace_user_ids(self.request.user)
+        return Contact.objects.filter(user_id__in=user_ids).exclude(source='chat')
 
     def perform_create(self, serializer):
         source = serializer.validated_data.get('source', '')
@@ -1609,7 +1623,6 @@ class ContactViewSet(viewsets.ModelViewSet):
         except Agent.DoesNotExist:
             return Response({'error': 'Agent introuvable.'}, status=404)
 
-        from .prospect_search_service import send_agent_intro
         sent, message = send_agent_intro(request.user, contact, agent)
         if not sent:
             return Response({'error': message}, status=400)
@@ -1639,8 +1652,9 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
     def get_queryset(self):
-        user_agents = Agent.objects.filter(user=self.request.user).values_list('id', flat=True)
-        user_teams = AgentTeam.objects.filter(user=self.request.user).values_list('id', flat=True)
+        user_ids = get_workspace_user_ids(self.request.user)
+        user_agents = Agent.objects.filter(user_id__in=user_ids).values_list('id', flat=True)
+        user_teams = AgentTeam.objects.filter(user_id__in=user_ids).values_list('id', flat=True)
         return KnowledgeBase.objects.filter(
             Q(agent_id__in=user_agents) | Q(team_id__in=user_teams)
         )
@@ -1670,15 +1684,35 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 @method_decorator(csrf_exempt, name='dispatch')
 class AgentViewSet(viewsets.ModelViewSet):
     serializer_class = AgentSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+
+    @action(detail=False, methods=['post'], parser_classes=[parsers.MultiPartParser, parsers.FormParser])
+    def upload_avatar(self, request):
+        file_obj = request.FILES.get('file') or request.FILES.get('avatar')
+        if not file_obj:
+            return Response({'error': 'Aucun fichier fourni'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        ext = os.path.splitext(file_obj.name)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg']:
+            return Response({'error': 'Format de fichier non supporté'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        filename = f"{uuid.uuid4().hex}{ext}"
+        relative_path = os.path.join('agent_avatars', filename)
+        full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+        
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, 'wb+') as destination:
+            for chunk in file_obj.chunks():
+                destination.write(chunk)
+                
+        url = f"{settings.MEDIA_URL}{relative_path}"
+        return Response({'url': url})
+
 
 
     def get_queryset(self):
-        user = self.request.user
-        owner_agents = Agent.objects.filter(user=user)
-        workspaces_as_member = WorkspaceMember.objects.filter(member_user=user).values_list('workspace_owner', flat=True)
-        member_agents = Agent.objects.filter(user__in=workspaces_as_member)
-        
-        return (owner_agents | member_agents).distinct()
+        user_ids = get_workspace_user_ids(self.request.user)
+        return Agent.objects.filter(user_id__in=user_ids).distinct()
 
     def check_permissions(self, request):
         super().check_permissions(request)
@@ -1736,7 +1770,8 @@ class AgentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def dashboard_stats(self, request):
         user = request.user
-        agents = Agent.objects.filter(user=user)
+        user_ids = get_workspace_user_ids(user)
+        agents = Agent.objects.filter(user_id__in=user_ids)
         agent_ids = agents.values_list('id', flat=True)
 
         messages = ChatMessage.objects.filter(agent_id__in=agent_ids)
@@ -1755,6 +1790,16 @@ class AgentViewSet(viewsets.ModelViewSet):
 
         economy = hours_saved * 15
         active_agents_count = agents.filter(is_deployed=True).count()
+
+        # Contacts & pipeline calculations
+        contacts = Contact.objects.filter(user_id__in=user_ids).exclude(source='chat')
+        ready_deals = contacts.filter(status='ready').count()
+        pipeline_contacts = contacts.exclude(status='no').count()
+        
+        revenue_val = ready_deals * 1500 + economy
+        pipeline_val = pipeline_contacts * 850
+        chiffre_affaires_str = f"{revenue_val:,} €".replace(',', ' ')
+        pipeline_valeur_str = f"{pipeline_val:,} €".replace(',', ' ')
 
         recent_msgs = messages.filter(sender='ai').select_related('agent').order_by('-created_at')[:5]
         
@@ -1812,6 +1857,8 @@ class AgentViewSet(viewsets.ModelViewSet):
 
         return Response({
             'active_agents': active_agents_count,
+            'chiffre_affaires': chiffre_affaires_str,
+            'pipeline_valeur': pipeline_valeur_str,
             'conversations': human_conversations,
             'ai_responses': ai_responses,
             'automation_rate': automation_rate,

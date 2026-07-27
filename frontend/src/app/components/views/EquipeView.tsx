@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { cn } from "../ui/utils";
 import { useAgents } from "../../hooks/useAgents";
-import { Users, Link as LinkIcon, Plus, Trash2, ArrowRight, Info, Sparkles, ChevronRight, X } from "lucide-react";
+import { Users, Link as LinkIcon, Plus, Trash2, ArrowRight, Info, Sparkles, ChevronRight, X, Pencil } from "lucide-react";
 import { Button } from "../ui/button";
 import { AITeamWizard } from "./AITeamWizard";
 import { ModalShell } from "../shared/ModalShell";
 import { EmptyState } from "../shared/EmptyState";
+import { confirmDialog } from "../shared/ConfirmDialog";
 
 // ── Predefined team templates ─────────────────────────────────────────────────
 const TEAM_TEMPLATES = [
@@ -55,8 +56,12 @@ const TEAM_TEMPLATES = [
     },
 ];
 
-export function EquipeView() {
-    const { agents, teams, links, createTeam, deleteTeam, createLink, deleteLink, createAgent, fetchAgents } = useAgents();
+interface EquipeViewProps {
+    setViewingAgent?: (agent: any) => void;
+}
+
+export function EquipeView({ setViewingAgent }: EquipeViewProps = {}) {
+    const { agents, teams, links, createTeam, updateTeam, deleteTeam, createLink, deleteLink, createAgent, deleteAgent, fetchAgents } = useAgents();
 
     // ── Team creation state ───────────────────────────────────────────────────
     const [isCreatingTeam, setIsCreatingTeam] = useState(false);
@@ -100,6 +105,41 @@ export function EquipeView() {
         avatar: "/avatars/avatar_1.png",
         llm_model: "gemini-1.5-flash"
     });
+
+    // ── Team editing state ────────────────────────────────────────────────────
+    const [editingTeam, setEditingTeam] = useState<any | null>(null);
+    const [editTeamName, setEditTeamName] = useState("");
+    const [editTeamColor, setEditTeamColor] = useState("#1e3a8a");
+    const [editTeamDescription, setEditTeamDescription] = useState("");
+
+    const openEditTeam = (team: any, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditingTeam(team);
+        setEditTeamName(team.name);
+        setEditTeamColor(team.color || "#1e3a8a");
+        setEditTeamDescription(team.description || "");
+    };
+
+    const handleUpdateTeam = async () => {
+        if (!editingTeam || !editTeamName) return;
+        await updateTeam(editingTeam.id, {
+            name: editTeamName,
+            color: editTeamColor,
+            description: editTeamDescription
+        });
+        setEditingTeam(null);
+    };
+
+    const handleDeleteTeam = async (team: any, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const ok = await confirmDialog({
+            title: `Supprimer l'équipe "${team.name}" ?`,
+            description: "Les agents de cette équipe deviendront indépendants. Cette action est irréversible.",
+            confirmLabel: "Supprimer",
+            danger: true
+        });
+        if (ok) deleteTeam(team.id);
+    };
 
     // ── Link creation state ───────────────────────────────────────────────────
     const [isCreatingLink, setIsCreatingLink] = useState(false);
@@ -233,149 +273,127 @@ export function EquipeView() {
                     </div>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 magia-grid auto-rows-min">
-                {teams.map(team => (
-                    <div
-                        key={team.id}
-                        onClick={() => setSelectedTeamForDetails(team)}
-                        className="magia-card shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all relative group overflow-hidden cursor-pointer"
-                        style={{ borderLeft: `6px solid ${team.color || '#1e3a8a'}` }}
-                    >
-                        <div className="flex items-center gap-4 mb-4">
-                            <div
-                                className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm overflow-hidden"
-                                style={{ backgroundColor: team.color || '#1e3a8a' }}
-                            >
-                                {team.avatar ? (
-                                    <img src={team.avatar} alt={team.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <Users className="w-5 h-5" />
-                                )}
-                            </div>
-                            <h3 className="text-[13px] font-medium text-gray-900">{team.name}</h3>
-                        </div>
-                        <div className="flex flex-col gap-4">
-                            {team.description && (
-                                <p className="text-[10px] text-gray-500 italic line-clamp-2 border-l-2 border-gray-100 pl-3 py-1">
-                                    {team.description}
-                                </p>
-                            )}
-                            <div className="space-y-2 border-t border-gray-50 pt-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <p className="text-[9px] font-semibold text-gray-400">Composition de l'unité :</p>
-                                    <div className="flex items-center gap-1.5">
-                                        {agents.some(a => a.team === team.id && (a.channels || []).some((c: string) => String(c).toLowerCase() === 'email')) && (
-                                            <span className="w-3.5 h-3.5 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-[7px] font-semibold border border-blue-100" title="Email actif">E</span>
-                                        )}
-                                        {agents.some(a => a.team === team.id && (a.channels || []).some((c: string) => String(c).toLowerCase() === 'whatsapp')) && (
-                                            <span className="w-3.5 h-3.5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-[7px] font-semibold border border-green-100" title="WhatsApp actif">W</span>
-                                        )}
-                                    </div>
+                    {teams.map(team => (
+                        <div
+                            key={team.id}
+                            onClick={() => setSelectedTeamForDetails(team)}
+                            className="magia-card shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all relative group overflow-hidden cursor-pointer"
+                            style={{ borderLeft: `6px solid ${team.color || '#1e3a8a'}` }}
+                        >
+                            <div className="flex items-center gap-4 mb-4">
+                                <div
+                                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm overflow-hidden"
+                                    style={{ backgroundColor: team.color || '#1e3a8a' }}
+                                >
+                                    {team.avatar ? (
+                                        <img src={team.avatar} alt={team.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Users className="w-5 h-5" />
+                                    )}
                                 </div>
-                                {agents.filter(a => a.team === team.id).map(agent => (
-                                    <div key={agent.id} className="flex items-start gap-2 group/item">
-                                        <div className="w-1 h-4 mt-0.5 rounded-none" style={{ backgroundColor: team.color || '#1e3a8a' }} />
-                                        <div className="flex-1">
-                                            <p className="text-[11px] font-semibold text-gray-900">{agent.name}</p>
-                                            <p className="text-[9px] text-gray-400 font-bold">{agent.role}</p>
+                                <h3 className="text-[13px] font-medium text-gray-900">{team.name}</h3>
+                            </div>
+                            <div className="flex flex-col gap-4">
+                                {team.description && (
+                                    <p className="text-[10px] text-gray-500 italic line-clamp-2 border-l-2 border-gray-100 pl-3 py-1">
+                                        {team.description}
+                                    </p>
+                                )}
+                                <div className="space-y-2 border-t border-gray-50 pt-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[9px] font-semibold text-gray-400">Composition de l'unité :</p>
+                                        <div className="flex items-center gap-1.5">
+                                            {agents.some(a => a.team === team.id && (a.channels || []).some((c: string) => String(c).toLowerCase() === 'email')) && (
+                                                <span className="w-3.5 h-3.5 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-[7px] font-semibold border border-blue-100" title="Email actif">E</span>
+                                            )}
+                                            {agents.some(a => a.team === team.id && (a.channels || []).some((c: string) => String(c).toLowerCase() === 'whatsapp')) && (
+                                                <span className="w-3.5 h-3.5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-[7px] font-semibold border border-green-100" title="WhatsApp actif">W</span>
+                                            )}
                                         </div>
                                     </div>
-                                ))}
-                                {agents.filter(a => a.team === team.id).length === 0 && (
-                                    <span className="text-[9px] font-semibold text-gray-300 italic">Aucun agent assigné</span>
-                                )}
+                                    {agents.filter(a => a.team === team.id).map(agent => (
+                                        <div key={agent.id} className="flex items-center justify-between gap-2 group/item py-1 border-b border-gray-50/60 last:border-0">
+                                            <div className="flex items-start gap-2 flex-1 min-w-0">
+                                                <div className="w-1 h-4 mt-0.5 rounded-none shrink-0" style={{ backgroundColor: team.color || '#1e3a8a' }} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[11px] font-semibold text-gray-900 truncate">{agent.name}</p>
+                                                    <p className="text-[9px] text-gray-400 font-bold truncate">{agent.role}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0 opacity-90 group-hover/item:opacity-100 transition-opacity">
+                                                {setViewingAgent && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setViewingAgent(agent);
+                                                        }}
+                                                        className="px-2 py-0.5 text-[9px] font-semibold bg-blue-50 text-blue-900 hover:bg-blue-100 rounded transition-colors"
+                                                    >
+                                                        Gérer
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        const ok = await confirmDialog({
+                                                            title: `Supprimer l'agent "${agent.name}" ?`,
+                                                            description: "Cette action est irréversible.",
+                                                            confirmLabel: "Supprimer",
+                                                            danger: true
+                                                        });
+                                                        if (ok) {
+                                                            deleteAgent(agent.id);
+                                                        }
+                                                    }}
+                                                    className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+                                                    title="Supprimer l'agent"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {agents.filter(a => a.team === team.id).length === 0 && (
+                                        <span className="text-[9px] font-semibold text-gray-300 italic">Aucun agent assigné</span>
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[10px] font-bold text-gray-400">
+                                        {agents.filter(a => a.team === team.id).length} AGENT{agents.filter(a => a.team === team.id).length > 1 ? 'S' : ''}
+                                    </p>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedTeamForNewAgent(team.id);
+                                            setIsCreatingAgent(true);
+                                        }}
+                                        className="text-xs font-medium text-blue-900 hover:underline flex items-center gap-1"
+                                    >
+                                        <Plus className="w-3 h-3" /> AJOUTER AGENT
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-bold text-gray-400">
-                                    {agents.filter(a => a.team === team.id).length} AGENT{agents.filter(a => a.team === team.id).length > 1 ? 'S' : ''}
-                                </p>
+                            <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedTeamForNewAgent(team.id);
-                                        setIsCreatingAgent(true);
-                                    }}
-                                    className="text-xs font-medium text-blue-900 hover:underline flex items-center gap-1"
+                                    onClick={(e) => openEditTeam(team, e)}
+                                    aria-label={`Modifier l'équipe ${team.name}`}
+                                    className="p-1.5 text-gray-300 hover:text-blue-600 transition-colors focus-visible:outline-none rounded-lg hover:bg-blue-50"
                                 >
-                                    <Plus className="w-3 h-3" /> AJOUTER AGENT
+                                    <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                    onClick={(e) => handleDeleteTeam(team, e)}
+                                    aria-label={`Supprimer l'équipe ${team.name}`}
+                                    className="p-1.5 text-gray-300 hover:text-red-500 transition-colors focus-visible:outline-none rounded-lg hover:bg-red-50"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                             </div>
                         </div>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                deleteTeam(team.id);
-                            }}
-                            aria-label={`Supprimer l'équipe ${team.name}`}
-                            className="absolute top-4 right-4 p-2 text-gray-200 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 rounded-lg"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                    </div>
-                ))}
-            </div>
-
-            {/* <div className="space-y-8">
-                <div className="flex items-center justify-between border-b border-gray-50 pb-4">
-                    <div className="flex items-center gap-3">
-                        <LinkIcon className="w-5 h-5 text-blue-900" />
-                        <h2 className="text-[14px] font-medium text-gray-900">Liaisons & Passages de témoin</h2>
-                    </div>
-                    <Button
-                        onClick={() => setIsCreatingLink(true)}
-                        variant="outline"
-                        className="text-xs font-medium border-gray-200"
-                    >
-                        <Plus className="w-3 h-3 mr-2" /> AJOUTER LIAISON
-                    </Button>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                    {links.map(link => (
-                        <div key={link.id} className="bg-gray-50/50 p-6 rounded-none border border-gray-100 flex items-center justify-between group">
-                            <div className="flex items-center gap-8">
-                                <div className="flex flex-col">
-                                    <span className="text-[9px] font-semibold text-gray-400 mb-1">DE :</span>
-                                    <span className="text-[12px] font-semibold text-gray-900">{link.source_agent_name}</span>
-                                    <span className="text-[8px] font-bold text-blue-600">{agents.find(a => a.id === link.source_agent)?.role}</span>
-                                </div>
-                                <div className="flex flex-col items-center">
-                                    <div className={cn(
-                                        "px-3 py-1 rounded-lg text-xs font-medium mb-2 border",
-                                        link.trigger_type === 'manual'
-                                            ? "bg-amber-100 text-amber-700 border-amber-200 ring-4 ring-amber-50"
-                                            : "bg-blue-100 text-blue-700 border-blue-200"
-                                    )}>
-                                        {link.trigger_type === 'interest' ? 'INTÉRÊT DÉTECTÉ' : link.trigger_type === 'email_requested' ? "DEMANDE D'EMAIL" : link.trigger_type === 'whatsapp_requested' ? 'DEMANDE WHATSAPP' : 'PASSAGE MANUEL'}
-                                    </div>
-                                    <ArrowRight className="w-4 h-4 text-gray-300 transition-transform group-hover:translate-x-1" />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[9px] font-semibold text-gray-400 mb-1">VERS :</span>
-                                    <span className="text-[12px] font-semibold text-gray-900">{link.target_agent_name}</span>
-                                    <span className="text-[8px] font-bold text-blue-600">{agents.find(a => a.id === link.target_agent)?.role}</span>
-                                </div>
-                                {link.description && (
-                                    <div className="max-w-[200px] border-l border-gray-200 pl-4 py-1">
-                                        <p className="text-[10px] text-gray-400 italic leading-snug">{link.description}</p>
-                                    </div>
-                                )}
-                            </div>
-                            <button
-                                onClick={() => deleteLink(link.id)}
-                                className="p-2 text-gray-300 hover:text-red-500 transition-colors"
-                            >
-                                <Trash2 className="w-5 h-5" />
-                            </button>
-                        </div>
                     ))}
-                    {links.length === 0 && (
-                        <div className="py-12 text-center bg-gray-50/30 rounded-none border border-dashed border-gray-100">
-                            <Info className="w-8 h-8 text-gray-200 mx-auto mb-4" />
-                            <p className="text-[11px] font-semibold text-gray-400">Aucune liaison configurée</p>
-                        </div>
-                    )}
                 </div>
-            </div> */}
 
             </div>
 
@@ -384,7 +402,7 @@ export function EquipeView() {
                 <ModalShell title={`Détails de l'équipe ${selectedTeamForDetails.name}`} onClose={() => setSelectedTeamForDetails(null)} className="max-w-2xl">
                     <div className="bg-white w-full rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="relative h-32 flex-shrink-0" style={{ backgroundColor: selectedTeamForDetails.color || '#1e3a8a' }}>
-                            <button 
+                            <button
                                 onClick={() => setSelectedTeamForDetails(null)}
                                 aria-label="Fermer"
                                 className="absolute top-6 right-6 p-2 bg-white/20 hover:bg-white/40 rounded-full transition-colors text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
@@ -401,7 +419,7 @@ export function EquipeView() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="pt-12 px-10 pb-10 overflow-y-auto custom-scrollbar">
                             <div className="flex items-center justify-between mb-6">
                                 <div>
@@ -433,16 +451,47 @@ export function EquipeView() {
                                         {agents.filter(a => a.team === selectedTeamForDetails.id).map(agent => (
                                             <div key={agent.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 transition-all group">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center font-semibold text-gray-400">
-                                                        {agent.name.charAt(0)}
+                                                    <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center font-semibold text-gray-400 overflow-hidden">
+                                                        {agent.avatar ? (
+                                                            <img src={agent.avatar} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            agent.name.charAt(0)
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <p className="text-[12px] font-semibold text-gray-900">{agent.name}</p>
                                                         <p className="text-[10px] text-gray-400 font-bold">{agent.role}</p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button className="text-[10px] font-semibold text-blue-900 px-3 py-1 hover:bg-blue-50 rounded-lg">Gérer</button>
+                                                <div className="flex items-center gap-2">
+                                                    {setViewingAgent && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedTeamForDetails(null);
+                                                                setViewingAgent(agent);
+                                                            }}
+                                                            className="text-[10px] font-semibold text-blue-900 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+                                                        >
+                                                            Gérer
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={async () => {
+                                                            const ok = await confirmDialog({
+                                                                title: `Supprimer l'agent "${agent.name}" ?`,
+                                                                description: "Cette action est irréversible.",
+                                                                confirmLabel: "Supprimer",
+                                                                danger: true
+                                                            });
+                                                            if (ok) {
+                                                                deleteAgent(agent.id);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                                                        title="Supprimer l'agent"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 </div>
                                             </div>
                                         ))}
@@ -452,14 +501,14 @@ export function EquipeView() {
                         </div>
 
                         <div className="p-8 bg-gray-50 border-t border-gray-100 flex gap-3 flex-shrink-0">
-                            <Button 
+                            <Button
                                 onClick={() => setSelectedTeamForDetails(null)}
-                                variant="outline" 
+                                variant="outline"
                                 className="flex-1 rounded-xl h-12 text-sm font-medium"
                             >
                                 Fermer
                             </Button>
-                            <Button 
+                            <Button
                                 className="flex-1 bg-blue-950 hover:bg-black rounded-xl h-12 text-sm font-medium shadow-lg shadow-blue-900/20"
                                 onClick={() => {
                                     setSelectedTeamForNewAgent(selectedTeamForDetails.id);
@@ -751,6 +800,70 @@ export function EquipeView() {
                                 className="flex-1 bg-blue-900 text-white text-xs font-medium py-3 h-auto"
                             >
                                 Finaliser la liaison
+                            </Button>
+                        </div>
+                    </div>
+                </ModalShell>
+            )}
+
+            {/* ── Edit Team Modal ─────────────────────────────────────────── */}
+            {editingTeam && (
+                <ModalShell
+                    onClose={() => setEditingTeam(null)}
+                    title={`Modifier l'équipe`}
+                    className="max-w-md"
+                >
+                    <div className="space-y-5">
+                        <div className="space-y-2">
+                            <label className="magia-label">Nom de l'équipe</label>
+                            <input
+                                type="text"
+                                value={editTeamName}
+                                onChange={e => setEditTeamName(e.target.value)}
+                                className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:outline-none focus:border-blue-900"
+                                placeholder="Ex : Équipe Commerciale"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="magia-label">Description</label>
+                            <textarea
+                                value={editTeamDescription}
+                                onChange={e => setEditTeamDescription(e.target.value)}
+                                className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-medium outline-none min-h-[80px] focus:border-blue-900"
+                                placeholder="Décrivez le rôle de cette équipe..."
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="magia-label">Couleur</label>
+                            <div className="flex gap-2 flex-wrap">
+                                {colors.map(c => (
+                                    <button
+                                        key={c.value}
+                                        type="button"
+                                        title={c.name}
+                                        onClick={() => setEditTeamColor(c.value)}
+                                        style={{ backgroundColor: c.value }}
+                                        className={cn(
+                                            "w-8 h-8 rounded-full transition-transform hover:scale-110",
+                                            editTeamColor === c.value ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : ""
+                                        )}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <Button variant="ghost" onClick={() => setEditingTeam(null)} className="flex-1 text-xs font-medium">
+                                Annuler
+                            </Button>
+                            <Button
+                                onClick={handleUpdateTeam}
+                                disabled={!editTeamName}
+                                className="flex-1 bg-blue-900 text-white text-xs font-medium py-3 h-auto"
+                            >
+                                Enregistrer
                             </Button>
                         </div>
                     </div>
