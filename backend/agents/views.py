@@ -1231,6 +1231,7 @@ class AgentTeamViewSet(viewsets.ModelViewSet):
         )
         
         agents_created = []
+        warnings = []
         for agent_def in plan['agents']:
             channels = agent_def.get('channels') or infer_channels_for_team_agent(
                 agent_def.get('name', ''),
@@ -1245,11 +1246,21 @@ class AgentTeamViewSet(viewsets.ModelViewSet):
                 system_prompt=agent_def['system_prompt'],
                 is_team_agent=True,
                 is_deployed=True,
+                is_active=True,
                 llm_model='gemini-2.0-flash',
                 execution_mode='auto',
                 channels=channels,
             )
             attach_user_channel_configs(agent, request.user)
+
+            # Detect missing channel connections
+            if 'whatsapp' in channels and not agent.whatsapp_config:
+                warnings.append(f"L'agent '{agent.name}' est configuré pour WhatsApp mais aucun compte WhatsApp n'est connecté.")
+            if 'email' in channels and not agent.email_config:
+                warnings.append(f"L'agent '{agent.name}' est configuré pour Email mais aucun compte Email n'est connecté.")
+            if 'facebook' in channels and not getattr(agent, 'facebook_config', None):
+                warnings.append(f"L'agent '{agent.name}' est configuré pour Facebook mais aucune Page Facebook n'est connectée.")
+
             agents_created.append(agent)
             
         for link_def in plan.get('links', []):
@@ -1270,7 +1281,7 @@ class AgentTeamViewSet(viewsets.ModelViewSet):
             details=f"Équipe '{team.name}' déployée avec {len(agents_created)} agents."
         )
         
-        return Response({'id': team.id, 'status': 'deployed'})
+        return Response({'id': team.id, 'status': 'deployed', 'warnings': list(set(warnings))})
 
     @action(detail=False, methods=['post'], url_path='design_team')
     def design_team(self, request):

@@ -74,6 +74,7 @@ export function AITeamWizard({ onClose }: Props) {
     const [plan, setPlan] = useState<TeamPlan | null>(null);
     const [creating, setCreating] = useState(false);
     const [done, setDone] = useState(false);
+    const [warnings, setWarnings] = useState<string[]>([]);
     const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -122,7 +123,10 @@ export function AITeamWizard({ onClose }: Props) {
         if (!plan) return;
         setCreating(true);
         try {
-            await deployTeamPlan(plan);
+            const res = await deployTeamPlan(plan);
+            if (res.warnings && res.warnings.length > 0) {
+                setWarnings(res.warnings);
+            }
             fetchAgents();
             setDone(true);
         } catch (e) {
@@ -135,13 +139,30 @@ export function AITeamWizard({ onClose }: Props) {
     if (done) {
         return (
             <div className="fixed inset-0 bg-gray-950/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-                <div className="bg-white w-full max-w-md rounded-none shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
+                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
                     <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
                         <CheckCircle2 className="w-10 h-10" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Équipe Déployée !</h2>
-                    <p className="text-gray-500 mb-8">Votre équipe d'agents est maintenant opérationnelle et prête à travailler.</p>
-                    <Button onClick={onClose} className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold">
+                    <p className="text-gray-500 mb-6">Votre équipe d'agents est désormais active et intégrée au tableau de bord.</p>
+
+                    {warnings.length > 0 && (
+                        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-left space-y-2">
+                            <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                                ⚠️ Canaux nécessitant une connexion :
+                            </p>
+                            <ul className="text-[11px] text-amber-700 space-y-1 list-disc pl-4 font-medium">
+                                {warnings.map((w, i) => (
+                                    <li key={i}>{w}</li>
+                                ))}
+                            </ul>
+                            <p className="text-[10px] text-amber-600 font-medium italic mt-2">
+                                Rendez-vous dans <strong>Paramètres</strong> pour connecter vos comptes.
+                            </p>
+                        </div>
+                    )}
+
+                    <Button onClick={onClose} className="w-full h-12 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-bold">
                         Accéder au tableau de bord
                     </Button>
                 </div>
