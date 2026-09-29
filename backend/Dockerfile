@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY . .
 
-RUN python manage.py collectstatic --noinput || true
+RUN python manage.py collectstatic --noinput
 
-EXPOSE 8000
+EXPOSE 10000
 
-CMD ["gunicorn", "magia_backend.wsgi:application", "--bind", "0.0.0.0:10000"]
+CMD ["gunicorn", "magia_backend.wsgi:application", "--bind", "0.0.0.0:10000", "--workers", "1", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
