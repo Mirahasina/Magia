@@ -17,4 +17,4 @@ RUN python manage.py collectstatic --noinput
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "gunicorn magia_backend.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 1 --timeout 120 --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "echo PORT=$PORT; python -c \"import socket; s=socket.socket(); s.bind(('0.0.0.0', int('$PORT'))); print('PORT TEST OK'); s.close()\"; exec gunicorn magia_backend.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 1 --timeout 120 --access-logfile - --error-logfile -"]
